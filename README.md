@@ -274,7 +274,7 @@ Cette séparation permet :
 
 ```bash
 red-tetris/
-├── client/
+├── frontend/
 │   ├── src/
 │   │   ├── app/
 │   │   │   └── store.ts
