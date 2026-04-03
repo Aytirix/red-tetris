@@ -2,6 +2,34 @@
 
 Projet de Tetris multijoueur en temps réel, développé en **full-stack JavaScript/TypeScript**.
 
+## Démarrage rapide frontend
+
+Le frontend est maintenant prêt avec deux modes Docker Compose, sans modification du dossier `server`.
+
+### Développement avec hot reload
+
+```bash
+make dev
+```
+
+Le frontend Vite est ensuite accessible sur `http://localhost:5180`.
+
+### Production
+
+```bash
+make prod
+```
+
+Le build de production est servi par Nginx sur `http://localhost:8080`.
+
+### Structure ajoutée
+
+- `frontend/` contient l'application React + TypeScript + Vite
+- `frontend/Dockerfile` gère le mode dev et le build de prod
+- `frontend/nginx.conf` sert la SPA en production
+- `docker-compose.yml` expose un profil `dev` et un profil `prod`
+- `Makefile` ajoute des commandes simples pour piloter les deux modes
+
 L’objectif est de proposer une application web moderne, proprement structurée, avec :
 - un **frontend SPA** réactif,
 - un **backend Node.js** temps réel,

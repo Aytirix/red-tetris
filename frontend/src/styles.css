@@ -1,0 +1,206 @@
+@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap");
+
+:root {
+  color-scheme: dark;
+  font-family: "IBM Plex Sans", sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  --bg: #120c0b;
+  --bg-elevated: rgba(73, 20, 13, 0.58);
+  --panel: rgba(33, 14, 11, 0.88);
+  --panel-border: rgba(255, 162, 122, 0.22);
+  --text: #fff6f1;
+  --muted: #d7b8aa;
+  --accent: #ff5b2e;
+  --accent-soft: #ff8a5b;
+  --accent-glow: rgba(255, 91, 46, 0.25);
+  --shadow: 0 24px 90px rgba(0, 0, 0, 0.35);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+  margin: 0;
+}
+
+body {
+  min-height: 100vh;
+  color: var(--text);
+  background:
+    radial-gradient(circle at top left, rgba(255, 91, 46, 0.18), transparent 34%),
+    radial-gradient(circle at 80% 20%, rgba(255, 185, 117, 0.14), transparent 28%),
+    linear-gradient(180deg, #1d1110 0%, #120c0b 44%, #080607 100%);
+}
+
+body::before {
+  position: fixed;
+  inset: 0;
+  content: "";
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+  background-size: 28px 28px;
+  mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.7), transparent);
+}
+
+code {
+  font-family: "Space Grotesk", sans-serif;
+}
+
+.shell {
+  width: min(1120px, calc(100% - 2rem));
+  margin: 0 auto;
+  padding: 3rem 0 4rem;
+}
+
+.hero {
+  position: relative;
+  overflow: hidden;
+  padding: clamp(2rem, 4vw, 4rem);
+  border: 1px solid var(--panel-border);
+  border-radius: 32px;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.04), transparent 45%),
+    linear-gradient(180deg, rgba(255, 91, 46, 0.14), rgba(255, 91, 46, 0.02)),
+    var(--bg-elevated);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(18px);
+}
+
+.hero::after {
+  position: absolute;
+  right: -5rem;
+  top: -4rem;
+  width: 18rem;
+  height: 18rem;
+  content: "";
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 91, 46, 0.25), transparent 68%);
+}
+
+.eyebrow,
+.panel-kicker,
+.command-label {
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  color: var(--accent-soft);
+}
+
+h1,
+h2,
+h3 {
+  margin: 0;
+  font-family: "Space Grotesk", sans-serif;
+  font-weight: 700;
+  line-height: 0.95;
+}
+
+h1 {
+  max-width: 12ch;
+  margin-top: 0.75rem;
+  font-size: clamp(3rem, 8vw, 6.5rem);
+}
+
+.lede {
+  max-width: 58ch;
+  margin: 1.5rem 0 0;
+  font-size: clamp(1rem, 1.6vw, 1.2rem);
+  color: var(--muted);
+}
+
+.command-grid,
+.content-grid,
+.feature-list {
+  display: grid;
+  gap: 1rem;
+}
+
+.command-grid {
+  margin-top: 2rem;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+.command-card,
+.panel {
+  border: 1px solid var(--panel-border);
+  border-radius: 24px;
+  background: var(--panel);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.22);
+}
+
+.command-card {
+  padding: 1rem 1.1rem;
+}
+
+.command-card code {
+  display: block;
+  margin-top: 0.55rem;
+  font-size: 0.95rem;
+  color: var(--text);
+}
+
+.content-grid {
+  margin-top: 1.25rem;
+  grid-template-columns: 1.1fr 1.4fr;
+  align-items: start;
+}
+
+.feature-list {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.panel {
+  padding: 1.4rem;
+}
+
+.panel p {
+  margin: 0.85rem 0 0;
+  color: var(--muted);
+}
+
+.panel-accent {
+  min-height: 100%;
+  background:
+    radial-gradient(circle at top right, var(--accent-glow), transparent 32%),
+    linear-gradient(180deg, rgba(255, 91, 46, 0.12), rgba(255, 91, 46, 0.04)),
+    var(--panel);
+}
+
+@media (max-width: 860px) {
+  .content-grid,
+  .feature-list {
+    grid-template-columns: 1fr;
+  }
+
+  h1 {
+    max-width: 9ch;
+  }
+}
+
+@media (max-width: 560px) {
+  .shell {
+    width: min(100% - 1rem, 1120px);
+    padding: 0.75rem 0 2rem;
+  }
+
+  .hero,
+  .panel,
+  .command-card {
+    border-radius: 22px;
+  }
+
+  .hero {
+    padding: 1.4rem;
+  }
+}
