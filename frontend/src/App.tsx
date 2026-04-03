@@ -31,6 +31,13 @@ export default function App() {
 					La base est en place pour attaquer le lobby, la room et l'interface de
 					jeu sans perdre de temps sur la plomberie.
 				</p>
+				<a href="https://google.fr" className="btn">
+					Documentation
+				</a>
+			</section>
+
+			<section className="command-section">
+				<h2>Commandes clés</h2>
 
 				<div className="command-grid">
 					{commands.map((command) => (
