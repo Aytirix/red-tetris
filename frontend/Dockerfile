@@ -5,8 +5,6 @@ COPY package*.json ./
 
 # L'image de développement
 FROM base AS dev
-RUN npm install
-COPY . .
 EXPOSE 5173
 
 # L'image de production

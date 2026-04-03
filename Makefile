@@ -1,5 +1,10 @@
 .DEFAULT_GOAL := help
 COMPOSE := docker compose
+UID := $(shell id -u)
+GID := $(shell id -g)
+
+export UID
+export GID
 
 .PHONY: help dev dev-build dev-down dev-logs prod prod-build prod-down prod-logs down clean
 
