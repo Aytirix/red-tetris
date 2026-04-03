@@ -1,44 +1,55 @@
+.DEFAULT_GOAL := help
 COMPOSE := docker compose
 
-.PHONY: help dev dev-build dev-down dev-logs prod prod-build prod-down prod-logs down
+.PHONY: help dev dev-build dev-down dev-logs prod prod-build prod-down prod-logs down clean
 
-help:
+help: ## Affiche cette aide
 	@printf "\n"
-	@printf "Targets disponibles:\n"
-	@printf "  make dev        Lance le frontend en mode dev avec hot reload\n"
-	@printf "  make dev-build  Rebuild l'image frontend dev\n"
-	@printf "  make dev-down   Stoppe le service frontend dev\n"
-	@printf "  make dev-logs   Suit les logs du frontend dev\n"
-	@printf "  make prod       Lance le frontend en mode production\n"
-	@printf "  make prod-build Rebuild l'image frontend prod\n"
-	@printf "  make prod-down  Stoppe le service frontend prod\n"
-	@printf "  make prod-logs  Suit les logs du frontend prod\n"
-	@printf "  make down       Stoppe les services dev et prod\n"
+	@printf "\033[1;38;5;216mRED TETRIS\033[0m\n"
+	@printf "\033[2mCompose: %s\033[0m\n\n" "$(COMPOSE)"
+	@printf "\033[1mDevelopment\033[0m\n"
+	@printf "  \033[36m%-12s\033[0m %s\n" "dev" "Lance le frontend et le backend avec hot reload"
+	@printf "  \033[36m%-12s\033[0m %s\n" "dev-build" "Rebuild l'image de developpement"
+	@printf "  \033[36m%-12s\033[0m %s\n" "dev-logs" "Suit les logs du frontend dev"
+	@printf "  \033[36m%-12s\033[0m %s\n" "dev-down" "Stoppe le service frontend dev"
+	@printf "\n"
+	@printf "\033[1mProduction\033[0m\n"
+	@printf "  \033[36m%-12s\033[0m %s\n" "prod" "Lance le frontend et le backend en mode production"
+	@printf "  \033[36m%-12s\033[0m %s\n" "prod-build" "Rebuild l'image de production"
+	@printf "  \033[36m%-12s\033[0m %s\n" "prod-logs" "Suit les logs du frontend prod"
+	@printf "  \033[36m%-12s\033[0m %s\n" "prod-down" "Stoppe le service frontend prod"
+	@printf "\n"
+	@printf "\033[1mMaintenance\033[0m\n"
+	@printf "  \033[36m%-12s\033[0m %s\n" "down" "Stoppe dev et prod sans supprimer les volumes"
+	@printf "  \033[36m%-12s\033[0m %s\n" "clean" "Supprime conteneurs, reseaux, volumes et orphelins"
 	@printf "\n"
 
-dev:
+dev: ## Lance le frontend en mode dev avec hot reload
 	$(COMPOSE) --profile dev up --build frontend-dev
 
-dev-build:
+dev-build: ## Rebuild l'image frontend dev
 	$(COMPOSE) --profile dev build frontend-dev
 
-dev-down:
+dev-down: ## Stoppe le service frontend dev
 	$(COMPOSE) --profile dev down
 
-dev-logs:
+dev-logs: ## Suit les logs du frontend dev
 	$(COMPOSE) logs -f frontend-dev
 
-prod:
+prod: ## Lance le frontend en mode production
 	$(COMPOSE) --profile prod up --build frontend-prod
 
-prod-build:
+prod-build: ## Rebuild l'image frontend prod
 	$(COMPOSE) --profile prod build frontend-prod
 
-prod-down:
+prod-down: ## Stoppe le service frontend prod
 	$(COMPOSE) --profile prod down
 
-prod-logs:
+prod-logs: ## Suit les logs du frontend prod
 	$(COMPOSE) logs -f frontend-prod
 
-down:
-	$(COMPOSE) --profile dev --profile prod down
+down: ## Stoppe les services dev et prod
+	$(COMPOSE) --profile dev --profile prod down --remove-orphans
+
+clean: ## Supprime les conteneurs, reseaux et volumes Docker Compose
+	$(COMPOSE) --profile dev --profile prod down --volumes --remove-orphans
