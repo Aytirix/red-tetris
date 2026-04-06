@@ -21,5 +21,20 @@ services:
     ports:
       - "8080:80"
 
+  backend-dev:
+    profiles: [ "dev" ]
+    build:
+      context: ./server
+      target: dev
+    ports:
+      - "${PORT}:${PORT}"
+    volumes:
+      - ./server:/app
+      - /app/node_modules
+    environment:
+      PORT: ${PORT}
+      NODE_ENV: ${NODE_ENV}
+    command: npm run dev
+
 volumes:
   frontend_node_modules:
