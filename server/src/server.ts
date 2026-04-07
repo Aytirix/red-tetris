@@ -4,7 +4,11 @@ const app = express();
 const PORT = Number(process.env.PORT) || 3000;
 
 app.get("/", (_req, res) => {
-	res.send("Red Tetris backend OK");
+	res.json("Red Tetris");
+});
+
+app.get("/health/:name", (_req, res) => {
+	res.json("OK");
 });
 
 app.listen(PORT, () => {
