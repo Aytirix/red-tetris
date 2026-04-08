@@ -55,11 +55,10 @@ prod-logs: ## Suit les logs du frontend prod
 ####################
 
 backend-dev: ## Lance le backend en mode dev avec hot reload
-	$(COMPOSE) --profile dev up --build backend-dev
+	$(COMPOSE) --profile dev up --build backend-dev db adminer
 
-backend-dev-build: ## Rebuild l'image backend dev
+backend-dev-build: ## Rebuild l'image backend dev db adminer
 	$(COMPOSE) --profile dev build backend-dev
-
 
 down: ## Stoppe les services dev et prod
 	$(COMPOSE) --profile dev --profile prod down --remove-orphans
