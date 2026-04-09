@@ -1,0 +1,22 @@
+{
+  "compilerOptions": {
+    "rootDir": "./src", // source code folder
+    "outDir": "./dist", // compiled output folder
+    "module": "NodeNext", // use Node.js modules
+    "moduleResolution": "NodeNext", // resolve imports like Node.js
+    "target": "ES2022", // generate modern JavaScript
+    "lib": ["ES2022"], // available JS features
+    "types": ["node"], // Node.js types
+    "sourceMap": true, // easier debugging
+    "strict": true, // strong type safety
+    "noUncheckedIndexedAccess": true, // indexes may be undefined
+    "exactOptionalPropertyTypes": true, // strict optional properties
+    "esModuleInterop": true, // easier package imports
+    "resolveJsonModule": true, // allow JSON imports
+    "verbatimModuleSyntax": true, // keep import/export syntax
+    "isolatedModules": true, // each file must work alone
+    "moduleDetection": "force", // every file is a module
+    "skipLibCheck": true // do not check library types
+  },
+  "include": ["src"] // only compile src
+}

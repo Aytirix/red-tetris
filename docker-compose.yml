@@ -20,4 +20,53 @@ services:
       context: ./frontend
       target: prod
     ports:
-      - "0.0.0.0:8080:80"
+      - "8080:80"
+
+  backend-dev:
+    profiles: [ "dev" ]
+    build:
+      context: ./server
+      target: dev
+    ports:
+      - "${PORT}:${PORT}"
+    volumes:
+      - ./server:/app
+      - backend_node_modules:/app/node_modules
+    environment:
+      HOST: ${HOST}
+      PORT: ${PORT}
+      NODE_ENV: ${NODE_ENV}
+      POSTGRES_HOST: ${POSTGRES_HOST}
+      POSTGRES_PORT: ${POSTGRES_PORT}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    depends_on:
+      - db
+    command: npm run dev
+
+  db:
+    image: postgres:18
+    restart: always
+    shm_size: 128mb
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - ${POSTGRES_PORT}:5432
+    volumes:
+      - db_data:/var/lib/postgresql
+
+  adminer:
+      image: adminer
+      restart: always
+      depends_on:
+        - db
+      ports:
+        - ${ADMINER_PORT}:8080
+
+volumes:
+  frontend_node_modules:
+  backend_node_modules:
+  db_data:

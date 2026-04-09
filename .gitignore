@@ -1,6 +1,18 @@
+# Frontend
 frontend/node_modules
 frontend/dist
 frontend/.vite
 frontend/*.tsbuildinfo
 frontend/*.js
 frontend/*.d.ts
+
+# Backend
+server/node_modules
+server/dist
+server/*.tsbuildinfo
+
+# Env files
+.env
+
+# macOS
+.DS_Store
