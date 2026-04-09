@@ -1,4 +1,5 @@
 .DEFAULT_GOAL := help
+.DEFAULT_GOAL := help
 COMPOSE := docker compose
 UID := $(shell id -u)
 GID := $(shell id -g)
@@ -6,7 +7,7 @@ GID := $(shell id -g)
 export UID
 export GID
 
-.PHONY: help dev dev-build dev-down dev-logs prod prod-build prod-down prod-logs down clean
+.PHONY: help dev dev-build dev-down dev-logs prod prod-build prod-down prod-logs  backend-dev backend-dev-build down clean
 
 help: ## Affiche cette aide
 	@printf "\n"
@@ -17,6 +18,8 @@ help: ## Affiche cette aide
 	@printf "  \033[36m%-12s\033[0m %s\n" "dev-build" "Rebuild l'image de developpement"
 	@printf "  \033[36m%-12s\033[0m %s\n" "dev-logs" "Suit les logs du frontend dev"
 	@printf "  \033[36m%-12s\033[0m %s\n" "dev-down" "Stoppe le service frontend dev"
+	@printf "  \033[36m%-12s\033[0m %s\n" "backend-dev" "Lance le backend en mode dev avec hot reload"
+	@printf "  \033[36m%-12s\033[0m %s\n" "backend-dev-build" "Rebuild l'image backend dev"
 	@printf "\n"
 	@printf "\033[1mProduction\033[0m\n"
 	@printf "  \033[36m%-12s\033[0m %s\n" "prod" "Lance le frontend et le backend en mode production"
@@ -52,6 +55,16 @@ prod-down: ## Stoppe le service frontend prod
 
 prod-logs: ## Suit les logs du frontend prod
 	$(COMPOSE) logs -f frontend-prod
+
+####################
+# Services backend #
+####################
+
+backend-dev: ## Lance le backend en mode dev avec hot reload
+	$(COMPOSE) --profile dev up --build backend-dev db adminer
+
+backend-dev-build: ## Rebuild l'image backend dev db adminer
+	$(COMPOSE) --profile dev build backend-dev
 
 down: ## Stoppe les services dev et prod
 	$(COMPOSE) --profile dev --profile prod down --remove-orphans
