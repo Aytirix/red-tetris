@@ -59,12 +59,12 @@ services:
       - db_data:/var/lib/postgresql
 
   adminer:
-      image: adminer
-      restart: always
-      depends_on:
-        - db
-      ports:
-        - ${ADMINER_PORT}:8080
+    image: adminer
+    restart: always
+    depends_on:
+      - db
+    ports:
+      - ${ADMINER_PORT}:8080
 
 volumes:
   frontend_node_modules:
