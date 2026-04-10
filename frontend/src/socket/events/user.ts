@@ -6,6 +6,7 @@ import type { Socket } from "socket.io-client";
 export function registerUserListeners(sock: Socket) {
 	sock.on("user:ResultUsernameAvailable", (data) => {
 		console.log("user:ResultUsernameAvailable", data);
+		localStorage.setItem("username", data.available.toString());
 	});
 }
 
