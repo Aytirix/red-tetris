@@ -1,4 +1,4 @@
-# Red Tetris — Instructions Claude
+# Red Piece — Instructions Claude
 
 ## Thème frontend
 

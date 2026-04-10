@@ -8,7 +8,7 @@ export default function NotFoundPage() {
 				<div className="not-found-code">404</div>
 				<h1>Signal perdu dans la grille</h1>
 				<p className="hero-text">
-					La page demandée n'existe pas ou a été déplacée. Vérifiez l'URL ou retournez à l'accueil pour continuer votre aventure dans le monde de Red Tetris.
+					La page demandée n'existe pas ou a été déplacée. Vérifiez l'URL ou retournez à l'accueil pour continuer votre aventure dans le monde de Red Piece.
 				</p>
 
 				<div className="not-found-actions">

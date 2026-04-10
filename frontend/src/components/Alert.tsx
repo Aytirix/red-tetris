@@ -79,7 +79,7 @@ export function AlertProvider({ children }: { children: React.ReactNode }) {
 			{state && (
 				<div style={{
 					position: "fixed", inset: 0,
-					background: "rgba(0,0,0,0.72)",
+					background: "var(--color-surface-strong)",
 					display: "flex", alignItems: "center", justifyContent: "center",
 					zIndex: 100, padding: "1rem",
 					backdropFilter: "blur(6px)",
@@ -129,8 +129,8 @@ export function AlertProvider({ children }: { children: React.ReactNode }) {
 									background: "linear-gradient(135deg, var(--color-primary-strong), var(--color-primary))",
 									boxShadow: "var(--shadow-neon-red)",
 								} : {
-									background: "rgba(61,231,255,0.12)",
-									border: "1px solid rgba(61,231,255,0.22)",
+									background: "var(--color-secondary-soft)",
+									border: "1px solid var(--color-secondary-soft)",
 									color: "var(--color-secondary)",
 									boxShadow: "var(--shadow-neon-cyan)",
 								}}

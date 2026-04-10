@@ -49,7 +49,7 @@ export default function App() {
 				<div className="hero-copy">
 					<p className="eyebrow">Theme system / arcade neon red</p>
 					<div className="hero-chip">Base visuelle pour lobby, room, HUD et profils</div>
-					<h1>Red Tetris</h1>
+					<h1>Red Piece</h1>
 					<p className="hero-text">
 						On part sur un theme facile a modifier: fond bleu nuit,
 						rouge pour les actions fortes, cyan pour les interactions

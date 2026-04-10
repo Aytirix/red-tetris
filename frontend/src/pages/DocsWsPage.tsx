@@ -92,7 +92,7 @@ function groupBy(events: WsEvent[]): [string, WsEvent[]][] {
 const inputStyle: React.CSSProperties = {
 	width: "100%",
 	padding: "0.65rem 0.9rem",
-	background: "rgba(0,0,0,0.45)",
+	background: "var(--color-surface)",
 	border: "1px solid var(--color-border)",
 	borderRadius: "10px",
 	color: "var(--color-text)",
@@ -116,6 +116,8 @@ const passwordManagerIgnoreProps = {
 	autoComplete: "off",
 	"data-bwignore": "true",
 } as const;
+
+const DOCS_WS_INTERNAL_EVENT_PREFIX = "__docsWs:";
 
 type TextareaField = "description" | "payloadDescription" | "responseDescription" | "payload" | "response";
 
@@ -174,8 +176,8 @@ function EventCard({ event, onEdit, onDelete, onTest }: {
 							className="button"
 							style={{
 								minHeight: "30px", padding: "0 0.75rem", fontSize: "0.76rem",
-								border: "1px solid rgba(61,231,255,0.22)",
-								background: "rgba(61,231,255,0.12)", color: "var(--color-secondary)",
+								border: "1px solid var(--color-secondary-soft)",
+								background: "var(--color-secondary-soft)", color: "var(--color-secondary)",
 							}}
 							onClick={() => onTest(event)}
 						>
@@ -194,7 +196,7 @@ function EventCard({ event, onEdit, onDelete, onTest }: {
 						style={{
 							minHeight: "30px", padding: "0 0.75rem", fontSize: "0.76rem",
 							border: "1px solid var(--color-border-strong)",
-							background: "rgba(255,54,95,0.1)", color: "var(--color-primary)",
+							background: "var(--color-primary-soft)", color: "var(--color-primary)",
 						}}
 						onClick={() => onDelete(event.id)}
 					>
@@ -221,7 +223,7 @@ function EventCard({ event, onEdit, onDelete, onTest }: {
 				<pre
 					style={{
 						margin: 0, padding: "0.85rem 1rem",
-						background: "rgba(0,0,0,0.35)", border: "1px solid var(--color-border)",
+						background: "var(--color-surface-soft)", border: "1px solid var(--color-border)",
 						borderRadius: "12px", fontSize: "0.78rem", color: "var(--color-secondary)",
 						lineHeight: 1.65, overflowX: "auto", fontFamily: "monospace",
 						userSelect: "text", WebkitUserSelect: "text", cursor: "text",
@@ -258,7 +260,7 @@ function EventCard({ event, onEdit, onDelete, onTest }: {
 						<pre
 							style={{
 								margin: 0, padding: "0.85rem 1rem",
-								background: "rgba(0,0,0,0.35)", border: "1px solid var(--color-border)",
+								background: "var(--color-surface-soft)", border: "1px solid var(--color-border)",
 								borderRadius: "12px", fontSize: "0.78rem", color: preColor,
 								lineHeight: 1.65, overflowX: "auto", fontFamily: "monospace",
 								userSelect: "text", WebkitUserSelect: "text", cursor: "text",
@@ -297,7 +299,7 @@ function GroupedEvents({ events, onEdit, onDelete, onTest }: {
 							color: "var(--color-accent)",
 							background: "var(--color-accent-soft)",
 							padding: "0.2rem 0.6rem", borderRadius: "6px",
-							border: "1px solid rgba(144,105,255,0.2)",
+							border: "1px solid var(--color-accent-soft)",
 						}}>
 							{group}
 						</span>
@@ -335,9 +337,11 @@ export default function DocsWsPage() {
 	const [error, setError] = useState("");
 	const [groupOpen, setGroupOpen] = useState(false);
 	const [testPayload, setTestPayload] = useState("");
+	const [testMockResponse, setTestMockResponse] = useState("");
 	const [testError, setTestError] = useState("");
 	const textareaRefs = useRef<Partial<Record<TextareaField, HTMLTextAreaElement | null>>>({});
 	const testPayloadRef = useRef<HTMLTextAreaElement | null>(null);
+	const testMockResponseRef = useRef<HTMLTextAreaElement | null>(null);
 	const [testStatus, setTestStatus] = useState<"idle" | "sent" | "waiting" | "received" | "timeout" | "error">("idle");
 	const [testResponse, setTestResponse] = useState("");
 	const [wsLogs, setWsLogs] = useState<WsLogEntry[]>([]);
@@ -356,6 +360,7 @@ export default function DocsWsPage() {
 	}, []);
 
 	function appendWsLog(direction: WsLogEntry["direction"], event: string, args: unknown[] = []) {
+		if (event.startsWith(DOCS_WS_INTERNAL_EVENT_PREFIX)) return;
 		const payload = formatLogPayload(args);
 		if (!payload) return;
 		const entry: WsLogEntry = {
@@ -416,6 +421,7 @@ export default function DocsWsPage() {
 		clearTestListener();
 		setTesting(null);
 		setTestPayload("");
+		setTestMockResponse("");
 		setTestError("");
 		setTestResponse("");
 		setTestStatus("idle");
@@ -425,6 +431,7 @@ export default function DocsWsPage() {
 		clearTestListener();
 		setTesting(event);
 		setTestPayload(getTestPayloadSeed(event.payload));
+		setTestMockResponse(getTestPayloadSeed(event.response));
 		setTestError("");
 		setTestResponse("");
 		setTestStatus("idle");
@@ -482,7 +489,10 @@ export default function DocsWsPage() {
 		if (testing && testPayloadRef.current) {
 			resizeTextarea(testPayloadRef.current, 8);
 		}
-	}, [testing, testPayload]);
+		if (testing && testMockResponseRef.current) {
+			resizeTextarea(testMockResponseRef.current, 8);
+		}
+	}, [testing, testPayload, testMockResponse]);
 
 	useEffect(() => closeTestModal, []);
 
@@ -532,13 +542,40 @@ export default function DocsWsPage() {
 		setIsOpen(false);
 	}
 
-	function handleTestSubmit(e: React.SyntheticEvent<HTMLFormElement>) {
-		e.preventDefault();
+	function listenForTestResponse() {
 		if (!testing) return;
 
 		clearTestListener();
-		setTestError("");
 		setTestResponse("");
+
+		if (!testing.responseName) return;
+
+		const handler = (data: unknown) => {
+			setTestResponse(JSON.stringify(data, null, 2));
+			setTestStatus("received");
+			if (testTimeoutRef.current !== null) {
+				window.clearTimeout(testTimeoutRef.current);
+				testTimeoutRef.current = null;
+			}
+			socket.off(testing.responseName, handler);
+			testListenerRef.current = null;
+		};
+
+		testListenerRef.current = { eventName: testing.responseName, handler };
+		socket.on(testing.responseName, handler);
+		setTestStatus("waiting");
+		testTimeoutRef.current = window.setTimeout(() => {
+			socket.off(testing.responseName, handler);
+			testListenerRef.current = null;
+			testTimeoutRef.current = null;
+			setTestStatus("timeout");
+		}, 10000);
+	}
+
+	function handleSendTestPayload() {
+		if (!testing) return;
+
+		setTestError("");
 
 		if (!socket.connected) {
 			setTestStatus("error");
@@ -556,27 +593,10 @@ export default function DocsWsPage() {
 		}
 
 		if (testing.responseName) {
-			const handler = (data: unknown) => {
-				setTestResponse(JSON.stringify(data, null, 2));
-				setTestStatus("received");
-				if (testTimeoutRef.current !== null) {
-					window.clearTimeout(testTimeoutRef.current);
-					testTimeoutRef.current = null;
-				}
-				socket.off(testing.responseName, handler);
-				testListenerRef.current = null;
-			};
-
-			testListenerRef.current = { eventName: testing.responseName, handler };
-			socket.on(testing.responseName, handler);
-			setTestStatus("waiting");
-			testTimeoutRef.current = window.setTimeout(() => {
-				socket.off(testing.responseName, handler);
-				testListenerRef.current = null;
-				testTimeoutRef.current = null;
-				setTestStatus("timeout");
-			}, 10000);
+			listenForTestResponse();
 		} else {
+			clearTestListener();
+			setTestResponse("");
 			setTestStatus("sent");
 		}
 
@@ -585,6 +605,44 @@ export default function DocsWsPage() {
 		} else {
 			socket.emit(testing.name, parsedPayload);
 		}
+	}
+
+	function handlePrepareMockResponse() {
+		if (!testing?.responseName) return;
+
+		setTestError("");
+
+		if (!socket.connected) {
+			setTestStatus("error");
+			setTestError("Socket non connecté au backend.");
+			return;
+		}
+
+		let parsedMockResponse: unknown;
+		try {
+			parsedMockResponse = testMockResponse.trim() ? JSON.parse(testMockResponse) : undefined;
+		} catch {
+			setTestStatus("error");
+			setTestError("La réponse mock doit être un JSON valide.");
+			return;
+		}
+
+		let parsedRequestPayload: unknown;
+		try {
+			parsedRequestPayload = testPayload.trim() ? JSON.parse(testPayload) : undefined;
+		} catch {
+			setTestStatus("error");
+			setTestError("Le payload de test doit être un JSON valide.");
+			return;
+		}
+
+		listenForTestResponse();
+		socket.emit(`${DOCS_WS_INTERNAL_EVENT_PREFIX}emitMockResponse`, {
+			eventName: testing.name,
+			responseName: testing.responseName,
+			response: parsedMockResponse,
+			requestPayload: parsedRequestPayload,
+		});
 	}
 
 	const filtered = selectedGroup ? events.filter((e) => (e.group || "Général") === selectedGroup) : events;
@@ -651,10 +709,10 @@ export default function DocsWsPage() {
 								onClick={() => setSelectedGroup(active ? null : g)}
 								style={{
 									minHeight: "34px", padding: "0 1rem", fontSize: "0.78rem",
-									border: `1px solid ${active ? "rgba(144,105,255,0.5)" : "var(--color-border)"}`,
+									border: `1px solid ${active ? "var(--color-accent)" : "var(--color-border)"}`,
 									background: active ? "var(--color-accent-soft)" : "transparent",
 									color: active ? "var(--color-accent)" : "var(--color-text-muted)",
-									boxShadow: active ? "0 0 0 1px rgba(144,105,255,0.14), 0 0 20px rgba(144,105,255,0.18)" : "none",
+									boxShadow: active ? "var(--shadow-neon-accent)" : "none",
 									textTransform: "uppercase",
 									letterSpacing: "0.1em",
 								}}
@@ -748,7 +806,7 @@ export default function DocsWsPage() {
 										style={{
 											border: "1px solid var(--color-border)",
 											borderRadius: "12px",
-											background: "rgba(0,0,0,0.28)",
+											background: "var(--color-surface-soft)",
 											padding: "0.9rem 1rem",
 										}}
 									>
@@ -779,7 +837,7 @@ export default function DocsWsPage() {
 												style={{
 													margin: 0,
 													padding: "0.8rem 0.9rem",
-													background: "rgba(0,0,0,0.35)",
+													background: "var(--color-surface-soft)",
 													border: "1px solid var(--color-border)",
 													borderRadius: "10px",
 													fontSize: "0.77rem",
@@ -806,7 +864,7 @@ export default function DocsWsPage() {
 			{isOpen && (
 				<div style={{
 					position: "fixed", inset: 0,
-					background: "rgba(0,0,0,0.72)",
+					background: "var(--color-surface-strong)",
 					display: "flex", alignItems: "center", justifyContent: "center",
 					zIndex: 50, padding: "1rem",
 					backdropFilter: "blur(6px)",
@@ -1036,7 +1094,7 @@ export default function DocsWsPage() {
 			{testing && (
 				<div style={{
 					position: "fixed", inset: 0,
-					background: "rgba(0,0,0,0.72)",
+					background: "var(--color-surface-strong)",
 					display: "flex", alignItems: "center", justifyContent: "center",
 					zIndex: 60, padding: "1rem",
 					backdropFilter: "blur(6px)",
@@ -1063,11 +1121,11 @@ export default function DocsWsPage() {
 							</button>
 						</div>
 
-						<form onSubmit={handleTestSubmit} autoComplete="off" style={{ padding: "1.5rem", display: "flex", flexDirection: "column", gap: "1rem" }}>
+						<form onSubmit={(e) => e.preventDefault()} autoComplete="off" style={{ padding: "1.5rem", display: "flex", flexDirection: "column", gap: "1rem" }}>
 							<div>
 								<span style={labelStyle}>Statut</span>
 								<p style={{ margin: 0, color: "var(--color-text-muted)", fontSize: "0.9rem" }}>
-									{testStatus === "idle" ? "Prêt à envoyer le test." : null}
+									{testStatus === "idle" ? "Prêt à envoyer le payload ou la réponse mock." : null}
 									{testStatus === "waiting" && testing.responseName ? `Event envoyé. En attente de ${testing.responseName}...` : null}
 									{testStatus === "received" && testing.responseName ? `Réponse ${testing.responseName} reçue.` : null}
 									{testStatus === "sent" ? "Event envoyé. Aucune réponse attendue." : null}
@@ -1118,7 +1176,7 @@ export default function DocsWsPage() {
 										color: "var(--color-accent)", fontSize: "0.82rem", letterSpacing: "0.04em",
 										background: "var(--color-accent-soft)",
 										padding: "0.3rem 0.65rem", borderRadius: "8px",
-										border: "1px solid rgba(144,105,255,0.2)",
+										border: "1px solid var(--color-accent-soft)",
 										userSelect: "text", WebkitUserSelect: "text", cursor: "text",
 									}}
 									onDoubleClick={(e) => selectAll(e.currentTarget)}
@@ -1135,7 +1193,7 @@ export default function DocsWsPage() {
 										<pre
 											style={{
 												margin: 0, padding: "0.85rem 1rem",
-												background: "rgba(0,0,0,0.35)", border: "1px solid var(--color-border)",
+												background: "var(--color-surface-soft)", border: "1px solid var(--color-border)",
 												borderRadius: "12px", fontSize: "0.78rem", color: "var(--color-accent)",
 												lineHeight: 1.65, overflowX: "auto", fontFamily: "monospace",
 												userSelect: "text", WebkitUserSelect: "text", cursor: "text",
@@ -1145,6 +1203,40 @@ export default function DocsWsPage() {
 											{formatJson(testing.response)}
 										</pre>
 									)}
+									<div style={{ marginTop: "0.75rem" }}>
+										<span style={labelStyle}>Réponse mock à renvoyer <span style={{ fontWeight: 400, textTransform: "none", letterSpacing: 0, color: "var(--color-accent)" }}>(JSON)</span></span>
+										<textarea
+											value={testMockResponse}
+											onChange={(e) => {
+												setTestMockResponse(e.target.value);
+												resizeTextarea(e.currentTarget, 8);
+											}}
+											onKeyDown={(e) => {
+												if (e.key !== "Tab") return;
+												e.preventDefault();
+												const el = e.currentTarget;
+												const start = el.selectionStart;
+												const end = el.selectionEnd;
+												const indent = "  ";
+												const newValue = testMockResponse.substring(0, start) + indent + testMockResponse.substring(end);
+												setTestMockResponse(newValue);
+												requestAnimationFrame(() => {
+													el.selectionStart = start + indent.length;
+													el.selectionEnd = start + indent.length;
+													resizeTextarea(el, 8);
+												});
+											}}
+											ref={(el) => {
+												testMockResponseRef.current = el;
+												if (el) resizeTextarea(el, 8);
+											}}
+											rows={1}
+											spellCheck={false}
+											placeholder='{"key": "value"}'
+											{...passwordManagerIgnoreProps}
+											style={{ ...inputStyle, fontFamily: "monospace", resize: "none", color: "var(--color-accent)", overflowY: "hidden" }}
+										/>
+									</div>
 								</div>
 							)}
 
@@ -1154,7 +1246,7 @@ export default function DocsWsPage() {
 									<pre
 										style={{
 											margin: 0, padding: "0.85rem 1rem",
-											background: "rgba(0,0,0,0.35)", border: "1px solid var(--color-border)",
+											background: "var(--color-surface-soft)", border: "1px solid var(--color-border)",
 											borderRadius: "12px", fontSize: "0.78rem", color: "var(--color-accent)",
 											lineHeight: 1.65, overflowX: "auto", fontFamily: "monospace",
 											userSelect: "text", WebkitUserSelect: "text", cursor: "text",
@@ -1169,8 +1261,13 @@ export default function DocsWsPage() {
 							{testError && <p style={{ color: "var(--color-primary)", fontSize: "0.85rem", margin: 0 }}>{testError}</p>}
 
 							<div style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem" }}>
-								<button type="submit" className="button button-primary">
-									Envoyer
+								{testing.responseName && (
+									<button type="button" className="button button-secondary" onClick={handlePrepareMockResponse}>
+										Envoyer la réponse mock
+									</button>
+								)}
+								<button type="button" className="button button-primary" onClick={handleSendTestPayload}>
+									Envoyer le payload
 								</button>
 								<button type="button" className="button button-outline" onClick={closeTestModal}>
 									Fermer
