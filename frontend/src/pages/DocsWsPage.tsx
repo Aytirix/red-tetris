@@ -15,6 +15,14 @@ interface WsEvent {
 	responseDescription: string;
 }
 
+interface WsLogEntry {
+	id: string;
+	direction: "incoming" | "outgoing" | "status";
+	event: string;
+	payload: string;
+	time: string;
+}
+
 const BACKEND_URL = `${window.location.protocol}//${window.location.hostname}:${import.meta.env.VITE_PORT || "3000"}`;
 
 function formatJson(str: string): string {
@@ -45,6 +53,29 @@ function getTestPayloadSeed(payload: string): string {
 		} catch {
 			return trimmed;
 		}
+	}
+}
+
+function formatLogPayload(args: unknown[]): string {
+	if (args.length === 0) return "";
+	if (args.length === 1) return formatLogValue(args[0]);
+	return formatLogValue(args);
+}
+
+function formatLogValue(value: unknown): string {
+	if (typeof value === "undefined") return "";
+	if (typeof value === "string") {
+		try {
+			return JSON.stringify(JSON.parse(value), null, 2);
+		} catch {
+			return "";
+		}
+	}
+	if (value instanceof Error) return "";
+	try {
+		return JSON.stringify(value, null, 2);
+	} catch {
+		return "";
 	}
 }
 
@@ -309,8 +340,10 @@ export default function DocsWsPage() {
 	const testPayloadRef = useRef<HTMLTextAreaElement | null>(null);
 	const [testStatus, setTestStatus] = useState<"idle" | "sent" | "waiting" | "received" | "timeout" | "error">("idle");
 	const [testResponse, setTestResponse] = useState("");
+	const [wsLogs, setWsLogs] = useState<WsLogEntry[]>([]);
 	const testListenerRef = useRef<{ eventName: string; handler: (data: unknown) => void } | null>(null);
 	const testTimeoutRef = useRef<number | null>(null);
+	const logsContainerRef = useRef<HTMLDivElement | null>(null);
 
 	const allGroups = [...new Set(events.map((e) => e.group).filter(Boolean))];
 	const [selectedGroup, setSelectedGroup] = useState<string | null>(null);
@@ -321,6 +354,19 @@ export default function DocsWsPage() {
 			.then((data) => { setEvents(data); setLoading(false); })
 			.catch(() => setLoading(false));
 	}, []);
+
+	function appendWsLog(direction: WsLogEntry["direction"], event: string, args: unknown[] = []) {
+		const payload = formatLogPayload(args);
+		if (!payload) return;
+		const entry: WsLogEntry = {
+			id: crypto.randomUUID(),
+			direction,
+			event,
+			payload,
+			time: new Date().toLocaleTimeString("fr-FR", { hour12: false }),
+		};
+		setWsLogs((logs) => [...logs.slice(-199), entry]);
+	}
 
 	async function save(updated: WsEvent[]) {
 		await fetch(`${BACKEND_URL}/ws-docs`, {
@@ -439,6 +485,31 @@ export default function DocsWsPage() {
 	}, [testing, testPayload]);
 
 	useEffect(() => closeTestModal, []);
+
+	useEffect(() => {
+		const incomingListener = (event: string, ...args: unknown[]) => appendWsLog("incoming", event, args);
+		const outgoingListener = (event: string, ...args: unknown[]) => appendWsLog("outgoing", event, args);
+		const disconnectListener = (reason: string) => appendWsLog("status", "disconnect", [{ reason }]);
+		const connectErrorListener = (err: Error) => appendWsLog("status", "connect_error", [{ message: err.message }]);
+
+		socket.onAny(incomingListener);
+		socket.onAnyOutgoing(outgoingListener);
+		socket.on("disconnect", disconnectListener);
+		socket.on("connect_error", connectErrorListener);
+
+		return () => {
+			socket.offAny(incomingListener);
+			socket.offAnyOutgoing(outgoingListener);
+			socket.off("disconnect", disconnectListener);
+			socket.off("connect_error", connectErrorListener);
+		};
+	}, []);
+
+	useEffect(() => {
+		if (logsContainerRef.current) {
+			logsContainerRef.current.scrollTop = logsContainerRef.current.scrollHeight;
+		}
+	}, [wsLogs]);
 
 	async function handleSubmit(e: React.SyntheticEvent<HTMLFormElement>) {
 		e.preventDefault();
@@ -595,27 +666,141 @@ export default function DocsWsPage() {
 				</div>
 			)}
 
-			{/* Events */}
-			{loading ? (
-				<p style={{ color: "var(--color-text-muted)", textAlign: "center", padding: "2rem" }}>
-					Chargement...
-				</p>
-			) : (
-				<div className="split-grid">
-					<div>
-						<p className="section-kicker" style={{ color: "var(--color-primary)", marginBottom: "1rem" }}>
-							↑ Front → Back
+			<div className="docs-ws-grid">
+				<div>
+					{/* Events */}
+					{loading ? (
+						<p style={{ color: "var(--color-text-muted)", textAlign: "center", padding: "2rem" }}>
+							Chargement...
 						</p>
-						<GroupedEvents events={frontToBack} onEdit={openEdit} onDelete={handleDelete} onTest={openTest} />
-					</div>
-					<div>
-						<p className="section-kicker" style={{ marginBottom: "1rem" }}>
-							↓ Back → Front
-						</p>
-						<GroupedEvents events={backToFront} onEdit={openEdit} onDelete={handleDelete} onTest={openTest} />
-					</div>
+					) : (
+						<div className="split-grid">
+							<div>
+								<p className="section-kicker" style={{ color: "var(--color-primary)", marginBottom: "1rem" }}>
+									↑ Front → Back
+								</p>
+								<GroupedEvents events={frontToBack} onEdit={openEdit} onDelete={handleDelete} onTest={openTest} />
+							</div>
+							<div>
+								<p className="section-kicker" style={{ marginBottom: "1rem" }}>
+									↓ Back → Front
+								</p>
+								<GroupedEvents events={backToFront} onEdit={openEdit} onDelete={handleDelete} onTest={openTest} />
+							</div>
+						</div>
+					)}
 				</div>
-			)}
+
+				<section className="card" style={{
+					padding: "1.5rem 2rem",
+					boxShadow: "var(--shadow-panel), var(--shadow-neon-cyan)",
+					alignSelf: "start",
+					position: "sticky",
+					top: "1rem",
+					height: "calc(100vh - 21rem)",
+					overflow: "hidden",
+					display: "flex",
+					flexDirection: "column",
+					gap: "1rem",
+				}}>
+					<div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "1rem" }}>
+						<div>
+							<p className="section-kicker" style={{ marginBottom: "0.45rem" }}>Logs WS</p>
+							<p style={{ margin: 0, color: "var(--color-text-muted)", fontSize: "0.9rem" }}>
+								{socket.connected ? "Socket connecté" : "Socket non connecté"}
+							</p>
+						</div>
+						<button
+							type="button"
+							className="button button-outline"
+							onClick={() => setWsLogs([])}
+						>
+							Vider
+						</button>
+					</div>
+
+					<div
+						ref={logsContainerRef}
+						style={{
+							display: "grid",
+							gap: "0.75rem",
+							flex: 1,
+							minHeight: 0,
+							overflowY: "auto",
+							paddingRight: "0.25rem",
+						}}
+					>
+						{wsLogs.length === 0 ? (
+							<p style={{ margin: 0, color: "var(--color-text-muted)", fontSize: "0.88rem", fontStyle: "italic" }}>
+								Aucun log WebSocket pour le moment.
+							</p>
+						) : (
+							wsLogs.map((log) => {
+								const color = log.direction === "incoming"
+									? "var(--color-accent)"
+									: log.direction === "outgoing"
+										? "var(--color-secondary)"
+										: "var(--color-primary)";
+
+								return (
+									<div
+										key={log.id}
+										style={{
+											border: "1px solid var(--color-border)",
+											borderRadius: "12px",
+											background: "rgba(0,0,0,0.28)",
+											padding: "0.9rem 1rem",
+										}}
+									>
+										<div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "1rem", marginBottom: log.payload ? "0.6rem" : 0 }}>
+											<div style={{ display: "flex", alignItems: "center", gap: "0.6rem", minWidth: 0 }}>
+												<span style={{
+													display: "inline-block",
+													padding: "0.22rem 0.5rem",
+													borderRadius: "999px",
+													border: `1px solid ${color}33`,
+													background: `${color}18`,
+													color,
+													fontSize: "0.68rem",
+													fontWeight: 700,
+													letterSpacing: "0.12em",
+													textTransform: "uppercase",
+													flexShrink: 0,
+												}}>
+													{log.direction === "incoming" ? "in" : log.direction === "outgoing" ? "out" : "status"}
+												</span>
+												<code style={{ color, fontSize: "0.8rem", overflowWrap: "anywhere" }}>{log.event}</code>
+											</div>
+											<span style={{ color: "var(--color-text-muted)", fontSize: "0.76rem", flexShrink: 0 }}>{log.time}</span>
+										</div>
+
+										{log.payload && (
+											<pre
+												style={{
+													margin: 0,
+													padding: "0.8rem 0.9rem",
+													background: "rgba(0,0,0,0.35)",
+													border: "1px solid var(--color-border)",
+													borderRadius: "10px",
+													fontSize: "0.77rem",
+													lineHeight: 1.6,
+													overflowX: "auto",
+													fontFamily: "monospace",
+													color: "var(--color-text-muted)",
+													userSelect: "text",
+													WebkitUserSelect: "text",
+												}}
+											>
+												{log.payload}
+											</pre>
+										)}
+									</div>
+								);
+							})
+						)}
+					</div>
+				</section>
+			</div>
 
 			{/* Modal */}
 			{isOpen && (

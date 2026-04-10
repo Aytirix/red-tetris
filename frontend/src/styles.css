@@ -83,6 +83,10 @@ code {
 	padding: clamp(1.2rem, 3vw, 2rem) 0 4rem;
 }
 
+.page-wide {
+	width: min(1780px, calc(100% - 2rem));
+}
+
 .page > * + * {
 	margin-top: 1.35rem;
 }
@@ -291,6 +295,13 @@ h3 {
 .split-grid {
 	display: grid;
 	gap: 1rem;
+}
+
+.docs-ws-grid {
+	display: grid;
+	gap: 1rem;
+	align-items: start;
+	grid-template-columns: minmax(0, 1.9fr) minmax(300px, 380px);
 }
 
 .preview-grid {
@@ -657,6 +668,7 @@ h3 {
 @media (max-width: 1080px) {
 	.hero-card,
 	.split-grid,
+	.docs-ws-grid,
 	.not-found-page,
 	.error-page {
 		grid-template-columns: 1fr;

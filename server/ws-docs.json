@@ -7,8 +7,8 @@
     "description": "",
     "payload": "{\n  \"username\": string\n}",
     "payloadDescription": "",
-    "response": "{\n  \"available\": boolean,\n  \"is_register\": boolean\n}",
+    "response": "{\n  \"available\": boolean,\n  \"is_register\": boolean,\n  \"username\": string\n}",
     "responseName": "user:ResultUsernameAvailable",
-    "responseDescription": "available = true = Si le pseudo est dispo (+ le réserver pour l'utilisateur) et false = le pseudo est déjà utiliser par une personne\nis_register = true si le pseudo est déjà enregistrer et false =  si c'est la 1er utilisation du pseudo"
+    "responseDescription": "available = true = Si le pseudo est dispo (+ le réserver pour l'utilisateur) et false = le pseudo est déjà utiliser par une personne\nis_register = true si le pseudo est déjà enregistrer et false =  si c'est la 1er utilisation du pseudo\n\nle pseudo doit être compris entre 3 et 15"
   }
 ]
