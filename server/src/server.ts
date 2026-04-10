@@ -1,12 +1,10 @@
-import express from "express";
+import { createApp } from "./app.js";
+import http from "http";
 
-const app = express();
-const PORT = Number(process.env.PORT) || 3000;
+const app = createApp();
+const server = http.createServer(app);
+const PORT = process.env.PORT || 3000;
 
-app.get("/", (_req, res) => {
-	res.json("Red Tetris");
-});
-
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+server.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`);
 });
