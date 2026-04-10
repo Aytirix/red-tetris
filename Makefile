@@ -32,7 +32,7 @@ help: ## Affiche cette aide
 	@printf "  \033[36m%-12s\033[0m %s\n" "clean" "Supprime les conteneurs, reseaux, volumes et orphelins"
 	@printf "\n"
 
-dev: ## Lance la stack dev (frontend, backend, db, adminer)
+dev: ## Lance la stack dev (frontend, backend, db, pgadmin)
 	$(COMPOSE) $(DEV_PROFILE) up --build
 
 dev-build: ## Rebuild les images du profil dev
