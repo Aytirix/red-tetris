@@ -3,11 +3,14 @@ import ReactDOM from "react-dom/client";
 import "./styles.css";
 import { router } from "./router";
 import { RouterProvider } from "react-router-dom";
+import { SocketProvider } from "./contexts/SocketContext";
 
 document.addEventListener("dragstart", (event) => {
 	event.preventDefault();
 });
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
-	<RouterProvider router={router} />
+	<SocketProvider>
+		<RouterProvider router={router} />
+	</SocketProvider>
 );
