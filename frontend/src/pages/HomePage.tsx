@@ -30,34 +30,98 @@ const FACTIONS: Record<Faction, { label: string; tone: "red" | "cyan"; icon: str
 	},
 };
 
-const CHARACTERS: Record<Faction, { id: string; name: string; role: string }[]> = {
+const CHARACTERS: Record<Faction, { id: string; name: string }[]> = {
 	pirates: [
-		{ id: "luffy", name: "Luffy", role: "Capitaine" },
-		{ id: "zoro", name: "Zoro", role: "Combattant" },
-		{ id: "nami", name: "Nami", role: "Navigatrice" },
-		{ id: "usopp", name: "Usopp", role: "Tireur d'élite" },
-		{ id: "sanji", name: "Sanji", role: "Cuisinier" },
-		{ id: "chopper", name: "Chopper", role: "Médecin" },
-		{ id: "robin", name: "Robin", role: "Archéologue" },
-		{ id: "franky", name: "Franky", role: "Charpentier" },
-		{ id: "brook", name: "Brook", role: "Musicien" },
-		{ id: "jinbei", name: "Jinbei", role: "Timonier" },
+		{ id: "luffy", name: "Luffy" },
+		{ id: "zoro", name: "Zoro" },
+		{ id: "nami", name: "Nami" },
+		{ id: "usopp", name: "Usopp" },
+		{ id: "sanji", name: "Sanji" },
+		{ id: "chopper", name: "Chopper" },
+		{ id: "robin", name: "Robin" },
+		{ id: "franky", name: "Franky" },
+		{ id: "brook", name: "Brook" },
+		{ id: "jinbei", name: "Jinbei" },
 	],
 	marines: [
-		{ id: "garp", name: "Garp", role: "Vice-Amiral" },
-		{ id: "smoker", name: "Smoker", role: "Vice-Amiral" },
-		{ id: "tashigi", name: "Tashigi", role: "Capitaine" },
-		{ id: "coby", name: "Coby", role: "Contre-Amiral" },
-		{ id: "aokiji", name: "Aokiji", role: "Amiral" },
-		{ id: "kizaru", name: "Kizaru", role: "Amiral" },
-		{ id: "akainu", name: "Akainu", role: "Amiral en chef" },
-		{ id: "fujitora", name: "Fujitora", role: "Amiral" },
-		{ id: "sengoku", name: "Sengoku", role: "Amiral en chef" },
-		{ id: "ryokugyu", name: "Ryokugyu", role: "Amiral" },
+		{ id: "garp", name: "Garp" },
+		{ id: "smoker", name: "Smoker" },
+		{ id: "tashigi", name: "Tashigi" },
+		{ id: "coby", name: "Coby" },
+		{ id: "aokiji", name: "Aokiji" },
+		{ id: "kizaru", name: "Kizaru" },
+		{ id: "akainu", name: "Akainu" },
+		{ id: "fujitora", name: "Fujitora" },
+		{ id: "sengoku", name: "Sengoku" },
+		{ id: "ryokugyu", name: "Ryokugyu" },
 	],
 };
 
 type CheckState = "idle" | "checking" | "available" | "unavailable";
+
+function getCharacterAvatarSrc(faction: Faction, characterId: string): string {
+	return `/img/avatar/${faction}/${characterId}.png`;
+}
+
+function AvatarPreview({ faction, characterId, characterName, selected, color }: {
+	faction: Faction;
+	characterId: string;
+	characterName: string;
+	selected: boolean;
+	color: string;
+}) {
+	const src = getCharacterAvatarSrc(faction, characterId);
+	const [hasError, setHasError] = useState(false);
+
+	useEffect(() => {
+		setHasError(false);
+	}, [src]);
+
+	return (
+		<div style={{
+			width: "100%",
+			aspectRatio: "1",
+			borderRadius: "50%",
+			display: "flex",
+			alignItems: "center",
+			justifyContent: "center",
+			overflow: "hidden",
+			outline: selected
+				? `2px solid ${color}`
+				: "1px solid rgba(255,255,255,0.08)",
+			outlineOffset: 0,
+			boxShadow: selected
+				? `0 0 22px ${color}55`
+				: "none",
+			transition: "all var(--transition-soft)",
+		}}>
+			{hasError ? (
+				<span style={{
+					fontFamily: "var(--font-display)",
+					fontSize: "2.7rem",
+					fontWeight: 700,
+					color: selected ? color : "var(--color-text-muted)",
+				}}>
+					{characterName[0]}
+				</span>
+			) : (
+				<img
+					src={src}
+					alt={characterName}
+					onError={() => setHasError(true)}
+					style={{
+						width: "100%",
+						height: "100%",
+						display: "block",
+						objectFit: "cover",
+						objectPosition: "center top",
+						transform: "scale(1.06)",
+					}}
+				/>
+			)}
+		</div>
+	);
+}
 
 // ─── Username step ───────────────────────────────────────────────────────────
 
@@ -268,40 +332,31 @@ function RegisterStep({ username, onSubmit }: {
 						)}
 					</div>
 
-					<div className="feature-grid" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(110px, 1fr))", gap: "0.65rem" }}>
+					<div className="feature-grid" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: "0.8rem" }}>
 						{CHARACTERS[faction].map((char) => {
 							const selected = avatar === char.id;
 							return (
 								<button key={char.id} onClick={() => setAvatar(char.id)} style={{
 									all: "unset", cursor: "pointer",
-									display: "flex", flexDirection: "column", alignItems: "center",
-									padding: "1rem 0.5rem", borderRadius: "var(--radius-card)",
-									border: `1px solid ${selected ? f.color : "var(--color-border)"}`,
-									background: selected ? f.colorSoft : "var(--color-surface-soft)",
-									boxShadow: selected ? f.shadow : "none",
-									transition: "all var(--transition-soft)",
+									width: "100%",
+									display: "flex", flexDirection: "column", alignItems: "stretch",
+									gap: "0.55rem",
+									transition: "transform var(--transition-soft)",
 								}}>
-									<div style={{
-										width: "3rem", height: "3rem", borderRadius: "50%",
-										display: "flex", alignItems: "center", justifyContent: "center",
-										background: selected ? f.colorSoft : "var(--color-surface)",
-										border: `1px solid ${selected ? f.color : "var(--color-border)"}`,
-										fontFamily: "var(--font-display)", fontSize: "1rem", fontWeight: 700,
-										color: selected ? f.color : "var(--color-text-muted)",
-										marginBottom: "0.5rem",
-										transition: "all var(--transition-soft)",
-									}}>
-										{char.name[0]}
-									</div>
+									<AvatarPreview
+										faction={faction}
+										characterId={char.id}
+										characterName={char.name}
+										selected={selected}
+										color={f.color}
+									/>
 									<span style={{
 										fontSize: "0.76rem", fontWeight: 700,
 										fontFamily: "var(--font-display)", letterSpacing: "0.04em",
 										color: selected ? f.color : "var(--color-text)",
+										textAlign: "center",
 									}}>
 										{char.name}
-									</span>
-									<span style={{ fontSize: "0.64rem", marginTop: "0.2rem", color: "var(--color-text-muted)", textAlign: "center", lineHeight: 1.3 }}>
-										{char.role}
 									</span>
 								</button>
 							);
