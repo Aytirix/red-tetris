@@ -1,8 +1,8 @@
-import app from "./app.js";
+import { createApp } from "./app.js";
 import http from "http";
 
+const app = createApp();
 const server = http.createServer(app);
-
 const PORT = process.env.PORT || 3000;
 
 server.listen(PORT, () => {
