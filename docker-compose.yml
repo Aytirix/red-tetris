@@ -5,16 +5,17 @@ services:
       context: ./frontend
       target: dev
       args:
-        PORT_DEV_FRONTEND: ${PORT_DEV_FRONTEND}
+        PORT_DEV_FRONTEND: ${PORT_DEV_FRONTEND:?PORT_DEV_FRONTEND is required}
     user: "${UID:-1000}:${GID:-1000}"
     ports:
-      - "0.0.0.0:${PORT_DEV_FRONTEND}:${PORT_DEV_FRONTEND}"
+      - "0.0.0.0:${PORT_DEV_FRONTEND:?PORT_DEV_FRONTEND is required}:${PORT_DEV_FRONTEND:?PORT_DEV_FRONTEND is required}"
     volumes:
       - ./frontend:/app
     environment:
       CHOKIDAR_USEPOLLING: "true"
       NPM_CONFIG_CACHE: /tmp/.npm
-    command: sh -c 'if [ ! -f node_modules/.package-lock.json ]; then npm ci; fi && npm run dev -- --host 0.0.0.0 --port ${PORT_DEV_FRONTEND}'
+      VITE_PORT: ${PORT:?PORT is required}
+    command: sh -c 'if [ ! -f node_modules/.package-lock.json ]; then npm ci; fi && npm run dev -- --host 0.0.0.0 --port ${PORT_DEV_FRONTEND:?PORT_DEV_FRONTEND is required}'
 
   frontend-builder:
     profiles: [ "prod" ]
@@ -31,20 +32,20 @@ services:
       context: ./server
       target: dev
     ports:
-      - "${PORT}:${PORT}"
+      - "${PORT:?PORT is required}:${PORT:?PORT is required}"
     volumes:
       - ./server:/app
       - backend_node_modules:/app/node_modules
     environment:
-      HOST: ${HOST}
-      PORT: ${PORT}
-      NODE_ENV: ${NODE_ENV}
-      POSTGRES_HOST: ${POSTGRES_HOST}
-      POSTGRES_PORT: ${POSTGRES_PORT}
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
-      DATABASE_URL: ${DATABASE_URL}
+      HOST: ${HOST:?HOST is required}
+      PORT: ${PORT:?PORT is required}
+      NODE_ENV: ${NODE_ENV:?NODE_ENV is required}
+      POSTGRES_HOST: ${POSTGRES_HOST:?POSTGRES_HOST is required}
+      POSTGRES_PORT: ${POSTGRES_PORT:?POSTGRES_PORT is required}
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB is required}
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
     depends_on:
       - db
     command: npm run dev
@@ -54,11 +55,11 @@ services:
     restart: always
     shm_size: 128mb
     environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB is required}
     ports:
-      - ${POSTGRES_PORT}:5432
+      - "${POSTGRES_PORT:?POSTGRES_PORT is required}:5432"
     volumes:
       - db_data:/var/lib/postgresql
 
@@ -68,10 +69,10 @@ services:
     depends_on:
       - db
     environment:
-      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL}
-      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD}
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:?PGADMIN_DEFAULT_EMAIL is required}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:?PGADMIN_DEFAULT_PASSWORD is required}
     ports:
-      - "${PGADMIN_PORT}:80"
+      - "${PGADMIN_PORT:?PGADMIN_PORT is required}:80"
 
 volumes:
   frontend_node_modules:
