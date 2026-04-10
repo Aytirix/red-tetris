@@ -13,7 +13,7 @@ export function createApp(): express.Express {
 		next();
 	});
 
-	// app.use(express.json());
+	app.use(express.json());
 
 	app.get("/", (_req, res) => {
 		res.send(`
