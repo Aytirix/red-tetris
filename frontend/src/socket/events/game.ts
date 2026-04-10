@@ -1,4 +1,4 @@
-import { socket } from "../../socket";
+import { socket } from "../socket";
 import type { Socket } from "socket.io-client";
 
 // --- Listeners (enregistrés une seule fois au connect) ---
