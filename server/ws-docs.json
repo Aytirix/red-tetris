@@ -1,14 +1,14 @@
 [
   {
     "id": "b8e75336-124a-437b-9403-fd6d4740d936",
-    "name": "user:checkUsernameavailable",
+    "name": "user:CheckUsernameAvailable",
     "direction": "front-to-back",
     "group": "user",
     "description": "",
     "payload": "{\n  \"username\": string\n}",
     "payloadDescription": "",
     "response": "{\n  \"available\": boolean,\n  \"is_register\": boolean\n}",
-    "responseName": "user:checkUsernameavailable",
-    "responseDescription": "available = Si le pseudo est dispo ou non ,si oui alors il est réserver pour cette utilisateur\nis_register = est-ce que pseudo est déjà enregistrer ou c'est la première fois ?"
+    "responseName": "user:ResultUsernameAvailable",
+    "responseDescription": "available = true = Si le pseudo est dispo (+ le réserver pour l'utilisateur) et false = le pseudo est déjà utiliser par une personne\nis_register = true si le pseudo est déjà enregistrer et false =  si c'est la 1er utilisation du pseudo"
   }
 ]
