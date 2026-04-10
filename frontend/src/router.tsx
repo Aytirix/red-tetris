@@ -4,6 +4,7 @@ import HomePage from "./pages/HomePage";
 import NotFoundPage from "./pages/NotFoundPage";
 import ThemePage from "./pages/ThemePage";
 import RouteErrorPage from "./pages/RouteErrorPage";
+import DocsWsPage from "./pages/DocsWsPage";
 
 export const router = createBrowserRouter([
 	{
@@ -13,6 +14,7 @@ export const router = createBrowserRouter([
 		children: [
 			{ index: true, element: <HomePage /> },
 			{ path: "theme", element: <ThemePage /> },
+			{ path: "docs-ws", element: <DocsWsPage /> },
 			{ path: "*", element: <NotFoundPage /> },
 		],
 	},

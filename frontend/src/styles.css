@@ -113,7 +113,6 @@ code {
 }
 
 .card:hover {
-	transform: translateY(-4px);
 	border-color: var(--color-border-strong);
 }
 
@@ -242,10 +241,6 @@ h3 {
 		box-shadow var(--transition-soft),
 		border-color var(--transition-soft),
 		background-color var(--transition-soft);
-}
-
-.button:hover {
-	transform: translateY(-2px);
 }
 
 .button-primary {
