@@ -14,8 +14,25 @@ export function createApp(): express.Express {
 
 	app.use(express.json());
 
-	app.get("/", (req, res) => {
-		res.send("Red Tetris Server");
+	app.get("/", (_req, res) => {
+		res.send(`
+			<!DOCTYPE html>
+			<html>
+				<head>
+					<title>Socket test</title>
+				</head>
+				<body>
+					<h1>Socket test</h1>
+					<script src="/socket.io/socket.io.js"></script>
+					<script>
+						const socket = io();
+						socket.on("connect", () => {
+							console.log("connected:", socket.id);
+						});
+					</script>
+				</body>
+			</html>
+		`);
 	});
 
 	app.use(wsDocsRouter);
