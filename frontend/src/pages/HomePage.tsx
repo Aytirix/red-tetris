@@ -506,11 +506,6 @@ function RegisterStep({ username, onSubmit }: {
 										: "La galerie d’avatars apparaîtra ici dès qu’une faction sera choisie."}
 								</p>
 							</div>
-							{faction && (
-								<div className="badge" style={{ color: f?.color, borderColor: f ? `${f.color}33` : undefined }}>
-									{characters.length} avatars
-								</div>
-							)}
 						</div>
 
 						{faction && f ? (
