@@ -4,23 +4,26 @@ services:
     build:
       context: ./frontend
       target: dev
+      args:
+        PORT_DEV_FRONTEND: ${PORT_DEV_FRONTEND}
     user: "${UID:-1000}:${GID:-1000}"
     ports:
-      - "0.0.0.0:5173:5173"
+      - "0.0.0.0:${PORT_DEV_FRONTEND}:${PORT_DEV_FRONTEND}"
     volumes:
       - ./frontend:/app
     environment:
       CHOKIDAR_USEPOLLING: "true"
       NPM_CONFIG_CACHE: /tmp/.npm
-    command: sh -c 'if [ ! -f node_modules/.package-lock.json ]; then npm ci; fi && npm run dev -- --host 0.0.0.0'
+    command: sh -c 'if [ ! -f node_modules/.package-lock.json ]; then npm ci; fi && npm run dev -- --host 0.0.0.0 --port ${PORT_DEV_FRONTEND}'
 
-  frontend-prod:
+  frontend-builder:
     profiles: [ "prod" ]
     build:
       context: ./frontend
-      target: prod
-    ports:
-      - "8080:80"
+      target: build
+    volumes:
+      - frontend_dist:/dist
+    command: sh -c "cp -r /app/dist/. /dist/"
 
   backend-dev:
     profiles: [ "dev" ]
@@ -73,4 +76,5 @@ services:
 volumes:
   frontend_node_modules:
   backend_node_modules:
+  frontend_dist:
   db_data:

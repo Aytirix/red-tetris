@@ -5,16 +5,11 @@ COPY package*.json ./
 
 # L'image de développement
 FROM base AS dev
-EXPOSE 5173
+ARG PORT_DEV_FRONTEND=5173
+EXPOSE ${PORT_DEV_FRONTEND}
 
 # L'image de production
 FROM base AS build
 RUN npm ci
 COPY . .
 RUN npm run build
-
-# L'image finale pour la production exécutant Nginx pour servir les fichiers statiques
-FROM nginx:1.27-alpine AS prod
-COPY nginx.conf /etc/nginx/conf.d/default.conf
-COPY --from=build /app/dist /usr/share/nginx/html
-EXPOSE 80
