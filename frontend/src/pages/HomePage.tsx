@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { ClipLoader } from "react-spinners";
 import { useSocket } from "../contexts/SocketContext";
 import { emitCheckUsernameAvailable } from "../socket/events/user";
@@ -61,10 +61,11 @@ type CheckState = "idle" | "checking" | "available" | "unavailable";
 
 // ─── Username step ───────────────────────────────────────────────────────────
 
-function UsernameStep({ username, setUsername, checkState, onConfirm }: {
+function UsernameStep({ username, setUsername, checkState, isRegistered, onConfirm }: {
 	username: string;
 	setUsername: (v: string) => void;
 	checkState: CheckState;
+	isRegistered: boolean;
 	onConfirm: () => void;
 }) {
 	return (
@@ -161,7 +162,7 @@ function UsernameStep({ username, setUsername, checkState, onConfirm }: {
 						transition: "opacity var(--transition-slow)",
 					}}
 				>
-					Choisir ce pseudo
+					{isRegistered ? "Jouer →" : "Choisir ce pseudo"}
 				</button>
 			</div>
 		</div>
@@ -316,16 +317,22 @@ function RegisterStep({ username, onSubmit }: {
 
 export default function HomePage() {
 	const navigate = useNavigate();
+	const location = useLocation();
 	const { socket } = useSocket();
 
-	const [step, setStep] = useState<"username" | "register">("username");
+	const locationState = location.state as { step?: "register"; returnTo?: string } | null;
+	const [step, setStep] = useState<"username" | "register">(
+		locationState?.step === "register" ? "register" : "username"
+	);
 	const [username, setUsername] = useState(() => localStorage.getItem("username") ?? "");
 	const [checkState, setCheckState] = useState<CheckState>("idle");
+	const [isRegistered, setIsRegistered] = useState(false);
 	const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
 	useEffect(() => {
 		const trimmed = username.trim();
 		setCheckState("idle");
+		setIsRegistered(false);
 		if (!trimmed) return;
 		if (timerRef.current) clearTimeout(timerRef.current);
 		timerRef.current = setTimeout(() => {
@@ -337,17 +344,33 @@ export default function HomePage() {
 
 	useEffect(() => {
 		function onResult(data: { available: boolean; is_register: boolean }) {
-			if (!data.available) { setCheckState("unavailable"); return; }
-			if (data.is_register) { navigate("/dashboard"); return; }
+			if (!data.available) { setCheckState("unavailable"); setIsRegistered(false); return; }
+			setIsRegistered(data.is_register);
 			setCheckState("available");
 		}
 		socket.on("user:ResultUsernameAvailable", onResult);
 		return () => { socket.off("user:ResultUsernameAvailable", onResult); };
 	}, [socket, navigate]);
 
+	function resolveDestination(newUsername: string): string {
+		const returnTo = locationState?.returnTo;
+		if (!returnTo) return "/dashboard";
+		const parts = returnTo.split("/").filter(Boolean);
+		if (parts.length === 2) return `/${parts[0]}/${newUsername}`;
+		return returnTo;
+	}
+
+	function handleUsernameConfirm() {
+		const trimmed = username.trim();
+		localStorage.setItem("username", trimmed);
+		if (isRegistered) { navigate(resolveDestination(trimmed)); return; }
+		setStep("register");
+	}
+
 	function handleRegisterSubmit(faction: Faction, avatar: string) {
-		socket.emit("user:Register", { username: username.trim(), faction, avatar });
-		navigate("/dashboard");
+		const trimmed = username.trim();
+		socket.emit("user:Register", { username: trimmed, faction, avatar });
+		navigate(resolveDestination(trimmed));
 	}
 
 	return (
@@ -357,7 +380,8 @@ export default function HomePage() {
 					username={username}
 					setUsername={setUsername}
 					checkState={checkState}
-					onConfirm={() => setStep("register")}
+					isRegistered={isRegistered}
+					onConfirm={handleUsernameConfirm}
 				/>
 			)}
 			{step === "register" && (
