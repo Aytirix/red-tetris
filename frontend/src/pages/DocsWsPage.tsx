@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useAlert } from "../components/Alert";
+import { socket } from "../socket/socket";
 
 interface WsEvent {
 	id: string;
@@ -21,6 +22,29 @@ function formatJson(str: string): string {
 		return JSON.stringify(JSON.parse(str), null, 2);
 	} catch {
 		return str;
+	}
+}
+
+function getTestPayloadSeed(payload: string): string {
+	const trimmed = payload.trim();
+	if (!trimmed) return "";
+
+	try {
+		return JSON.stringify(JSON.parse(trimmed), null, 2);
+	} catch {
+		const normalized = trimmed
+			.replace(/:\s*string\b/g, ': ""')
+			.replace(/:\s*boolean\b/g, ": false")
+			.replace(/:\s*number\b/g, ": 0")
+			.replace(/:\s*null\b/g, ": null")
+			.replace(/:\s*object\b/g, ": {}")
+			.replace(/:\s*array\b/g, ": []");
+
+		try {
+			return JSON.stringify(JSON.parse(normalized), null, 2);
+		} catch {
+			return trimmed;
+		}
 	}
 }
 
@@ -88,10 +112,11 @@ function selectAll(el: HTMLElement) {
 	selection.addRange(range);
 }
 
-function EventCard({ event, onEdit, onDelete }: {
+function EventCard({ event, onEdit, onDelete, onTest }: {
 	event: WsEvent;
 	onEdit: (e: WsEvent) => void;
 	onDelete: (id: string) => void;
+	onTest: (e: WsEvent) => void;
 }) {
 	const isFtB = event.direction === "front-to-back";
 	const accent = isFtB ? "var(--color-primary)" : "var(--color-secondary)";
@@ -113,6 +138,19 @@ function EventCard({ event, onEdit, onDelete }: {
 					{event.name}
 				</code>
 				<div style={{ display: "flex", gap: "0.5rem", flexShrink: 0 }}>
+					{isFtB && (
+						<button
+							className="button"
+							style={{
+								minHeight: "30px", padding: "0 0.75rem", fontSize: "0.76rem",
+								border: "1px solid rgba(61,231,255,0.22)",
+								background: "rgba(61,231,255,0.12)", color: "var(--color-secondary)",
+							}}
+							onClick={() => onTest(event)}
+						>
+							Tester
+						</button>
+					)}
 					<button
 						className="button button-secondary"
 						style={{ minHeight: "30px", padding: "0 0.75rem", fontSize: "0.76rem" }}
@@ -205,10 +243,11 @@ function EventCard({ event, onEdit, onDelete }: {
 	);
 }
 
-function GroupedEvents({ events, onEdit, onDelete }: {
+function GroupedEvents({ events, onEdit, onDelete, onTest }: {
 	events: WsEvent[];
 	onEdit: (e: WsEvent) => void;
 	onDelete: (id: string) => void;
+	onTest: (e: WsEvent) => void;
 }) {
 	if (events.length === 0) {
 		return <p style={{ color: "var(--color-text-muted)", fontSize: "0.88rem", fontStyle: "italic" }}>Aucun event documenté</p>;
@@ -234,7 +273,7 @@ function GroupedEvents({ events, onEdit, onDelete }: {
 						<div style={{ flex: 1, height: "1px", background: "var(--color-border)" }} />
 					</div>
 					{groupEvents.map((e) => (
-						<EventCard key={e.id} event={e} onEdit={onEdit} onDelete={onDelete} />
+						<EventCard key={e.id} event={e} onEdit={onEdit} onDelete={onDelete} onTest={onTest} />
 					))}
 				</div>
 			))}
@@ -260,10 +299,18 @@ export default function DocsWsPage() {
 	const [loading, setLoading] = useState(true);
 	const [isOpen, setIsOpen] = useState(false);
 	const [editing, setEditing] = useState<WsEvent | null>(null);
+	const [testing, setTesting] = useState<WsEvent | null>(null);
 	const [form, setForm] = useState(emptyForm);
 	const [error, setError] = useState("");
 	const [groupOpen, setGroupOpen] = useState(false);
+	const [testPayload, setTestPayload] = useState("");
+	const [testError, setTestError] = useState("");
 	const textareaRefs = useRef<Partial<Record<TextareaField, HTMLTextAreaElement | null>>>({});
+	const testPayloadRef = useRef<HTMLTextAreaElement | null>(null);
+	const [testStatus, setTestStatus] = useState<"idle" | "sent" | "waiting" | "received" | "timeout" | "error">("idle");
+	const [testResponse, setTestResponse] = useState("");
+	const testListenerRef = useRef<{ eventName: string; handler: (data: unknown) => void } | null>(null);
+	const testTimeoutRef = useRef<number | null>(null);
 
 	const allGroups = [...new Set(events.map((e) => e.group).filter(Boolean))];
 	const [selectedGroup, setSelectedGroup] = useState<string | null>(null);
@@ -306,6 +353,35 @@ export default function DocsWsPage() {
 		});
 		setError("");
 		setIsOpen(true);
+	}
+
+	function clearTestListener() {
+		if (testListenerRef.current) {
+			socket.off(testListenerRef.current.eventName, testListenerRef.current.handler);
+			testListenerRef.current = null;
+		}
+		if (testTimeoutRef.current !== null) {
+			window.clearTimeout(testTimeoutRef.current);
+			testTimeoutRef.current = null;
+		}
+	}
+
+	function closeTestModal() {
+		clearTestListener();
+		setTesting(null);
+		setTestPayload("");
+		setTestError("");
+		setTestResponse("");
+		setTestStatus("idle");
+	}
+
+	function openTest(event: WsEvent) {
+		clearTestListener();
+		setTesting(event);
+		setTestPayload(getTestPayloadSeed(event.payload));
+		setTestError("");
+		setTestResponse("");
+		setTestStatus("idle");
 	}
 
 	async function handleDelete(id: string) {
@@ -356,6 +432,14 @@ export default function DocsWsPage() {
 		}
 	}, [form, isOpen]);
 
+	useEffect(() => {
+		if (testing && testPayloadRef.current) {
+			resizeTextarea(testPayloadRef.current, 8);
+		}
+	}, [testing, testPayload]);
+
+	useEffect(() => closeTestModal, []);
+
 	async function handleSubmit(e: React.SyntheticEvent<HTMLFormElement>) {
 		e.preventDefault();
 		const event: WsEvent = {
@@ -375,6 +459,61 @@ export default function DocsWsPage() {
 			: [...events, event];
 		await save(updated);
 		setIsOpen(false);
+	}
+
+	function handleTestSubmit(e: React.SyntheticEvent<HTMLFormElement>) {
+		e.preventDefault();
+		if (!testing) return;
+
+		clearTestListener();
+		setTestError("");
+		setTestResponse("");
+
+		if (!socket.connected) {
+			setTestStatus("error");
+			setTestError("Socket non connecté au backend.");
+			return;
+		}
+
+		let parsedPayload: unknown;
+		try {
+			parsedPayload = testPayload.trim() ? JSON.parse(testPayload) : undefined;
+		} catch {
+			setTestStatus("error");
+			setTestError("Le payload de test doit être un JSON valide.");
+			return;
+		}
+
+		if (testing.responseName) {
+			const handler = (data: unknown) => {
+				setTestResponse(JSON.stringify(data, null, 2));
+				setTestStatus("received");
+				if (testTimeoutRef.current !== null) {
+					window.clearTimeout(testTimeoutRef.current);
+					testTimeoutRef.current = null;
+				}
+				socket.off(testing.responseName, handler);
+				testListenerRef.current = null;
+			};
+
+			testListenerRef.current = { eventName: testing.responseName, handler };
+			socket.on(testing.responseName, handler);
+			setTestStatus("waiting");
+			testTimeoutRef.current = window.setTimeout(() => {
+				socket.off(testing.responseName, handler);
+				testListenerRef.current = null;
+				testTimeoutRef.current = null;
+				setTestStatus("timeout");
+			}, 10000);
+		} else {
+			setTestStatus("sent");
+		}
+
+		if (typeof parsedPayload === "undefined") {
+			socket.emit(testing.name);
+		} else {
+			socket.emit(testing.name, parsedPayload);
+		}
 	}
 
 	const filtered = selectedGroup ? events.filter((e) => (e.group || "Général") === selectedGroup) : events;
@@ -467,13 +606,13 @@ export default function DocsWsPage() {
 						<p className="section-kicker" style={{ color: "var(--color-primary)", marginBottom: "1rem" }}>
 							↑ Front → Back
 						</p>
-						<GroupedEvents events={frontToBack} onEdit={openEdit} onDelete={handleDelete} />
+						<GroupedEvents events={frontToBack} onEdit={openEdit} onDelete={handleDelete} onTest={openTest} />
 					</div>
 					<div>
 						<p className="section-kicker" style={{ marginBottom: "1rem" }}>
 							↓ Back → Front
 						</p>
-						<GroupedEvents events={backToFront} onEdit={openEdit} onDelete={handleDelete} />
+						<GroupedEvents events={backToFront} onEdit={openEdit} onDelete={handleDelete} onTest={openTest} />
 					</div>
 				</div>
 			)}
@@ -702,6 +841,154 @@ export default function DocsWsPage() {
 								</button>
 								<button type="submit" className="button button-primary">
 									{editing ? "Sauvegarder" : "Ajouter"}
+								</button>
+							</div>
+						</form>
+					</div>
+				</div>
+			)}
+
+			{testing && (
+				<div style={{
+					position: "fixed", inset: 0,
+					background: "rgba(0,0,0,0.72)",
+					display: "flex", alignItems: "center", justifyContent: "center",
+					zIndex: 60, padding: "1rem",
+					backdropFilter: "blur(6px)",
+				}}>
+					<div className="card" style={{
+						width: "100%", maxWidth: "720px",
+						boxShadow: "var(--shadow-panel), var(--shadow-neon-cyan)",
+						padding: 0,
+					}}>
+						<div style={{
+							display: "flex", justifyContent: "space-between", alignItems: "center",
+							padding: "1.25rem 1.5rem",
+							borderBottom: "1px solid var(--color-border)",
+						}}>
+							<div>
+								<p className="eyebrow" style={{ margin: 0 }}>Tester l'event</p>
+								<code style={{ color: "var(--color-secondary)", fontSize: "0.82rem" }}>{testing.name}</code>
+							</div>
+							<button
+								onClick={closeTestModal}
+								style={{ color: "var(--color-text-muted)", fontSize: "1.4rem", lineHeight: 1, cursor: "pointer" }}
+							>
+								×
+							</button>
+						</div>
+
+						<form onSubmit={handleTestSubmit} autoComplete="off" style={{ padding: "1.5rem", display: "flex", flexDirection: "column", gap: "1rem" }}>
+							<div>
+								<span style={labelStyle}>Statut</span>
+								<p style={{ margin: 0, color: "var(--color-text-muted)", fontSize: "0.9rem" }}>
+									{testStatus === "idle" ? "Prêt à envoyer le test." : null}
+									{testStatus === "waiting" && testing.responseName ? `Event envoyé. En attente de ${testing.responseName}...` : null}
+									{testStatus === "received" && testing.responseName ? `Réponse ${testing.responseName} reçue.` : null}
+									{testStatus === "sent" ? "Event envoyé. Aucune réponse attendue." : null}
+									{testStatus === "timeout" && testing.responseName ? `Aucune réponse ${testing.responseName} reçue après 10 secondes.` : null}
+									{testStatus === "error" ? "L'envoi du test a échoué." : null}
+								</p>
+							</div>
+
+							<div>
+								<span style={labelStyle}>Payload à envoyer <span style={{ fontWeight: 400, textTransform: "none", letterSpacing: 0, color: "var(--color-secondary)" }}>(JSON)</span></span>
+								<textarea
+									value={testPayload}
+									onChange={(e) => {
+										setTestPayload(e.target.value);
+										resizeTextarea(e.currentTarget, 8);
+									}}
+									onKeyDown={(e) => {
+										if (e.key !== "Tab") return;
+										e.preventDefault();
+										const el = e.currentTarget;
+										const start = el.selectionStart;
+										const end = el.selectionEnd;
+										const indent = "  ";
+										const newValue = testPayload.substring(0, start) + indent + testPayload.substring(end);
+										setTestPayload(newValue);
+										requestAnimationFrame(() => {
+											el.selectionStart = start + indent.length;
+											el.selectionEnd = start + indent.length;
+											resizeTextarea(el, 8);
+										});
+									}}
+									ref={(el) => {
+										testPayloadRef.current = el;
+										if (el) resizeTextarea(el, 8);
+									}}
+									rows={1}
+									spellCheck={false}
+									placeholder='{"key": "value"}'
+									{...passwordManagerIgnoreProps}
+									style={{ ...inputStyle, fontFamily: "monospace", resize: "none", color: "var(--color-secondary)", overflowY: "hidden" }}
+								/>
+							</div>
+
+							{testing.responseName && (
+								<div>
+									<code style={{
+										display: "inline-block", marginBottom: "0.5rem",
+										color: "var(--color-accent)", fontSize: "0.82rem", letterSpacing: "0.04em",
+										background: "var(--color-accent-soft)",
+										padding: "0.3rem 0.65rem", borderRadius: "8px",
+										border: "1px solid rgba(144,105,255,0.2)",
+										userSelect: "text", WebkitUserSelect: "text", cursor: "text",
+									}}
+									onDoubleClick={(e) => selectAll(e.currentTarget)}
+									>
+										{testing.responseName}
+									</code>
+									<span style={labelStyle}>Réponse attendue</span>
+									{testing.responseDescription && (
+										<p style={{ margin: "0 0 0.5rem", color: "var(--color-text-muted)", fontSize: "0.82rem", lineHeight: 1.5 }}>
+											{testing.responseDescription}
+										</p>
+									)}
+									{testing.response && (
+										<pre
+											style={{
+												margin: 0, padding: "0.85rem 1rem",
+												background: "rgba(0,0,0,0.35)", border: "1px solid var(--color-border)",
+												borderRadius: "12px", fontSize: "0.78rem", color: "var(--color-accent)",
+												lineHeight: 1.65, overflowX: "auto", fontFamily: "monospace",
+												userSelect: "text", WebkitUserSelect: "text", cursor: "text",
+											}}
+											onDoubleClick={(e) => selectAll(e.currentTarget)}
+										>
+											{formatJson(testing.response)}
+										</pre>
+									)}
+								</div>
+							)}
+
+							{testResponse && (
+								<div>
+									<span style={labelStyle}>Réponse reçue <span style={{ fontWeight: 400, textTransform: "none", letterSpacing: 0, color: "var(--color-accent)" }}>(runtime)</span></span>
+									<pre
+										style={{
+											margin: 0, padding: "0.85rem 1rem",
+											background: "rgba(0,0,0,0.35)", border: "1px solid var(--color-border)",
+											borderRadius: "12px", fontSize: "0.78rem", color: "var(--color-accent)",
+											lineHeight: 1.65, overflowX: "auto", fontFamily: "monospace",
+											userSelect: "text", WebkitUserSelect: "text", cursor: "text",
+										}}
+										onDoubleClick={(e) => selectAll(e.currentTarget)}
+									>
+										{testResponse}
+									</pre>
+								</div>
+							)}
+
+							{testError && <p style={{ color: "var(--color-primary)", fontSize: "0.85rem", margin: 0 }}>{testError}</p>}
+
+							<div style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem" }}>
+								<button type="submit" className="button button-primary">
+									Envoyer
+								</button>
+								<button type="button" className="button button-outline" onClick={closeTestModal}>
+									Fermer
 								</button>
 							</div>
 						</form>
