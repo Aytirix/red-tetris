@@ -1,4 +1,4 @@
-# Red Tetris
+# Red Piece
 
 Projet de Tetris multijoueur en temps réel, développé en **full-stack JavaScript/TypeScript**.
 

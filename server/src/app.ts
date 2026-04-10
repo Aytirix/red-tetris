@@ -1,6 +1,8 @@
 import express from "express";
 import { wsDocsRouter } from "./routes/wsDocs.js";
 
+const isDev = process.env.NODE_ENV === "development";
+
 export function createApp(): express.Express {
 	const app = express();
 
@@ -36,7 +38,9 @@ export function createApp(): express.Express {
 		`);
 	});
 
-	app.use(wsDocsRouter);
+	if (isDev) {
+		app.use(wsDocsRouter);
+	}
 
 	return app;
 }

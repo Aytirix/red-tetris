@@ -13,7 +13,7 @@ export GID
 
 help: ## Affiche cette aide
 	@printf "\n"
-	@printf "\033[1;38;5;216mRED TETRIS\033[0m\n"
+	@printf "\033[1;38;5;216mRED PIECE\033[0m\n"
 	@printf "\033[2mCompose: %s\033[0m\n\n" "$(COMPOSE)"
 	@printf "\033[1mDevelopment\033[0m\n"
 	@printf "  \033[36m%-12s\033[0m %s\n" "dev" "Lance la stack dev complete"
