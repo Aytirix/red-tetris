@@ -55,7 +55,7 @@ prod-logs: ## Suit les logs du frontend prod
 ####################
 
 backend-dev: ## Lance le backend en mode dev avec hot reload
-	$(COMPOSE) --profile dev up --build backend-dev db adminer
+	$(COMPOSE) --profile dev up --build backend-dev db pgadmin
 
 backend-dev-build: ## Rebuild l'image backend dev db adminer
 	$(COMPOSE) --profile dev build backend-dev
