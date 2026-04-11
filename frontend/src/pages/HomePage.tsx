@@ -67,7 +67,7 @@ const CHARACTERS: Record<Faction, { id: string; name: string }[]> = {
 		{ id: "garp", name: "Garp" },
 		{ id: "smoker", name: "Smoker" },
 		{ id: "tashigi", name: "Tashigi" },
-		{ id: "coby", name: "Coby" },
+		{ id: "koby", name: "Koby" },
 		{ id: "aokiji", name: "Aokiji" },
 		{ id: "kizaru", name: "Kizaru" },
 		{ id: "akainu", name: "Akainu" },
@@ -681,6 +681,7 @@ function RegisterStep({ username, onSubmit }: {
 								left: isLeft ? 0 : "50%",
 								width: "50%",
 								cursor: !faction ? "pointer" : "default",
+								opacity: !faction ? 1 : 0,
 								display: "flex",
 								alignItems: "center",
 								justifyContent: "center",
@@ -688,7 +689,7 @@ function RegisterStep({ username, onSubmit }: {
 								background: isLeft
 									? "linear-gradient(90deg, rgba(209, 75, 63, 0.16) 0%, rgba(209, 75, 63, 0.06) 48%, rgba(209, 75, 63, 0) 100%)"
 									: "linear-gradient(270deg, rgba(28, 120, 192, 0.16) 0%, rgba(28, 120, 192, 0.06) 48%, rgba(28, 120, 192, 0) 100%)",
-								transition: "background var(--transition-soft), transform var(--transition-soft)",
+								transition: "opacity 140ms ease, background var(--transition-soft), transform var(--transition-soft)",
 								pointerEvents: !faction ? "auto" : "none",
 								zIndex: 1,
 							}}
@@ -1045,9 +1046,22 @@ function RegisterStep({ username, onSubmit }: {
 								</div>
 							</div>
 
-							{layerIsActive && avatar && (
+							{layerIsActive && (
 								<div style={{ display: "flex", justifyContent: "center" }}>
-									<button className="button button-primary" onClick={() => onSubmit(layerFaction, avatar)}>
+									<button
+										className="button button-primary"
+										disabled={!avatar}
+										onClick={() => {
+											if (!avatar) return;
+											onSubmit(layerFaction, avatar);
+										}}
+										style={{
+											opacity: avatar ? 1 : 0.42,
+											cursor: avatar ? "pointer" : "not-allowed",
+											filter: avatar ? "none" : "grayscale(0.2)",
+											transition: "opacity var(--transition-soft), filter var(--transition-soft)",
+										}}
+									>
 										Rejoindre la bataille
 									</button>
 								</div>
