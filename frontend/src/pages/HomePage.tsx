@@ -22,7 +22,7 @@ const FACTIONS: Record<Faction, FactionData> = {
 		label: "Pirates",
 		tone: "red",
 		icon: "☠",
-		image: "/img/choix-faction/luffy.png",
+		image: "/img/choix-faction/pirates.jpg",
 		color: "var(--color-primary)",
 		colorSoft: "var(--color-primary-soft)",
 		shadow: "var(--shadow-neon-red)",
@@ -37,7 +37,7 @@ const FACTIONS: Record<Faction, FactionData> = {
 		label: "Marines",
 		tone: "cyan",
 		icon: "⚓",
-		image: "/img/choix-faction/garp.png",
+		image: "/img/choix-faction/marine.jpg",
 		color: "var(--color-secondary)",
 		colorSoft: "var(--color-secondary-soft)",
 		shadow: "var(--shadow-neon-cyan)",
@@ -356,12 +356,17 @@ function RegisterStep({ username, onSubmit }: {
 	username: string;
 	onSubmit: (faction: Faction, avatar: string) => void;
 }) {
+	const swipeDurationMs = 460;
+	const edgeHandleBaseOffset = 24;
+	const edgeHandleMinOpacity = 0.42;
 	const [faction, setFaction] = useState<Faction | null>(null);
 	const [avatar, setAvatar] = useState<string | null>(null);
+	const [isFactionDetailVisible, setIsFactionDetailVisible] = useState(false);
 	const containerRef = useRef<HTMLDivElement>(null);
 	const targetRef = useRef({ x: 0, y: 0 });
 	const currentRef = useRef({ x: 0, y: 0 });
 	const rafRef = useRef<number>(0);
+	const swipeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
 	const f = faction ? FACTIONS[faction] : null;
 	const characters = faction ? CHARACTERS[faction] : [];
@@ -381,75 +386,205 @@ function RegisterStep({ username, onSubmit }: {
 		return () => cancelAnimationFrame(rafRef.current);
 	}, []);
 
+	useEffect(() => {
+		return () => {
+			if (swipeTimerRef.current) {
+				clearTimeout(swipeTimerRef.current);
+			}
+		};
+	}, []);
+
+	useEffect(() => {
+		const host = containerRef.current;
+		if (!host) return;
+		if (!faction) {
+			host.style.setProperty("--edge-handle-offset", `${edgeHandleBaseOffset}px`);
+			host.style.setProperty("--edge-handle-opacity", "0");
+			return;
+		}
+		host.style.setProperty(
+			"--edge-handle-offset",
+			faction === "pirates" ? `${edgeHandleBaseOffset}px` : `-${edgeHandleBaseOffset}px`,
+		);
+		host.style.setProperty("--edge-handle-opacity", `${edgeHandleMinOpacity}`);
+	}, [edgeHandleBaseOffset, edgeHandleMinOpacity, faction]);
+
 	function handleMouseMove(e: React.MouseEvent<HTMLDivElement>) {
 		const rect = e.currentTarget.getBoundingClientRect();
 		targetRef.current = {
 			x: ((e.clientX - rect.left) / rect.width - 0.5) * 2,
 			y: ((e.clientY - rect.top) / rect.height - 0.5) * 2,
 		};
+
+		const host = containerRef.current;
+		if (!host || !faction) {
+			host?.style.setProperty("--edge-handle-offset", `${edgeHandleBaseOffset}px`);
+			host?.style.setProperty("--edge-handle-opacity", "0");
+			return;
+		}
+
+		const edgeDistance = faction === "pirates"
+			? rect.right - e.clientX
+			: e.clientX - rect.left;
+		const reveal = Math.max(0, Math.min(1, 1 - edgeDistance / 160));
+		const offset = (1 - reveal) * edgeHandleBaseOffset;
+
+		host.style.setProperty(
+			"--edge-handle-offset",
+			faction === "pirates" ? `${offset}px` : `${-offset}px`,
+		);
+		host.style.setProperty(
+			"--edge-handle-opacity",
+			`${edgeHandleMinOpacity + reveal * (0.96 - edgeHandleMinOpacity)}`,
+		);
 	}
+
+	function handleFactionSelect(nextFaction: Faction) {
+		if (swipeTimerRef.current) {
+			clearTimeout(swipeTimerRef.current);
+		}
+		setAvatar(null);
+		setFaction(nextFaction);
+		setIsFactionDetailVisible(false);
+		swipeTimerRef.current = setTimeout(() => {
+			setIsFactionDetailVisible(true);
+			swipeTimerRef.current = null;
+		}, 24);
+	}
+
+	function handleFactionBack() {
+		if (!faction) return;
+		if (swipeTimerRef.current) {
+			clearTimeout(swipeTimerRef.current);
+		}
+		setAvatar(null);
+		setIsFactionDetailVisible(false);
+		swipeTimerRef.current = setTimeout(() => {
+			setFaction(null);
+			swipeTimerRef.current = null;
+		}, swipeDurationMs);
+	}
+
+	const isPirates = faction === "pirates";
+	const panoramaTranslate = !faction
+		? "-50vw"
+		: isFactionDetailVisible
+			? (isPirates ? "0vw" : "-100vw")
+			: "-50vw";
+	const chooserUiOpacity = !faction || !isFactionDetailVisible ? 1 : 0;
+	const chooserUiTranslate = !faction || !isFactionDetailVisible ? "0%" : (isPirates ? "8%" : "-8%");
+	const detailUiTranslate = isFactionDetailVisible ? "0vw" : (isPirates ? "-100vw" : "100vw");
+	const detailContentTranslate = isFactionDetailVisible ? "0vw" : (isPirates ? "-18vw" : "18vw");
+	const detailPanelOffset = isPirates ? "-25rem" : "25rem";
+	const edgeHandleTranslate = isFactionDetailVisible
+		? `var(--edge-handle-offset, ${edgeHandleBaseOffset}px)`
+		: (isPirates ? "92px" : "-92px");
 
 	return (
 		<div
 			ref={containerRef}
 			onMouseMove={handleMouseMove}
+			onMouseLeave={() => {
+				containerRef.current?.style.setProperty("--edge-handle-opacity", faction ? `${edgeHandleMinOpacity}` : "0");
+				containerRef.current?.style.setProperty(
+					"--edge-handle-offset",
+					faction === "marines" ? `-${edgeHandleBaseOffset}px` : `${edgeHandleBaseOffset}px`,
+				);
+			}}
 			style={{
 				position: "fixed", inset: 0, overflow: "hidden",
 				background: "linear-gradient(180deg, var(--color-bg-2) 0%, var(--color-bg-1) 48%, var(--color-bg-0) 100%)",
 			}}
 		>
-			{/* ── Layer 0 : affrontement pour le choix de faction, héros de camp ensuite ── */}
-			<img
-				src={f ? f.image : "/img/choix-faction/affrontement.png"}
-				alt=""
-				draggable={false}
-				style={f ? {
+			<div style={{
+				position: "absolute",
+				inset: 0,
+				overflow: "hidden",
+			}}>
+				<div style={{
 					position: "absolute",
-					height: "88vh",
-					width: "auto",
-					left: "50%",
-					top: "50%",
-					transform: "translateX(-50%) translateY(-48%) translate(calc(var(--px, 0) * -18px), calc(var(--py, 0) * -12px))",
+					top: 0,
+					left: 0,
+					height: "100%",
+					width: "200vw",
+					display: "grid",
+					gridTemplateColumns: "50vw 100vw 50vw",
+					transform: `translateX(${panoramaTranslate})`,
+					transition: `transform ${swipeDurationMs}ms cubic-bezier(0.22, 1, 0.36, 1)`,
 					willChange: "transform",
-					pointerEvents: "none",
-					userSelect: "none",
-					filter: f.dropShadow,
-					transition: "filter 0.4s ease",
-				} : {
+				}}>
+					<img
+						src="/img/choix-faction/pirates.jpg"
+						alt=""
+						draggable={false}
+						style={{
+							width: "50vw",
+							height: "100vh",
+							objectFit: "cover",
+							objectPosition: "right center",
+							userSelect: "none",
+							pointerEvents: "none",
+							filter: "brightness(0.94) saturate(0.98)",
+						}}
+					/>
+					<img
+						src="/img/choix-faction/affrontement.jpg"
+						alt=""
+						draggable={false}
+						style={{
+							width: "100vw",
+							height: "100vh",
+							objectFit: "cover",
+							objectPosition: "center center",
+							userSelect: "none",
+							pointerEvents: "none",
+							filter: "brightness(0.92) saturate(0.96)",
+						}}
+					/>
+					<img
+						src="/img/choix-faction/marine.jpg"
+						alt=""
+						draggable={false}
+						style={{
+							width: "50vw",
+							height: "100vh",
+							objectFit: "cover",
+							objectPosition: "left center",
+							userSelect: "none",
+							pointerEvents: "none",
+							filter: "brightness(0.94) saturate(0.98)",
+						}}
+					/>
+				</div>
+
+				<div style={{
 					position: "absolute",
 					inset: 0,
-					width: "100%",
-					height: "100%",
-					objectFit: "cover",
-					objectPosition: "center center",
-					transform: "scale(1.04) translate(calc(var(--px, 0) * -10px), calc(var(--py, 0) * -6px))",
-					willChange: "transform",
+					background: "linear-gradient(180deg, rgba(8, 18, 34, 0.14) 0%, rgba(8, 18, 34, 0.06) 34%, rgba(8, 18, 34, 0.22) 100%)",
 					pointerEvents: "none",
-					userSelect: "none",
-					filter: "brightness(0.92) saturate(0.92)",
-				}}
-			/>
+				}} />
+			</div>
 
-			{/* ── Vignette bas (fondu vers le fond) ── */}
 			<div style={{
-				position: "absolute", bottom: 0, left: 0, right: 0, height: "22%",
+				position: "absolute",
+				inset: 0,
+				opacity: chooserUiOpacity,
+				transform: `translateX(${chooserUiTranslate})`,
+				transition: `opacity ${swipeDurationMs}ms ease, transform ${swipeDurationMs}ms cubic-bezier(0.22, 1, 0.36, 1)`,
 				pointerEvents: "none",
-				background: f
-					? "linear-gradient(to top, var(--color-bg-0) 0%, transparent 100%)"
-					: "transparent",
-			}} />
-
-			{/* ── Layer 1 : En-tête (léger mouvement avant) ── */}
-			<div style={{
-				position: "absolute", top: 0, left: 0, right: 0,
-				padding: faction ? "1.5rem 2rem" : "2rem 1.5rem 0",
-				display: "flex", justifyContent: faction ? "space-between" : "center", alignItems: "flex-start",
-				transform: "translate(calc(var(--px, 0) * 5px), calc(var(--py, 0) * 3px))",
-				willChange: "transform",
-				pointerEvents: faction ? "auto" : "none",
-				zIndex: 5,
+				zIndex: 3,
 			}}>
-				{!faction ? (
+				<div style={{
+					position: "absolute",
+					top: 0,
+					left: 0,
+					right: 0,
+					padding: "2rem 1.5rem 0",
+					display: "flex",
+					justifyContent: "center",
+					transform: "translate(calc(var(--px, 0) * 5px), calc(var(--py, 0) * 3px))",
+					willChange: "transform",
+				}}>
 					<div style={{
 						display: "flex",
 						flexDirection: "column",
@@ -478,241 +613,417 @@ function RegisterStep({ username, onSubmit }: {
 							Choisissez votre camp
 						</p>
 					</div>
-				) : (
-					<>
-						<div>
-							<h2 style={{ marginTop: "0.3rem" }}>
-								<span style={{ color: "var(--color-secondary)" }}>{username || "Toto"}</span>
-							</h2>
-							<p className="eyebrow" style={{ marginTop: "0.35rem" }}>
-								Camp {f!.label}
-							</p>
-						</div>
-						{avatar && (
-							<button className="button button-primary" onClick={() => onSubmit(faction, avatar)}>
-								Rejoindre la bataille
-							</button>
-						)}
-					</>
-				)}
+				</div>
+
+				<div style={{
+					position: "absolute",
+					left: "50%",
+					top: "54%",
+					transform: "translate(-50%, -50%)",
+					width: "clamp(72px, 6vw, 118px)",
+					height: "72vh",
+					opacity: 0.92,
+				}}>
+					<svg
+						viewBox="0 0 100 100"
+						preserveAspectRatio="none"
+						aria-hidden="true"
+						style={{ width: "100%", height: "100%", overflow: "visible" }}
+					>
+						<path
+							d="M58 0 L68 12 L49 27 L61 42 L43 56 L55 72 L39 86 L47 100"
+							fill="none"
+							stroke="rgba(167, 223, 255, 0.34)"
+							strokeWidth="18"
+							strokeLinecap="round"
+							strokeLinejoin="round"
+						/>
+						<path
+							d="M58 0 L68 12 L49 27 L61 42 L43 56 L55 72 L39 86 L47 100"
+							fill="none"
+							stroke="rgba(255, 243, 205, 0.78)"
+							strokeWidth="9"
+							strokeLinecap="round"
+							strokeLinejoin="round"
+						/>
+						<path
+							d="M58 0 L68 12 L49 27 L61 42 L43 56 L55 72 L39 86 L47 100"
+							fill="none"
+							stroke="rgba(255, 252, 242, 0.98)"
+							strokeWidth="3.2"
+							strokeLinecap="round"
+							strokeLinejoin="round"
+						/>
+					</svg>
+				</div>
+
+				{(Object.entries(FACTIONS) as [Faction, typeof FACTIONS.pirates][]).map(([key, fc]) => {
+					const isLeft = key === "pirates";
+					return (
+						<button
+							key={key}
+							type="button"
+							aria-label={`Choisir ${fc.label}`}
+							onClick={() => handleFactionSelect(key)}
+							style={{
+								all: "unset",
+								position: "absolute",
+								top: 0,
+								bottom: 0,
+								left: isLeft ? 0 : "50%",
+								width: "50%",
+								cursor: !faction ? "pointer" : "default",
+								display: "flex",
+								alignItems: "center",
+								justifyContent: "center",
+								paddingTop: "10vh",
+								background: isLeft
+									? "linear-gradient(90deg, rgba(209, 75, 63, 0.16) 0%, rgba(209, 75, 63, 0.06) 48%, rgba(209, 75, 63, 0) 100%)"
+									: "linear-gradient(270deg, rgba(28, 120, 192, 0.16) 0%, rgba(28, 120, 192, 0.06) 48%, rgba(28, 120, 192, 0) 100%)",
+								transition: "background var(--transition-soft), transform var(--transition-soft)",
+								pointerEvents: !faction ? "auto" : "none",
+								zIndex: 1,
+							}}
+							onMouseEnter={e => {
+								if (faction) return;
+								const el = e.currentTarget;
+								el.style.background = isLeft
+									? "linear-gradient(90deg, rgba(209, 75, 63, 0.26) 0%, rgba(209, 75, 63, 0.11) 52%, rgba(209, 75, 63, 0) 100%)"
+									: "linear-gradient(270deg, rgba(28, 120, 192, 0.26) 0%, rgba(28, 120, 192, 0.11) 52%, rgba(28, 120, 192, 0) 100%)";
+								el.style.transform = isLeft ? "translateX(-4px)" : "translateX(4px)";
+							}}
+							onMouseLeave={e => {
+								const el = e.currentTarget;
+								el.style.background = isLeft
+									? "linear-gradient(90deg, rgba(209, 75, 63, 0.16) 0%, rgba(209, 75, 63, 0.06) 48%, rgba(209, 75, 63, 0) 100%)"
+									: "linear-gradient(270deg, rgba(28, 120, 192, 0.16) 0%, rgba(28, 120, 192, 0.06) 48%, rgba(28, 120, 192, 0) 100%)";
+								el.style.transform = "none";
+							}}
+						>
+							<div style={{
+								display: "flex",
+								flexDirection: "column",
+								alignItems: "center",
+								gap: "0.75rem",
+								pointerEvents: "none",
+								textAlign: "center",
+							}}>
+								<span style={{
+									fontSize: "clamp(3.2rem, 7vw, 5.4rem)",
+									lineHeight: 1,
+									color: isLeft ? "rgba(255, 248, 241, 0.98)" : "rgba(242, 248, 255, 0.98)",
+									WebkitTextStroke: isLeft ? "1px rgba(58, 22, 18, 0.55)" : "1px rgba(12, 39, 67, 0.45)",
+									textShadow: isLeft
+										? "0 0 28px rgba(209, 75, 63, 0.55)"
+										: "0 0 28px rgba(28, 120, 192, 0.42)",
+								}}>
+									{fc.icon}
+								</span>
+								<strong style={{
+									color: isLeft ? "rgba(255, 242, 235, 0.98)" : "rgba(241, 248, 255, 0.98)",
+									fontSize: "clamp(2rem, 4vw, 3.2rem)",
+									fontFamily: "var(--font-display)",
+									letterSpacing: "0.1em",
+									textTransform: "uppercase",
+									textShadow: "0 4px 22px rgba(8, 19, 37, 0.82)",
+								}}>
+									{fc.label}
+								</strong>
+							</div>
+						</button>
+					);
+				})}
 			</div>
 
-			{/* ── Layer 2 : Zone de sélection entre les bras (plan avant, mouvement rapide) ── */}
-			<div style={faction ? {
-				position: "absolute",
-				top: "54%", left: "50%",
-				transform: "translateX(-50%) translate(calc(var(--px, 0) * 14px), calc(var(--py, 0) * 9px))",
-				willChange: "transform",
-				width: "min(680px, calc(100vw - 2.4rem))",
-				zIndex: 4,
-			} : {
-				position: "absolute",
-				inset: 0,
-				zIndex: 2,
-			}}>
-					{!faction ? (
-						<>
+			{faction && f && (
+				<div style={{
+					position: "absolute",
+					inset: 0,
+					transform: `translateX(${detailUiTranslate})`,
+					transition: `transform ${swipeDurationMs}ms cubic-bezier(0.22, 1, 0.36, 1)`,
+					willChange: "transform",
+					overflow: "hidden",
+					pointerEvents: isFactionDetailVisible ? "auto" : "none",
+					zIndex: 4,
+				}}>
+					<img
+						src={f.image}
+						alt=""
+						draggable={false}
+						style={{
+							position: "absolute",
+							inset: 0,
+							width: "100%",
+							height: "100%",
+							objectFit: "cover",
+							objectPosition: "center center",
+							transform: "scale(1.03) translate(calc(var(--px, 0) * -6px), calc(var(--py, 0) * -4px))",
+							willChange: "transform",
+							userSelect: "none",
+							pointerEvents: "none",
+							filter: "brightness(0.95) saturate(1)",
+						}}
+					/>
+					<div style={{
+						position: "absolute",
+						inset: 0,
+						background: "linear-gradient(180deg, rgba(8, 18, 34, 0.12) 0%, rgba(8, 18, 34, 0.08) 38%, rgba(8, 18, 34, 0.18) 100%)",
+						pointerEvents: "none",
+					}} />
+					<div style={{
+						position: "absolute",
+						inset: 0,
+						transform: `translateX(${detailContentTranslate})`,
+						transition: `transform ${swipeDurationMs}ms cubic-bezier(0.22, 1, 0.36, 1)`,
+						willChange: "transform",
+						zIndex: 4,
+					}}>
+						<button
+							type="button"
+							onClick={handleFactionBack}
+							style={{
+								all: "unset",
+								position: "absolute",
+								top: 0,
+								[isPirates ? "right" : "left"]: 0,
+								width: "88px",
+								height: "100%",
+								display: "flex",
+								alignItems: "center",
+								justifyContent: "center",
+								cursor: "pointer",
+								zIndex: 5,
+								opacity: "var(--edge-handle-opacity, 0)",
+								transform: `translateX(${edgeHandleTranslate})`,
+								transition: "opacity 180ms ease, transform 320ms cubic-bezier(0.22, 1, 0.36, 1)",
+								filter: `drop-shadow(0 10px 24px rgba(0, 0, 0, 0.14)) drop-shadow(0 0 14px ${f.glow})`,
+							}}
+						>
+							<svg
+								viewBox="0 0 88 100"
+								preserveAspectRatio="none"
+								aria-hidden="true"
+								style={{
+									position: "absolute",
+									inset: 0,
+									width: "100%",
+									height: "100%",
+									overflow: "visible",
+								}}
+							>
+								<defs>
+									<linearGradient id={`edge-handle-fill-${faction}`} x1={isPirates ? "0%" : "100%"} y1="0%" x2={isPirates ? "100%" : "0%"} y2="0%">
+										<stop offset="0%" stopColor="rgba(7, 12, 22, 0)" />
+										<stop offset="18%" stopColor="rgba(7, 12, 22, 0.04)" />
+										<stop offset="52%" stopColor="rgba(7, 12, 22, 0.14)" />
+										<stop offset="100%" stopColor="rgba(7, 12, 22, 0.46)" />
+									</linearGradient>
+								</defs>
+								<path
+									d={isPirates
+										? "M88 0 H30 C16 4 8 18 6 34 C2 43 0 47 0 50 C0 53 2 57 6 66 C8 82 16 96 30 100 H88 Z"
+										: "M0 0 H58 C72 4 80 18 82 34 C86 43 88 47 88 50 C88 53 86 57 82 66 C80 82 72 96 58 100 H0 Z"}
+									fill={`url(#edge-handle-fill-${faction})`}
+								/>
+							</svg>
+							<svg
+								viewBox="0 0 24 24"
+								aria-hidden="true"
+								style={{
+									position: "relative",
+									zIndex: 1,
+									width: "30px",
+									height: "30px",
+									transform: isPirates ? "translateX(-12px)" : "translateX(12px)",
+									filter: `drop-shadow(0 0 10px ${f.glow})`,
+								}}
+							>
+								<path
+									d={isPirates ? "M10 5 L17 12 L10 19" : "M14 5 L7 12 L14 19"}
+									fill="none"
+									stroke="rgba(255, 255, 255, 0.28)"
+									strokeWidth="5"
+									strokeLinecap="round"
+									strokeLinejoin="round"
+								/>
+								<path
+									d={isPirates ? "M10 5 L17 12 L10 19" : "M14 5 L7 12 L14 19"}
+									fill="none"
+									stroke="rgba(255, 249, 240, 0.98)"
+									strokeWidth="2.9"
+									strokeLinecap="round"
+									strokeLinejoin="round"
+								/>
+							</svg>
+						</button>
+
+						<div style={{
+							position: "absolute",
+							top: "50%",
+							left: "50%",
+							transform: `translate(-50%, -50%) translateX(${detailPanelOffset})`,
+							width: "min(560px, calc(100vw - 2rem))",
+							display: "grid",
+							gap: "1rem",
+							zIndex: 4,
+						}}>
+						<div style={{ textAlign: "center" }}>
+							<p className="eyebrow" style={{ color: f.color }}>
+								{username || "Toto"}
+							</p>
+							<h2 style={{
+								marginTop: "0.35rem",
+								color: "rgba(255, 250, 244, 0.98)",
+								textShadow: "0 4px 22px rgba(7, 12, 23, 0.66)",
+							}}>
+								Choisissez votre personnage
+							</h2>
+						</div>
+
+						<div style={{
+							position: "relative",
+							overflow: "hidden",
+							borderRadius: "36px",
+							aspectRatio: "1 / 1",
+							background: "linear-gradient(180deg, rgba(14, 23, 37, 0.82) 0%, rgba(14, 23, 37, 0.56) 100%)",
+							border: `1px solid ${f.border}`,
+							backdropFilter: "blur(14px) saturate(130%)",
+							boxShadow: `0 28px 64px rgba(6, 12, 22, 0.38), 0 0 48px ${f.glow}`,
+						}}>
 							<div style={{
 								position: "absolute",
-								left: "50%",
-								top: "54%",
-								transform: "translate(-50%, -50%)",
-								width: "clamp(72px, 6vw, 118px)",
-								height: "72vh",
+								inset: "5% 35% 5% 35%",
+								opacity: 0.28,
 								pointerEvents: "none",
-								opacity: 0.92,
 							}}>
 								<svg
 									viewBox="0 0 100 100"
 									preserveAspectRatio="none"
 									aria-hidden="true"
-									style={{
-										width: "100%",
-										height: "100%",
-										overflow: "visible",
-									}}
+									style={{ width: "100%", height: "100%" }}
 								>
 									<path
 										d="M58 0 L68 12 L49 27 L61 42 L43 56 L55 72 L39 86 L47 100"
 										fill="none"
-										stroke="rgba(167, 223, 255, 0.34)"
-										strokeWidth="18"
+										stroke={f.selected}
+										strokeWidth="10"
 										strokeLinecap="round"
 										strokeLinejoin="round"
 									/>
 									<path
 										d="M58 0 L68 12 L49 27 L61 42 L43 56 L55 72 L39 86 L47 100"
 										fill="none"
-										stroke="rgba(255, 243, 205, 0.78)"
-										strokeWidth="9"
-										strokeLinecap="round"
-										strokeLinejoin="round"
-									/>
-									<path
-										d="M58 0 L68 12 L49 27 L61 42 L43 56 L55 72 L39 86 L47 100"
-										fill="none"
-										stroke="rgba(255, 252, 242, 0.98)"
-										strokeWidth="3.2"
+										stroke="rgba(255, 248, 236, 0.72)"
+										strokeWidth="3"
 										strokeLinecap="round"
 										strokeLinejoin="round"
 									/>
 								</svg>
 							</div>
-							{(Object.entries(FACTIONS) as [Faction, typeof FACTIONS.pirates][]).map(([key, fc]) => {
-								const isLeft = key === "pirates";
-								return (
-								<button
-									key={key}
-									type="button"
-									aria-label={`Choisir ${fc.label}`}
-									onClick={() => setFaction(key)}
-									style={{
-										all: "unset",
-										position: "absolute",
-										top: 0,
-										bottom: 0,
-										left: isLeft ? 0 : "50%",
-										width: "50%",
-										cursor: "pointer",
-										display: "flex",
-										alignItems: "center",
-										justifyContent: "center",
-										paddingTop: "10vh",
-										background: isLeft
-											? "linear-gradient(90deg, rgba(209, 75, 63, 0.18) 0%, rgba(209, 75, 63, 0.08) 48%, rgba(209, 75, 63, 0) 100%)"
-											: "linear-gradient(270deg, rgba(28, 120, 192, 0.18) 0%, rgba(28, 120, 192, 0.08) 48%, rgba(28, 120, 192, 0) 100%)",
-										transition: "background var(--transition-soft), transform var(--transition-soft)",
-									}}
-									onMouseEnter={e => {
-										const el = e.currentTarget;
-										el.style.background = isLeft
-											? "linear-gradient(90deg, rgba(209, 75, 63, 0.28) 0%, rgba(209, 75, 63, 0.12) 52%, rgba(209, 75, 63, 0) 100%)"
-											: "linear-gradient(270deg, rgba(28, 120, 192, 0.28) 0%, rgba(28, 120, 192, 0.12) 52%, rgba(28, 120, 192, 0) 100%)";
-										el.style.transform = isLeft ? "translateX(-4px)" : "translateX(4px)";
-									}}
-									onMouseLeave={e => {
-										const el = e.currentTarget;
-										el.style.background = isLeft
-											? "linear-gradient(90deg, rgba(209, 75, 63, 0.18) 0%, rgba(209, 75, 63, 0.08) 48%, rgba(209, 75, 63, 0) 100%)"
-											: "linear-gradient(270deg, rgba(28, 120, 192, 0.18) 0%, rgba(28, 120, 192, 0.08) 48%, rgba(28, 120, 192, 0) 100%)";
-										el.style.transform = "none";
-									}}
-								>
-									<div style={{
-										display: "flex",
-										flexDirection: "column",
-										alignItems: "center",
-										gap: "0.75rem",
-										pointerEvents: "none",
-										textAlign: "center",
-									}}>
-										<span style={{
-											fontSize: "clamp(3.2rem, 7vw, 5.4rem)",
-											lineHeight: 1,
-											color: isLeft ? "rgba(255, 248, 241, 0.98)" : "rgba(242, 248, 255, 0.98)",
-											WebkitTextStroke: isLeft ? "1px rgba(58, 22, 18, 0.55)" : "1px rgba(12, 39, 67, 0.45)",
-											textShadow: isLeft
-												? "0 0 28px rgba(209, 75, 63, 0.55)"
-												: "0 0 28px rgba(28, 120, 192, 0.42)",
-										}}>
-											{fc.icon}
-										</span>
-										<strong style={{
-											color: isLeft ? "rgba(255, 242, 235, 0.98)" : "rgba(241, 248, 255, 0.98)",
-											fontSize: "clamp(2rem, 4vw, 3.2rem)",
-											fontFamily: "var(--font-display)",
-											letterSpacing: "0.1em",
-											textTransform: "uppercase",
-											textShadow: "0 4px 22px rgba(8, 19, 37, 0.82)",
-										}}>
-											{fc.label}
-										</strong>
-									</div>
-								</button>
-							);
-						})}
-					</>
-				) : (
-					<div style={{
-						background: "linear-gradient(180deg, rgba(255, 251, 243, 0.42) 0%, rgba(255, 251, 243, 0.08) 100%)",
-						border: `1px solid ${f!.border}`,
-						borderRadius: "32px",
-						backdropFilter: "blur(12px) saturate(120%)",
-						padding: "0.8rem 0.8rem 0.6rem",
-						boxShadow: `0 22px 52px rgba(52, 72, 99, 0.12), 0 0 48px ${f!.glow}`,
-					}}>
-						<div style={{
-							display: "flex", alignItems: "center", justifyContent: "space-between",
-							marginBottom: "0.85rem", padding: "0 0.3rem",
-						}}>
-							<button
-								type="button"
-								className="button button-ghost"
-								onClick={() => { setFaction(null); setAvatar(null); }}
-								style={{ fontSize: "0.76rem", minHeight: "28px", padding: "0 0.65rem" }}
-							>
-								← Faction
-							</button>
-							<span style={{
-								color: f!.color, fontFamily: "var(--font-display)",
-								fontSize: "0.76rem", letterSpacing: "0.12em", textTransform: "uppercase",
+
+							<div style={{
+								position: "relative",
+								zIndex: 1,
+								height: "100%",
+								display: "grid",
+								gridTemplateRows: "auto 1fr",
+								padding: "1rem",
 							}}>
-								{f!.icon} {f!.label}
-							</span>
+								<div style={{
+									display: "flex",
+									alignItems: "center",
+									justifyContent: "space-between",
+									marginBottom: "0.6rem",
+								}}>
+									<span style={{
+										color: "rgba(255, 248, 240, 0.88)",
+										fontFamily: "var(--font-display)",
+										fontSize: "0.95rem",
+										letterSpacing: "0.08em",
+									}}>
+										{f.icon} {f.label}
+									</span>
+									<span style={{
+										color: "rgba(255, 248, 240, 0.62)",
+										fontSize: "0.78rem",
+										letterSpacing: "0.08em",
+										textTransform: "uppercase",
+									}}>
+										10 personnages
+									</span>
+								</div>
+
+								<div style={{
+									display: "grid",
+									gridTemplateColumns: "repeat(5, 1fr)",
+									gap: "0.55rem",
+									alignContent: "start",
+								}}>
+									{characters.map(char => {
+										const selected = avatar === char.id;
+										return (
+											<button
+												key={char.id}
+												type="button"
+												onClick={() => setAvatar(char.id)}
+												style={{
+													all: "unset",
+													cursor: "pointer",
+													display: "flex",
+													flexDirection: "column",
+													alignItems: "center",
+													gap: "0.45rem",
+													padding: "0.35rem 0.15rem 0.45rem",
+													borderRadius: "20px",
+													border: "1px solid transparent",
+													background: selected
+														? `linear-gradient(180deg, ${f.colorSoft} 0%, rgba(255, 255, 255, 0) 100%)`
+														: "transparent",
+													boxShadow: selected ? `0 14px 28px ${f.glow}` : "none",
+													transform: selected ? "translateY(-2px)" : "none",
+													transition: "all var(--transition-soft)",
+												}}
+											>
+												<div style={{ width: "clamp(58px, 5vw, 72px)", height: "clamp(58px, 5vw, 72px)" }}>
+													<AvatarPreview
+														faction={faction}
+														characterId={char.id}
+														characterName={char.name}
+														selected={selected}
+														color={f.color}
+														selectedGlow={f.selected}
+													/>
+												</div>
+												<span style={{
+													color: selected ? "rgba(255, 250, 243, 0.98)" : "rgba(233, 238, 246, 0.92)",
+													fontSize: "0.78rem",
+													fontWeight: 700,
+													fontFamily: "var(--font-display)",
+													letterSpacing: "0.04em",
+													lineHeight: 1.1,
+													textAlign: "center",
+													textShadow: "0 1px 14px rgba(6, 12, 22, 0.7)",
+												}}>
+													{char.name}
+												</span>
+											</button>
+										);
+									})}
+								</div>
+							</div>
 						</div>
-						<div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: "0.45rem" }}>
-							{characters.map(char => {
-								const selected = avatar === char.id;
-								return (
-									<button
-										key={char.id}
-										type="button"
-										onClick={() => setAvatar(char.id)}
-										style={{
-											all: "unset",
-											cursor: "pointer",
-											display: "flex", flexDirection: "column",
-											alignItems: "center", gap: "0.45rem",
-											padding: "0.3rem 0.15rem 0.45rem",
-											borderRadius: "20px",
-											border: "1px solid transparent",
-											background: selected
-												? `linear-gradient(180deg, ${f!.colorSoft} 0%, rgba(255, 255, 255, 0) 100%)`
-												: "transparent",
-											boxShadow: selected ? `0 14px 28px ${f!.glow}` : "none",
-											transform: selected ? "translateY(-2px)" : "none",
-											transition: "all var(--transition-soft)",
-										}}
-									>
-										<div style={{ width: "clamp(58px, 5vw, 72px)", height: "clamp(58px, 5vw, 72px)" }}>
-											<AvatarPreview
-												faction={faction}
-												characterId={char.id}
-												characterName={char.name}
-												selected={selected}
-												color={f!.color}
-												selectedGlow={f!.selected}
-											/>
-										</div>
-										<span style={{
-											color: selected ? f!.color : "var(--color-text)",
-											fontSize: "0.78rem",
-											fontWeight: 700,
-											fontFamily: "var(--font-display)",
-											letterSpacing: "0.04em",
-											lineHeight: 1.1,
-											textAlign: "center",
-											textShadow: "0 1px 14px rgba(255, 249, 238, 0.7)",
-										}}>
-											{char.name}
-										</span>
+
+							{avatar && (
+								<div style={{ display: "flex", justifyContent: "center" }}>
+									<button className="button button-primary" onClick={() => onSubmit(faction, avatar)}>
+										Rejoindre la bataille
 									</button>
-								);
-							})}
+								</div>
+							)}
 						</div>
 					</div>
-				)}
-			</div>
+				</div>
+			)}
 		</div>
 	);
 }
