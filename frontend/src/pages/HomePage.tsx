@@ -9,22 +9,44 @@ import { APP_NAME } from "../config";
 
 type Faction = "pirates" | "marines";
 
-const FACTIONS: Record<Faction, { label: string; tone: "red" | "cyan"; icon: string; color: string; colorSoft: string; shadow: string }> = {
+type FactionData = {
+	label: string; tone: "red" | "cyan"; icon: string; image: string;
+	color: string; colorSoft: string; shadow: string;
+	border: string; borderStrong: string;
+	glow: string; glowHover: string; selected: string;
+	dropShadow: string;
+};
+
+const FACTIONS: Record<Faction, FactionData> = {
 	pirates: {
 		label: "Pirates",
 		tone: "red",
 		icon: "☠",
+		image: "/img/choix-faction/luffy.png",
 		color: "var(--color-primary)",
 		colorSoft: "var(--color-primary-soft)",
 		shadow: "var(--shadow-neon-red)",
+		border: "var(--color-primary-border)",
+		borderStrong: "var(--color-primary-border-strong)",
+		glow: "var(--color-primary-glow)",
+		glowHover: "var(--color-primary-glow-hover)",
+		selected: "var(--color-primary-selected)",
+		dropShadow: "var(--shadow-drop-primary)",
 	},
 	marines: {
 		label: "Marines",
 		tone: "cyan",
 		icon: "⚓",
+		image: "/img/choix-faction/garp.png",
 		color: "var(--color-secondary)",
 		colorSoft: "var(--color-secondary-soft)",
 		shadow: "var(--shadow-neon-cyan)",
+		border: "var(--color-secondary-border)",
+		borderStrong: "var(--color-secondary-border-strong)",
+		glow: "var(--color-secondary-glow)",
+		glowHover: "var(--color-secondary-glow-hover)",
+		selected: "var(--color-secondary-selected)",
+		dropShadow: "var(--shadow-drop-secondary)",
 	},
 };
 
@@ -130,12 +152,13 @@ function computeAvatarCrop(src: string): Promise<AvatarCrop> {
 	});
 }
 
-function AvatarPreview({ faction, characterId, characterName, selected, color }: {
+function AvatarPreview({ faction, characterId, characterName, selected, color, selectedGlow }: {
 	faction: Faction;
 	characterId: string;
 	characterName: string;
 	selected: boolean;
 	color: string;
+	selectedGlow: string;
 }) {
 	const src = getCharacterAvatarSrc(faction, characterId);
 	const [hasError, setHasError] = useState(false);
@@ -174,10 +197,10 @@ function AvatarPreview({ faction, characterId, characterName, selected, color }:
 			overflow: "hidden",
 			outline: selected
 				? `2px solid ${color}`
-				: "1px solid rgba(255,255,255,0.08)",
+				: "1px solid var(--color-border)",
 			outlineOffset: 0,
 			boxShadow: selected
-				? `0 0 22px ${color}55`
+				? `0 0 22px ${selectedGlow}`
 				: "none",
 			transition: "all var(--transition-soft)",
 			position: "relative",
@@ -253,7 +276,7 @@ function UsernameStep({ username, setUsername, checkState, isRegistered, onConfi
 					letterSpacing: "0.12em",
 					textTransform: "uppercase",
 					color: "var(--color-text)",
-					textShadow: "0 0 30px var(--color-primary), 0 2px 8px rgba(0,0,0,0.8)",
+					textShadow: "0 0 30px var(--color-primary), 0 2px 8px var(--color-scrim)",
 					textAlign: "center",
 				}}>
 					{APP_NAME}
@@ -335,239 +358,223 @@ function RegisterStep({ username, onSubmit }: {
 }) {
 	const [faction, setFaction] = useState<Faction | null>(null);
 	const [avatar, setAvatar] = useState<string | null>(null);
+	const containerRef = useRef<HTMLDivElement>(null);
+	const targetRef = useRef({ x: 0, y: 0 });
+	const currentRef = useRef({ x: 0, y: 0 });
+	const rafRef = useRef<number>(0);
+
 	const f = faction ? FACTIONS[faction] : null;
 	const characters = faction ? CHARACTERS[faction] : [];
-	const selectedCharacter = avatar ? characters.find((char) => char.id === avatar) ?? null : null;
+
+	// Parallax animation loop — no React state, pure DOM updates
+	useEffect(() => {
+		function tick() {
+			const cur = currentRef.current;
+			const tgt = targetRef.current;
+			cur.x += (tgt.x - cur.x) * 0.08;
+			cur.y += (tgt.y - cur.y) * 0.08;
+			containerRef.current?.style.setProperty("--px", cur.x.toFixed(4));
+			containerRef.current?.style.setProperty("--py", cur.y.toFixed(4));
+			rafRef.current = requestAnimationFrame(tick);
+		}
+		rafRef.current = requestAnimationFrame(tick);
+		return () => cancelAnimationFrame(rafRef.current);
+	}, []);
+
+	function handleMouseMove(e: React.MouseEvent<HTMLDivElement>) {
+		const rect = e.currentTarget.getBoundingClientRect();
+		targetRef.current = {
+			x: ((e.clientX - rect.left) / rect.width - 0.5) * 2,
+			y: ((e.clientY - rect.top) / rect.height - 0.5) * 2,
+		};
+	}
 
 	return (
-		<section
-			className="card"
+		<div
+			ref={containerRef}
+			onMouseMove={handleMouseMove}
 			style={{
-				padding: "clamp(1.3rem, 3vw, 2rem)",
-				boxShadow: f ? `var(--shadow-panel), ${f.shadow}` : "var(--shadow-panel), var(--shadow-neon-accent)",
+				position: "fixed", inset: 0, overflow: "hidden",
+				background: "linear-gradient(180deg, var(--color-bg-2) 0%, var(--color-bg-1) 48%, var(--color-bg-0) 100%)",
 			}}
 		>
-			<div style={{ display: "grid", gap: "1.35rem", position: "relative", zIndex: 1 }}>
-				<div className="section-header" style={{ marginBottom: 0 }}>
-					<div>
-						<p className="eyebrow">Première connexion</p>
-						<h1 style={{ maxWidth: "none", marginTop: "0.55rem" }}>
-							Assemblez votre entrée en scène
-						</h1>
-						<p className="hero-text" style={{ marginTop: "0.75rem", maxWidth: "60ch" }}>
-							<span style={{ color: "var(--color-secondary)", fontWeight: 700 }}>{username}</span>, choisissez votre faction puis votre avatar.
-							Ce choix de camp est <strong style={{ color: "var(--color-primary)" }}>définitif</strong>.
-						</p>
-					</div>
-					{avatar && faction && (
-						<button className="button button-primary" onClick={() => onSubmit(faction, avatar)}>
-							Rejoindre la bataille
-						</button>
-					)}
+			{/* ── Layer 0 : Luffy (arrière-plan, mouvement lent inverse) ── */}
+			<img
+				src={f ? f.image : "/img/choix-faction/luffy.png"}
+				alt=""
+				draggable={false}
+				style={{
+					position: "absolute",
+					height: "88vh",
+					width: "auto",
+					left: "50%",
+					top: "50%",
+					transform: "translateX(-50%) translateY(-48%) translate(calc(var(--px, 0) * -18px), calc(var(--py, 0) * -12px))",
+					willChange: "transform",
+					pointerEvents: "none",
+					userSelect: "none",
+					filter: f ? f.dropShadow : "var(--shadow-drop-neutral)",
+					transition: "filter 0.4s ease",
+				}}
+			/>
+
+			{/* ── Vignette bas (fondu vers le fond) ── */}
+			<div style={{
+				position: "absolute", bottom: 0, left: 0, right: 0, height: "22%",
+				pointerEvents: "none",
+				background: "linear-gradient(to top, var(--color-bg-0) 0%, transparent 100%)",
+			}} />
+
+			{/* ── Layer 1 : En-tête (léger mouvement avant) ── */}
+			<div style={{
+				position: "absolute", top: 0, left: 0, right: 0,
+				padding: "1.5rem 2rem",
+				display: "flex", justifyContent: "space-between", alignItems: "flex-start",
+				transform: "translate(calc(var(--px, 0) * 5px), calc(var(--py, 0) * 3px))",
+				willChange: "transform",
+			}}>
+				<div>
+					<p className="eyebrow">Première connexion</p>
+					<h2 style={{ marginTop: "0.3rem" }}>
+						<span style={{ color: "var(--color-secondary)" }}>{username}</span>
+						{faction ? `, camp ${f!.label}` : ", choisissez votre camp"}
+					</h2>
 				</div>
+				{avatar && faction && (
+					<button className="button button-primary" onClick={() => onSubmit(faction, avatar)}>
+						Rejoindre la bataille
+					</button>
+				)}
+			</div>
 
-				<div className="split-grid" style={{ display: "grid", gap: "1rem", alignItems: "start" }}>
-					<div style={{ display: "grid", gap: "1rem" }}>
-						<div
-							style={{
-								padding: "1.1rem",
-								borderRadius: "28px",
-								border: "1px solid var(--color-border)",
-								background: "linear-gradient(180deg, rgba(255,255,255,0.58), rgba(255,255,255,0.34))",
-								boxShadow: "inset 0 1px 0 rgba(255,255,255,0.75)",
-							}}
-						>
-							<p className="section-kicker" style={{ color: "var(--color-accent)" }}>1. Faction</p>
-							<p className="section-copy" style={{ marginTop: "0.65rem" }}>
-								Choisissez le camp qui définira votre identité pour la suite.
-							</p>
-							<div style={{ display: "grid", gap: "0.75rem", marginTop: "1rem" }}>
-								{(Object.entries(FACTIONS) as [Faction, typeof FACTIONS.pirates][]).map(([key, fc]) => {
-									const selected = faction === key;
-									return (
-										<button
-											key={key}
-											type="button"
-											onClick={() => {
-												setFaction(key);
-												setAvatar(null);
-											}}
-											style={{
-												all: "unset",
-												cursor: "pointer",
-												display: "grid",
-												gap: "0.35rem",
-												padding: "1rem 1.05rem",
-												borderRadius: "22px",
-												border: `1px solid ${selected ? `${fc.color}55` : "var(--color-border)"}`,
-												background: selected ? fc.colorSoft : "rgba(255,255,255,0.56)",
-												boxShadow: selected ? fc.shadow : "none",
-												transition: "all var(--transition-soft)",
-											}}
-										>
-											<div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "1rem" }}>
-												<strong style={{ color: selected ? fc.color : "var(--color-text)", fontSize: "1rem", letterSpacing: "0.02em" }}>
-													{fc.icon} {fc.label}
-												</strong>
-												<span
-													style={{
-														fontSize: "0.72rem",
-														fontWeight: 700,
-														letterSpacing: "0.1em",
-														textTransform: "uppercase",
-														color: selected ? fc.color : "var(--color-text-muted)",
-													}}
-												>
-													{selected ? "Choisie" : "Choisir"}
-												</span>
-											</div>
-										</button>
-									);
-								})}
-							</div>
-						</div>
-
-						<div
-							style={{
-								padding: "1.15rem",
-								borderRadius: "28px",
-								border: "1px solid var(--color-border)",
-								background: f
-									? `linear-gradient(180deg, ${f.colorSoft}, rgba(255,255,255,0.42))`
-									: "linear-gradient(180deg, rgba(255,255,255,0.58), rgba(255,255,255,0.34))",
-								boxShadow: "inset 0 1px 0 rgba(255,255,255,0.75)",
-								textAlign: "center",
-							}}
-						>
-							<p className="section-kicker" style={{ color: f ? f.color : "var(--color-accent)" }}>
-								{f ? "2. Aperçu" : "En attente"}
-							</p>
-							{f && selectedCharacter ? (
-								<>
-									<div style={{ width: "min(220px, 72%)", margin: "1rem auto 0" }}>
-										<AvatarPreview
-											faction={faction}
-											characterId={selectedCharacter.id}
-											characterName={selectedCharacter.name}
-											selected
-											color={f.color}
-										/>
-									</div>
-									<h2 style={{ marginTop: "1rem", color: f.color }}>
-										{selectedCharacter.name}
-									</h2>
-									<div style={{ display: "flex", justifyContent: "center", gap: "0.6rem", flexWrap: "wrap", marginTop: "1rem" }}>
-										<span className="badge" style={{ color: f.color, borderColor: `${f.color}33`, background: "rgba(255,255,255,0.58)" }}>
-											{f.label}
-										</span>
-										<span className="badge" style={{ color: "var(--color-text-muted)", background: "rgba(255,255,255,0.58)" }}>
-											{username}
-										</span>
-									</div>
-								</>
-							) : f ? (
-								<>
-									<h2 style={{ marginTop: "0.85rem", color: f.color }}>{f.label}</h2>
-									<p className="section-copy" style={{ margin: "0.7rem auto 0", maxWidth: "28ch" }}>
-										Camp choisi. Il ne manque plus que votre avatar pour rejoindre la bataille.
-									</p>
-								</>
-							) : (
-								<>
-									<h2 style={{ marginTop: "0.85rem" }}>Choisissez un camp</h2>
-									<p className="section-copy" style={{ margin: "0.7rem auto 0", maxWidth: "28ch" }}>
-										Une fois votre faction choisie, la galerie d’avatars s’ouvre juste à droite.
-									</p>
-								</>
-							)}
-						</div>
+			{/* ── Layer 2 : Zone de sélection entre les bras (plan avant, mouvement rapide) ── */}
+			<div style={{
+				position: "absolute",
+				top: "48%", left: "50%",
+				transform: "translateX(-50%) translate(calc(var(--px, 0) * 14px), calc(var(--py, 0) * 9px))",
+				willChange: "transform",
+				width: "min(560px, 60vw)",
+			}}>
+				{!faction ? (
+					<div style={{ display: "flex", gap: "1rem" }}>
+						{(Object.entries(FACTIONS) as [Faction, typeof FACTIONS.pirates][]).map(([key, fc]) => (
+							<button
+								key={key}
+								type="button"
+								onClick={() => setFaction(key)}
+								style={{
+									all: "unset",
+									cursor: "pointer",
+									flex: 1,
+									padding: "1.6rem 1rem",
+									background: "var(--color-surface)",
+									border: `1px solid ${fc.border}`,
+									borderRadius: "22px",
+									backdropFilter: "blur(10px)",
+									boxShadow: `var(--shadow-panel), 0 0 28px ${fc.glow}`,
+									display: "flex", flexDirection: "column", alignItems: "center", gap: "0.65rem",
+									transition: "all 0.2s ease",
+								}}
+								onMouseEnter={e => {
+									const el = e.currentTarget;
+									el.style.boxShadow = `var(--shadow-panel), 0 0 48px ${fc.glowHover}`;
+									el.style.borderColor = fc.borderStrong;
+									el.style.background = fc.colorSoft;
+									el.style.transform = "translateY(-3px) scale(1.02)";
+								}}
+								onMouseLeave={e => {
+									const el = e.currentTarget;
+									el.style.boxShadow = `var(--shadow-panel), 0 0 28px ${fc.glow}`;
+									el.style.borderColor = fc.border;
+									el.style.background = "var(--color-surface)";
+									el.style.transform = "";
+								}}
+							>
+								<span style={{ fontSize: "2.4rem", lineHeight: 1 }}>{fc.icon}</span>
+								<strong style={{
+									color: fc.color, fontSize: "1.1rem",
+									fontFamily: "var(--font-display)", letterSpacing: "0.08em",
+									textTransform: "uppercase",
+								}}>
+									{fc.label}
+								</strong>
+							</button>
+						))}
 					</div>
-
-					<div
-						style={{
-							padding: "1.2rem",
-							borderRadius: "28px",
-							border: "1px solid var(--color-border)",
-							background: "linear-gradient(180deg, rgba(255,255,255,0.62), rgba(255,255,255,0.38))",
-							boxShadow: "inset 0 1px 0 rgba(255,255,255,0.75)",
-						}}
-					>
-						<div className="section-header" style={{ marginBottom: "1.15rem" }}>
-							<div>
-								<p className="section-kicker" style={{ color: f ? f.color : "var(--color-accent)" }}>
-									2. Avatar
-								</p>
-								<h2 style={{ marginTop: "0.45rem" }}>
-									{f ? `Roster ${f.label}` : "Choisissez d'abord une faction"}
-								</h2>
-								<p className="section-copy" style={{ marginTop: "0.6rem" }}>
-									{f
-										? "Sélectionnez le personnage qui vous représentera lors de votre première entrée dans le jeu."
-										: "La galerie d’avatars apparaîtra ici dès qu’une faction sera choisie."}
-								</p>
-							</div>
+				) : (
+					<div style={{
+						background: "var(--color-surface)",
+						border: `1px solid ${f!.border}`,
+						borderRadius: "24px",
+						backdropFilter: "blur(10px)",
+						padding: "0.85rem",
+						boxShadow: `var(--shadow-panel), 0 0 48px ${f!.glow}`,
+					}}>
+						<div style={{
+							display: "flex", alignItems: "center", justifyContent: "space-between",
+							marginBottom: "0.7rem", padding: "0 0.2rem",
+						}}>
+							<button
+								type="button"
+								className="button button-ghost"
+								onClick={() => { setFaction(null); setAvatar(null); }}
+								style={{ fontSize: "0.76rem", minHeight: "28px", padding: "0 0.65rem" }}
+							>
+								← Faction
+							</button>
+							<span style={{
+								color: f!.color, fontFamily: "var(--font-display)",
+								fontSize: "0.76rem", letterSpacing: "0.12em", textTransform: "uppercase",
+							}}>
+								{f!.icon} {f!.label}
+							</span>
 						</div>
-
-						{faction && f ? (
-							<div className="feature-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(165px, 1fr))", gap: "1rem" }}>
-								{characters.map((char) => {
-									const selected = avatar === char.id;
-									return (
-										<button
-											key={char.id}
-											type="button"
-											onClick={() => setAvatar(char.id)}
-											style={{
-												all: "unset",
-												cursor: "pointer",
-												display: "grid",
-												gap: "0.7rem",
-												padding: "0.85rem",
-												borderRadius: "24px",
-												border: `1px solid ${selected ? `${f.color}55` : "rgba(53, 91, 132, 0.1)"}`,
-												background: selected ? f.colorSoft : "rgba(255,255,255,0.52)",
-												boxShadow: selected ? f.shadow : "0 10px 24px rgba(52, 72, 99, 0.04)",
-												transition: "all var(--transition-soft)",
-											}}
-										>
+						<div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: "0.45rem" }}>
+							{characters.map(char => {
+								const selected = avatar === char.id;
+								return (
+									<button
+										key={char.id}
+										type="button"
+										onClick={() => setAvatar(char.id)}
+										style={{
+											all: "unset",
+											cursor: "pointer",
+											display: "flex", flexDirection: "column",
+											alignItems: "center", gap: "0.35rem",
+											padding: "0.5rem 0.25rem",
+											borderRadius: "14px",
+											border: `1px solid ${selected ? f!.selected : "var(--color-border)"}`,
+											background: selected ? f!.colorSoft : "var(--color-surface-soft)",
+											boxShadow: selected ? f!.shadow : "none",
+											transition: "all var(--transition-soft)",
+										}}
+									>
+										<div style={{ width: "52px", height: "52px" }}>
 											<AvatarPreview
 												faction={faction}
 												characterId={char.id}
 												characterName={char.name}
 												selected={selected}
-												color={f.color}
+												color={f!.color}
+												selectedGlow={f!.selected}
 											/>
-											<div style={{ textAlign: "center", display: "grid", gap: "0.3rem" }}>
-												<strong style={{ color: selected ? f.color : "var(--color-text)", fontSize: "0.98rem", letterSpacing: "0.02em" }}>
-													{char.name}
-												</strong>
-												<span style={{ color: "var(--color-text-muted)", fontSize: "0.74rem", letterSpacing: "0.08em", textTransform: "uppercase" }}>
-													{selected ? "Avatar sélectionné" : "Disponible"}
-												</span>
-											</div>
-										</button>
-									);
-								})}
-							</div>
-						) : (
-							<div
-								style={{
-									padding: "2.25rem 1rem",
-									borderRadius: "24px",
-									border: "1px dashed var(--color-border-strong)",
-									background: "rgba(255,255,255,0.42)",
-									textAlign: "center",
-								}}
-							>
-								<p className="section-copy" style={{ margin: 0 }}>
-									Choisissez une faction à gauche pour révéler les avatars disponibles.
-								</p>
-							</div>
-						)}
+										</div>
+										<span style={{
+											color: selected ? f!.color : "var(--color-text-muted)",
+											fontSize: "0.68rem", fontWeight: 600,
+											letterSpacing: "0.03em", textAlign: "center",
+										}}>
+											{char.name}
+										</span>
+									</button>
+								);
+							})}
+						</div>
 					</div>
-				</div>
+				)}
 			</div>
-		</section>
+		</div>
 	);
 }
 
