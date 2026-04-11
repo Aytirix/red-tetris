@@ -398,12 +398,12 @@ function RegisterStep({ username, onSubmit }: {
 				background: "linear-gradient(180deg, var(--color-bg-2) 0%, var(--color-bg-1) 48%, var(--color-bg-0) 100%)",
 			}}
 		>
-			{/* ── Layer 0 : Luffy (arrière-plan, mouvement lent inverse) ── */}
+			{/* ── Layer 0 : affrontement pour le choix de faction, héros de camp ensuite ── */}
 			<img
-				src={f ? f.image : "/img/choix-faction/luffy.png"}
+				src={f ? f.image : "/img/choix-faction/affrontement.png"}
 				alt=""
 				draggable={false}
-				style={{
+				style={f ? {
 					position: "absolute",
 					height: "88vh",
 					width: "auto",
@@ -413,8 +413,20 @@ function RegisterStep({ username, onSubmit }: {
 					willChange: "transform",
 					pointerEvents: "none",
 					userSelect: "none",
-					filter: f ? f.dropShadow : "var(--shadow-drop-neutral)",
+					filter: f.dropShadow,
 					transition: "filter 0.4s ease",
+				} : {
+					position: "absolute",
+					inset: 0,
+					width: "100%",
+					height: "100%",
+					objectFit: "cover",
+					objectPosition: "center center",
+					transform: "scale(1.04) translate(calc(var(--px, 0) * -10px), calc(var(--py, 0) * -6px))",
+					willChange: "transform",
+					pointerEvents: "none",
+					userSelect: "none",
+					filter: "brightness(0.92) saturate(0.92)",
 				}}
 			/>
 
@@ -422,97 +434,216 @@ function RegisterStep({ username, onSubmit }: {
 			<div style={{
 				position: "absolute", bottom: 0, left: 0, right: 0, height: "22%",
 				pointerEvents: "none",
-				background: "linear-gradient(to top, var(--color-bg-0) 0%, transparent 100%)",
+				background: f
+					? "linear-gradient(to top, var(--color-bg-0) 0%, transparent 100%)"
+					: "transparent",
 			}} />
 
 			{/* ── Layer 1 : En-tête (léger mouvement avant) ── */}
 			<div style={{
 				position: "absolute", top: 0, left: 0, right: 0,
-				padding: "1.5rem 2rem",
-				display: "flex", justifyContent: "space-between", alignItems: "flex-start",
+				padding: faction ? "1.5rem 2rem" : "2rem 1.5rem 0",
+				display: "flex", justifyContent: faction ? "space-between" : "center", alignItems: "flex-start",
 				transform: "translate(calc(var(--px, 0) * 5px), calc(var(--py, 0) * 3px))",
 				willChange: "transform",
+				pointerEvents: faction ? "auto" : "none",
+				zIndex: 5,
 			}}>
-				<div>
-					<p className="eyebrow">Première connexion</p>
-					<h2 style={{ marginTop: "0.3rem" }}>
-						<span style={{ color: "var(--color-secondary)" }}>{username}</span>
-						{faction ? `, camp ${f!.label}` : ", choisissez votre camp"}
-					</h2>
-				</div>
-				{avatar && faction && (
-					<button className="button button-primary" onClick={() => onSubmit(faction, avatar)}>
-						Rejoindre la bataille
-					</button>
+				{!faction ? (
+					<div style={{
+						display: "flex",
+						flexDirection: "column",
+						alignItems: "center",
+						gap: "0.3rem",
+						textAlign: "center",
+					}}>
+						<h1 style={{
+							margin: 0,
+							maxWidth: "unset",
+							fontSize: "clamp(2.6rem, 6vw, 4.8rem)",
+							letterSpacing: "0.03em",
+							color: "rgba(255, 249, 240, 0.98)",
+							textShadow: "0 4px 24px rgba(8, 19, 37, 0.85)",
+						}}>
+							{username || "Toto"}
+						</h1>
+						<p style={{
+							margin: 0,
+							fontFamily: "var(--font-display)",
+							fontSize: "clamp(1.3rem, 3vw, 2rem)",
+							letterSpacing: "0.05em",
+							color: "rgba(255, 251, 244, 0.96)",
+							textShadow: "0 3px 20px rgba(8, 19, 37, 0.75)",
+						}}>
+							Choisissez votre camp
+						</p>
+					</div>
+				) : (
+					<>
+						<div>
+							<h2 style={{ marginTop: "0.3rem" }}>
+								<span style={{ color: "var(--color-secondary)" }}>{username || "Toto"}</span>
+							</h2>
+							<p className="eyebrow" style={{ marginTop: "0.35rem" }}>
+								Camp {f!.label}
+							</p>
+						</div>
+						{avatar && (
+							<button className="button button-primary" onClick={() => onSubmit(faction, avatar)}>
+								Rejoindre la bataille
+							</button>
+						)}
+					</>
 				)}
 			</div>
 
 			{/* ── Layer 2 : Zone de sélection entre les bras (plan avant, mouvement rapide) ── */}
-			<div style={{
+			<div style={faction ? {
 				position: "absolute",
-				top: "48%", left: "50%",
+				top: "54%", left: "50%",
 				transform: "translateX(-50%) translate(calc(var(--px, 0) * 14px), calc(var(--py, 0) * 9px))",
 				willChange: "transform",
-				width: "min(560px, 60vw)",
+				width: "min(680px, calc(100vw - 2.4rem))",
+				zIndex: 4,
+			} : {
+				position: "absolute",
+				inset: 0,
+				zIndex: 2,
 			}}>
-				{!faction ? (
-					<div style={{ display: "flex", gap: "1rem" }}>
-						{(Object.entries(FACTIONS) as [Faction, typeof FACTIONS.pirates][]).map(([key, fc]) => (
-							<button
-								key={key}
-								type="button"
-								onClick={() => setFaction(key)}
-								style={{
-									all: "unset",
-									cursor: "pointer",
-									flex: 1,
-									padding: "1.6rem 1rem",
-									background: "var(--color-surface)",
-									border: `1px solid ${fc.border}`,
-									borderRadius: "22px",
-									backdropFilter: "blur(10px)",
-									boxShadow: `var(--shadow-panel), 0 0 28px ${fc.glow}`,
-									display: "flex", flexDirection: "column", alignItems: "center", gap: "0.65rem",
-									transition: "all 0.2s ease",
-								}}
-								onMouseEnter={e => {
-									const el = e.currentTarget;
-									el.style.boxShadow = `var(--shadow-panel), 0 0 48px ${fc.glowHover}`;
-									el.style.borderColor = fc.borderStrong;
-									el.style.background = fc.colorSoft;
-									el.style.transform = "translateY(-3px) scale(1.02)";
-								}}
-								onMouseLeave={e => {
-									const el = e.currentTarget;
-									el.style.boxShadow = `var(--shadow-panel), 0 0 28px ${fc.glow}`;
-									el.style.borderColor = fc.border;
-									el.style.background = "var(--color-surface)";
-									el.style.transform = "";
-								}}
-							>
-								<span style={{ fontSize: "2.4rem", lineHeight: 1 }}>{fc.icon}</span>
-								<strong style={{
-									color: fc.color, fontSize: "1.1rem",
-									fontFamily: "var(--font-display)", letterSpacing: "0.08em",
-									textTransform: "uppercase",
-								}}>
-									{fc.label}
-								</strong>
-							</button>
-						))}
-					</div>
+					{!faction ? (
+						<>
+							<div style={{
+								position: "absolute",
+								left: "50%",
+								top: "54%",
+								transform: "translate(-50%, -50%)",
+								width: "clamp(72px, 6vw, 118px)",
+								height: "72vh",
+								pointerEvents: "none",
+								opacity: 0.92,
+							}}>
+								<svg
+									viewBox="0 0 100 100"
+									preserveAspectRatio="none"
+									aria-hidden="true"
+									style={{
+										width: "100%",
+										height: "100%",
+										overflow: "visible",
+									}}
+								>
+									<path
+										d="M58 0 L68 12 L49 27 L61 42 L43 56 L55 72 L39 86 L47 100"
+										fill="none"
+										stroke="rgba(167, 223, 255, 0.34)"
+										strokeWidth="18"
+										strokeLinecap="round"
+										strokeLinejoin="round"
+									/>
+									<path
+										d="M58 0 L68 12 L49 27 L61 42 L43 56 L55 72 L39 86 L47 100"
+										fill="none"
+										stroke="rgba(255, 243, 205, 0.78)"
+										strokeWidth="9"
+										strokeLinecap="round"
+										strokeLinejoin="round"
+									/>
+									<path
+										d="M58 0 L68 12 L49 27 L61 42 L43 56 L55 72 L39 86 L47 100"
+										fill="none"
+										stroke="rgba(255, 252, 242, 0.98)"
+										strokeWidth="3.2"
+										strokeLinecap="round"
+										strokeLinejoin="round"
+									/>
+								</svg>
+							</div>
+							{(Object.entries(FACTIONS) as [Faction, typeof FACTIONS.pirates][]).map(([key, fc]) => {
+								const isLeft = key === "pirates";
+								return (
+								<button
+									key={key}
+									type="button"
+									aria-label={`Choisir ${fc.label}`}
+									onClick={() => setFaction(key)}
+									style={{
+										all: "unset",
+										position: "absolute",
+										top: 0,
+										bottom: 0,
+										left: isLeft ? 0 : "50%",
+										width: "50%",
+										cursor: "pointer",
+										display: "flex",
+										alignItems: "center",
+										justifyContent: "center",
+										paddingTop: "10vh",
+										background: isLeft
+											? "linear-gradient(90deg, rgba(209, 75, 63, 0.18) 0%, rgba(209, 75, 63, 0.08) 48%, rgba(209, 75, 63, 0) 100%)"
+											: "linear-gradient(270deg, rgba(28, 120, 192, 0.18) 0%, rgba(28, 120, 192, 0.08) 48%, rgba(28, 120, 192, 0) 100%)",
+										transition: "background var(--transition-soft), transform var(--transition-soft)",
+									}}
+									onMouseEnter={e => {
+										const el = e.currentTarget;
+										el.style.background = isLeft
+											? "linear-gradient(90deg, rgba(209, 75, 63, 0.28) 0%, rgba(209, 75, 63, 0.12) 52%, rgba(209, 75, 63, 0) 100%)"
+											: "linear-gradient(270deg, rgba(28, 120, 192, 0.28) 0%, rgba(28, 120, 192, 0.12) 52%, rgba(28, 120, 192, 0) 100%)";
+										el.style.transform = isLeft ? "translateX(-4px)" : "translateX(4px)";
+									}}
+									onMouseLeave={e => {
+										const el = e.currentTarget;
+										el.style.background = isLeft
+											? "linear-gradient(90deg, rgba(209, 75, 63, 0.18) 0%, rgba(209, 75, 63, 0.08) 48%, rgba(209, 75, 63, 0) 100%)"
+											: "linear-gradient(270deg, rgba(28, 120, 192, 0.18) 0%, rgba(28, 120, 192, 0.08) 48%, rgba(28, 120, 192, 0) 100%)";
+										el.style.transform = "none";
+									}}
+								>
+									<div style={{
+										display: "flex",
+										flexDirection: "column",
+										alignItems: "center",
+										gap: "0.75rem",
+										pointerEvents: "none",
+										textAlign: "center",
+									}}>
+										<span style={{
+											fontSize: "clamp(3.2rem, 7vw, 5.4rem)",
+											lineHeight: 1,
+											color: isLeft ? "rgba(255, 248, 241, 0.98)" : "rgba(242, 248, 255, 0.98)",
+											WebkitTextStroke: isLeft ? "1px rgba(58, 22, 18, 0.55)" : "1px rgba(12, 39, 67, 0.45)",
+											textShadow: isLeft
+												? "0 0 28px rgba(209, 75, 63, 0.55)"
+												: "0 0 28px rgba(28, 120, 192, 0.42)",
+										}}>
+											{fc.icon}
+										</span>
+										<strong style={{
+											color: isLeft ? "rgba(255, 242, 235, 0.98)" : "rgba(241, 248, 255, 0.98)",
+											fontSize: "clamp(2rem, 4vw, 3.2rem)",
+											fontFamily: "var(--font-display)",
+											letterSpacing: "0.1em",
+											textTransform: "uppercase",
+											textShadow: "0 4px 22px rgba(8, 19, 37, 0.82)",
+										}}>
+											{fc.label}
+										</strong>
+									</div>
+								</button>
+							);
+						})}
+					</>
 				) : (
 					<div style={{
-						background: "var(--color-surface)",
+						background: "linear-gradient(180deg, rgba(255, 251, 243, 0.42) 0%, rgba(255, 251, 243, 0.08) 100%)",
 						border: `1px solid ${f!.border}`,
-						borderRadius: "24px",
-						backdropFilter: "blur(10px)",
-						padding: "0.85rem",
-						boxShadow: `var(--shadow-panel), 0 0 48px ${f!.glow}`,
+						borderRadius: "32px",
+						backdropFilter: "blur(12px) saturate(120%)",
+						padding: "0.8rem 0.8rem 0.6rem",
+						boxShadow: `0 22px 52px rgba(52, 72, 99, 0.12), 0 0 48px ${f!.glow}`,
 					}}>
 						<div style={{
 							display: "flex", alignItems: "center", justifyContent: "space-between",
-							marginBottom: "0.7rem", padding: "0 0.2rem",
+							marginBottom: "0.85rem", padding: "0 0.3rem",
 						}}>
 							<button
 								type="button"
@@ -541,16 +672,19 @@ function RegisterStep({ username, onSubmit }: {
 											all: "unset",
 											cursor: "pointer",
 											display: "flex", flexDirection: "column",
-											alignItems: "center", gap: "0.35rem",
-											padding: "0.5rem 0.25rem",
-											borderRadius: "14px",
-											border: `1px solid ${selected ? f!.selected : "var(--color-border)"}`,
-											background: selected ? f!.colorSoft : "var(--color-surface-soft)",
-											boxShadow: selected ? f!.shadow : "none",
+											alignItems: "center", gap: "0.45rem",
+											padding: "0.3rem 0.15rem 0.45rem",
+											borderRadius: "20px",
+											border: "1px solid transparent",
+											background: selected
+												? `linear-gradient(180deg, ${f!.colorSoft} 0%, rgba(255, 255, 255, 0) 100%)`
+												: "transparent",
+											boxShadow: selected ? `0 14px 28px ${f!.glow}` : "none",
+											transform: selected ? "translateY(-2px)" : "none",
 											transition: "all var(--transition-soft)",
 										}}
 									>
-										<div style={{ width: "52px", height: "52px" }}>
+										<div style={{ width: "clamp(58px, 5vw, 72px)", height: "clamp(58px, 5vw, 72px)" }}>
 											<AvatarPreview
 												faction={faction}
 												characterId={char.id}
@@ -561,9 +695,14 @@ function RegisterStep({ username, onSubmit }: {
 											/>
 										</div>
 										<span style={{
-											color: selected ? f!.color : "var(--color-text-muted)",
-											fontSize: "0.68rem", fontWeight: 600,
-											letterSpacing: "0.03em", textAlign: "center",
+											color: selected ? f!.color : "var(--color-text)",
+											fontSize: "0.78rem",
+											fontWeight: 700,
+											fontFamily: "var(--font-display)",
+											letterSpacing: "0.04em",
+											lineHeight: 1.1,
+											textAlign: "center",
+											textShadow: "0 1px 14px rgba(255, 249, 238, 0.7)",
 										}}>
 											{char.name}
 										</span>
