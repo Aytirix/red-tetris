@@ -42,6 +42,21 @@
 	--color-border-strong: rgba(209, 75, 63, 0.24);
 	--color-grid: rgba(28, 120, 192, 0.06);
 
+	/* Faction borders and glows */
+	--color-primary-border: rgba(209, 75, 63, 0.28);
+	--color-secondary-border: rgba(28, 120, 192, 0.28);
+	--color-primary-border-strong: rgba(209, 75, 63, 0.47);
+	--color-secondary-border-strong: rgba(28, 120, 192, 0.47);
+	--color-primary-glow: rgba(209, 75, 63, 0.10);
+	--color-secondary-glow: rgba(28, 120, 192, 0.10);
+	--color-primary-glow-hover: rgba(209, 75, 63, 0.25);
+	--color-secondary-glow-hover: rgba(28, 120, 192, 0.25);
+	--color-primary-selected: rgba(209, 75, 63, 0.33);
+	--color-secondary-selected: rgba(28, 120, 192, 0.33);
+
+	/* Overlay / scrim */
+	--color-scrim: rgba(0, 0, 0, 0.8);
+
 	/* Shadows */
 	--shadow-panel:
 		0 20px 50px rgba(52, 72, 99, 0.09),
@@ -55,6 +70,11 @@
 	--shadow-neon-accent:
 		0 0 0 1px var(--color-accent-soft),
 		0 16px 34px var(--color-accent-soft);
+
+	/* Drop-shadows pour images avec transparence (parallax) */
+	--shadow-drop-neutral: drop-shadow(0 8px 32px rgba(209, 75, 63, 0.22));
+	--shadow-drop-primary: drop-shadow(0 8px 40px rgba(209, 75, 63, 0.38));
+	--shadow-drop-secondary: drop-shadow(0 8px 40px rgba(28, 120, 192, 0.38));
 
 	--radius-hero: 34px;
 	--radius-card: 24px;
