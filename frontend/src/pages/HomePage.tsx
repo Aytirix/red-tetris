@@ -85,6 +85,41 @@ type AvatarCrop = {
 };
 
 const avatarCropCache = new Map<string, AvatarCrop>();
+const REGISTER_SCENE_IMAGE_SRCS = [
+	"/img/choix-faction/affrontement.jpg",
+	"/img/choix-faction/pirates.jpg",
+	"/img/choix-faction/marine.jpg",
+];
+
+function preloadImageAsset(src: string): Promise<void> {
+	return new Promise((resolve) => {
+		const image = new Image();
+		let settled = false;
+
+		function finish() {
+			if (settled) return;
+			settled = true;
+			resolve();
+		}
+
+		function decodeAndFinish() {
+			if (typeof image.decode === "function") {
+				image.decode().catch(() => undefined).finally(finish);
+				return;
+			}
+			finish();
+		}
+
+		image.decoding = "async";
+		image.onload = decodeAndFinish;
+		image.onerror = finish;
+		image.src = src;
+
+		if (image.complete) {
+			decodeAndFinish();
+		}
+	});
+}
 
 function getCharacterAvatarSrc(faction: Faction, characterId: string): string {
 	return `/img/avatar/${faction}/${characterId}.png`;
@@ -242,12 +277,13 @@ function AvatarPreview({ faction, characterId, characterName, selected, color, s
 
 // ─── Username step ───────────────────────────────────────────────────────────
 
-function UsernameStep({ username, setUsername, checkState, isRegistered, onConfirm }: {
+function UsernameStep({ username, setUsername, checkState, isRegistered, onConfirm, sceneExitActive = false }: {
 	username: string;
 	setUsername: (v: string) => void;
 	checkState: CheckState;
 	isRegistered: boolean;
 	onConfirm: () => void;
+	sceneExitActive?: boolean;
 }) {
 	const containerRef = useRef<HTMLDivElement>(null);
 	const targetRef = useRef({ x: 0, y: 0 });
@@ -287,6 +323,11 @@ function UsernameStep({ username, setUsername, checkState, isRegistered, onConfi
 				inset: 0,
 				overflow: "hidden",
 				background: "#05080e",
+				opacity: sceneExitActive ? 0.9 : 1,
+				transform: sceneExitActive ? "translateX(-28px) scale(1.01)" : "translateX(0) scale(1)",
+				transformOrigin: "center center",
+				transition: "opacity 260ms ease, transform 420ms cubic-bezier(0.22, 1, 0.36, 1)",
+				willChange: "opacity, transform",
 			}}
 		>
 			<img
@@ -404,9 +445,10 @@ function UsernameStep({ username, setUsername, checkState, isRegistered, onConfi
 
 // ─── Register step ───────────────────────────────────────────────────────────
 
-function RegisterStep({ username, onSubmit }: {
+function RegisterStep({ username, onSubmit, sceneEnterActive = false }: {
 	username: string;
 	onSubmit: (faction: Faction, avatar: string) => void;
+	sceneEnterActive?: boolean;
 }) {
 	const swipeDurationMs = 460;
 	const edgeHandleBaseOffset = 24;
@@ -549,6 +591,11 @@ function RegisterStep({ username, onSubmit }: {
 			style={{
 				position: "fixed", inset: 0, overflow: "hidden",
 				background: "linear-gradient(180deg, var(--color-bg-2) 0%, var(--color-bg-1) 48%, var(--color-bg-0) 100%)",
+				opacity: sceneEnterActive ? 0.9 : 1,
+				transform: sceneEnterActive ? "translateX(28px) scale(1.012)" : "translateX(0) scale(1)",
+				transformOrigin: "center center",
+				transition: "opacity 260ms ease, transform 520ms cubic-bezier(0.22, 1, 0.36, 1)",
+				willChange: "opacity, transform",
 			}}
 		>
 			<img
@@ -1081,8 +1128,8 @@ export default function HomePage() {
 	const navigate = useNavigate();
 	const location = useLocation();
 	const { socket } = useSocket();
-	const stepTransitionMs = 760;
-	const stepTransitionSwitchMs = 320;
+	const stepTransitionMs = 440;
+	const stepTransitionSwitchMs = 180;
 
 	// Detect room-join mode: returnTo with exactly 2 non-empty path parts (e.g. /room/username)
 	const returnTo = (location.state as { returnTo?: string } | null)?.returnTo ?? "";
@@ -1100,22 +1147,51 @@ export default function HomePage() {
 	const [isRegistered, setIsRegistered] = useState(false);
 	const [sceneTransition, setSceneTransition] = useState<null | "to-register">(null);
 	const [isSceneTransitionActive, setIsSceneTransitionActive] = useState(false);
+	const [isRegisterSceneEntering, setIsRegisterSceneEntering] = useState(false);
 	const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const transitionRafRef = useRef<number | null>(null);
+	const registerEnterRafRef = useRef<number | null>(null);
 	const transitionTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+	const registerSceneReadyRef = useRef(false);
+	const registerSceneReadyPromiseRef = useRef<Promise<void> | null>(null);
+	const transitionTokenRef = useRef(0);
 
 	// Ref to read latest username inside the socket handler without stale closure
 	const usernameRef = useRef(username);
 	useEffect(() => { usernameRef.current = username; }, [username]);
 
+	function ensureRegisterSceneReady() {
+		if (registerSceneReadyRef.current) {
+			return Promise.resolve();
+		}
+		if (registerSceneReadyPromiseRef.current) {
+			return registerSceneReadyPromiseRef.current;
+		}
+		registerSceneReadyPromiseRef.current = Promise.all(
+			REGISTER_SCENE_IMAGE_SRCS.map(preloadImageAsset),
+		).then(() => {
+			registerSceneReadyRef.current = true;
+		});
+		return registerSceneReadyPromiseRef.current;
+	}
+
 	function clearSceneTransitionTimers() {
+		transitionTokenRef.current += 1;
 		if (transitionRafRef.current !== null) {
 			cancelAnimationFrame(transitionRafRef.current);
 			transitionRafRef.current = null;
 		}
+		if (registerEnterRafRef.current !== null) {
+			cancelAnimationFrame(registerEnterRafRef.current);
+			registerEnterRafRef.current = null;
+		}
 		transitionTimersRef.current.forEach(clearTimeout);
 		transitionTimersRef.current = [];
 	}
+
+	useEffect(() => {
+		void ensureRegisterSceneReady();
+	}, []);
 
 	useEffect(() => {
 		return () => {
@@ -1125,20 +1201,32 @@ export default function HomePage() {
 
 	function startRegisterStepTransition() {
 		clearSceneTransitionTimers();
+		const transitionToken = transitionTokenRef.current;
 		setSceneTransition("to-register");
 		setIsSceneTransitionActive(false);
 		transitionRafRef.current = requestAnimationFrame(() => {
+			if (transitionTokenRef.current !== transitionToken) return;
 			setIsSceneTransitionActive(true);
 			transitionRafRef.current = null;
 		});
 		transitionTimersRef.current.push(setTimeout(() => {
-			setStep("register");
+			void ensureRegisterSceneReady().then(() => {
+				if (transitionTokenRef.current !== transitionToken) return;
+				setIsRegisterSceneEntering(true);
+				setStep("register");
+					registerEnterRafRef.current = requestAnimationFrame(() => {
+					if (transitionTokenRef.current !== transitionToken) return;
+					setIsRegisterSceneEntering(false);
+					registerEnterRafRef.current = null;
+				});
+				transitionTimersRef.current.push(setTimeout(() => {
+					if (transitionTokenRef.current !== transitionToken) return;
+					setSceneTransition(null);
+					setIsSceneTransitionActive(false);
+					transitionTimersRef.current = [];
+				}, stepTransitionMs + 40));
+			});
 		}, stepTransitionSwitchMs));
-		transitionTimersRef.current.push(setTimeout(() => {
-			setSceneTransition(null);
-			setIsSceneTransitionActive(false);
-			transitionTimersRef.current = [];
-		}, stepTransitionMs));
 	}
 
 	useEffect(() => {
@@ -1209,16 +1297,21 @@ export default function HomePage() {
 			<>
 				{step === "username" && (
 					<UsernameStep
-					username={username}
-					setUsername={setUsername}
-					checkState={checkState}
-					isRegistered={isRegistered}
-					onConfirm={handleUsernameConfirm}
-				/>
-			)}
-				{step === "register" && (
-					<RegisterStep username={usernameRef.current.trim()} onSubmit={handleRegisterSubmit} />
+						username={username}
+						setUsername={setUsername}
+						checkState={checkState}
+						isRegistered={isRegistered}
+						onConfirm={handleUsernameConfirm}
+						sceneExitActive={sceneTransition === "to-register" && step === "username" && isSceneTransitionActive}
+					/>
 				)}
+					{step === "register" && (
+						<RegisterStep
+							username={usernameRef.current.trim()}
+							onSubmit={handleRegisterSubmit}
+							sceneEnterActive={isRegisterSceneEntering}
+						/>
+					)}
 				{sceneTransition === "to-register" && (
 					<div
 						aria-hidden="true"
@@ -1232,43 +1325,34 @@ export default function HomePage() {
 					>
 						<div style={{
 							position: "absolute",
-							inset: 0,
-							background: "radial-gradient(circle at center, rgba(255, 247, 235, 0.24) 0%, rgba(12, 18, 30, 0.72) 34%, rgba(4, 8, 16, 0.96) 100%)",
-							opacity: isSceneTransitionActive ? 1 : 0,
-							transition: `opacity ${Math.round(stepTransitionMs * 0.28)}ms ease`,
-						}} />
-						<div style={{
-							position: "absolute",
-							top: "-24%",
-							left: "-100vw",
-							width: "92vw",
-							height: "148vh",
-							transform: isSceneTransitionActive
-								? "translateX(208vw) rotate(-8deg)"
-								: "translateX(0vw) rotate(-8deg)",
-							transformOrigin: "center center",
+							top: 0,
+							left: "-112vw",
+							width: "112vw",
+							height: "100%",
+							transform: `translate3d(${
+								!isSceneTransitionActive
+									? "0vw"
+									: step === "username"
+										? "112vw"
+										: "224vw"
+							}, 0, 0)`,
+							transformOrigin: "left center",
 							transition: `transform ${stepTransitionMs}ms cubic-bezier(0.22, 1, 0.36, 1)`,
-							background: "linear-gradient(90deg, rgba(205, 68, 58, 0) 0%, rgba(205, 68, 58, 0.26) 24%, rgba(255, 250, 242, 0.96) 50%, rgba(41, 132, 212, 0.28) 76%, rgba(41, 132, 212, 0) 100%)",
-							filter: "blur(18px)",
-							opacity: 0.98,
-						}} />
-						<div style={{
-							position: "absolute",
-							top: "-28%",
-							left: "-72vw",
-							width: "34vw",
-							height: "156vh",
-							transform: isSceneTransitionActive
-								? "translateX(226vw) rotate(-8deg)"
-								: "translateX(0vw) rotate(-8deg)",
-							transformOrigin: "center center",
-							transition: `transform ${stepTransitionMs}ms cubic-bezier(0.22, 1, 0.36, 1)`,
-							background: "linear-gradient(180deg, rgba(255, 255, 255, 0) 0%, rgba(255, 252, 247, 0.98) 50%, rgba(255, 255, 255, 0) 100%)",
-							boxShadow: "0 0 40px rgba(255, 251, 244, 0.5), 0 0 80px rgba(49, 130, 205, 0.24), 0 0 80px rgba(205, 74, 62, 0.24)",
-							opacity: 0.94,
-						}} />
+							background: "linear-gradient(90deg, rgba(5, 9, 16, 0.98) 0%, rgba(6, 10, 18, 0.97) 76%, rgba(255, 250, 242, 0.18) 100%)",
+							boxShadow: "18px 0 42px rgba(255, 248, 236, 0.08)",
+							willChange: "transform",
+						}}>
+							<div style={{
+								position: "absolute",
+								top: 0,
+								right: 0,
+								width: "4px",
+								height: "100%",
+								background: "linear-gradient(180deg, rgba(255, 250, 242, 0.1) 0%, rgba(255, 250, 242, 0.46) 50%, rgba(255, 250, 242, 0.1) 100%)",
+							}} />
+						</div>
 					</div>
-				)}
+					)}
 				{/* step === "loading": renders nothing while the initial room-join check is pending */}
 			</>
 		);
