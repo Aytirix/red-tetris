@@ -578,14 +578,25 @@ export default function HomePage() {
 	const location = useLocation();
 	const { socket } = useSocket();
 
-	const locationState = location.state as { step?: "register"; returnTo?: string } | null;
-	const [step, setStep] = useState<"username" | "register">(
-		locationState?.step === "register" ? "register" : "username"
+	// Detect room-join mode: returnTo with exactly 2 non-empty path parts (e.g. /room/username)
+	const returnTo = (location.state as { returnTo?: string } | null)?.returnTo ?? "";
+	const returnToParts = returnTo.split("/").filter(Boolean);
+	const isRoomJoin = returnToParts.length === 2 && returnToParts[0].length >= 1 && returnToParts[1].length >= 1;
+
+	// In room-join mode: use username from URL, show nothing while check is pending
+	const [step, setStep] = useState<"loading" | "username" | "register">(
+		() => isRoomJoin ? "loading" : "username"
 	);
-	const [username, setUsername] = useState(() => localStorage.getItem("username") ?? "");
+	const [username, setUsername] = useState(
+		() => isRoomJoin ? returnToParts[1] : (localStorage.getItem("username") ?? "")
+	);
 	const [checkState, setCheckState] = useState<CheckState>("idle");
 	const [isRegistered, setIsRegistered] = useState(false);
 	const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+	// Ref to read latest username inside the socket handler without stale closure
+	const usernameRef = useRef(username);
+	useEffect(() => { usernameRef.current = username; }, [username]);
 
 	useEffect(() => {
 		const trimmed = username.trim();
@@ -602,19 +613,34 @@ export default function HomePage() {
 
 	useEffect(() => {
 		function onResult(data: { available: boolean; is_register: boolean }) {
-			if (!data.available) { setCheckState("unavailable"); setIsRegistered(false); return; }
+			if (!data.available) {
+				setCheckState("unavailable");
+				setIsRegistered(data.is_register);
+				if (isRoomJoin) {
+					// URL username is taken → let user pick a new one
+					setStep("username");
+				}
+				return;
+			}
+			// available: true
 			setIsRegistered(data.is_register);
 			setCheckState("available");
+			if (isRoomJoin && !data.is_register) {
+				// Available + not registered → skip to faction selection
+				setStep("register");
+			} else if (isRoomJoin && data.is_register) {
+				// Available + already registered → show username step with "Jouer →"
+				setStep("username");
+			}
+			// non-room-join: step stays "username", user clicks the button
 		}
 		socket.on("user:ResultUsernameAvailable", onResult);
 		return () => { socket.off("user:ResultUsernameAvailable", onResult); };
-	}, [socket, navigate]);
+	}, [socket]); // isRoomJoin is stable (derived from location.state)
 
 	function resolveDestination(newUsername: string): string {
-		const returnTo = locationState?.returnTo;
 		if (!returnTo) return "/dashboard";
-		const parts = returnTo.split("/").filter(Boolean);
-		if (parts.length === 2) return `/${parts[0]}/${newUsername}`;
+		if (returnToParts.length === 2) return `/${returnToParts[0]}/${newUsername}`;
 		return returnTo;
 	}
 
@@ -626,7 +652,8 @@ export default function HomePage() {
 	}
 
 	function handleRegisterSubmit(faction: Faction, avatar: string) {
-		const trimmed = username.trim();
+		const trimmed = usernameRef.current.trim();
+		localStorage.setItem("username", trimmed);
 		socket.emit("user:Register", { username: trimmed, faction, avatar });
 		navigate(resolveDestination(trimmed));
 	}
@@ -643,8 +670,9 @@ export default function HomePage() {
 				/>
 			)}
 			{step === "register" && (
-				<RegisterStep username={username.trim()} onSubmit={handleRegisterSubmit} />
+				<RegisterStep username={usernameRef.current.trim()} onSubmit={handleRegisterSubmit} />
 			)}
+			{/* step === "loading": renders nothing while the initial room-join check is pending */}
 		</>
 	);
 }
