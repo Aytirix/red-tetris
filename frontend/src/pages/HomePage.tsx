@@ -410,7 +410,7 @@ function RegisterStep({ username, onSubmit }: {
 }) {
 	const swipeDurationMs = 460;
 	const edgeHandleBaseOffset = 24;
-	const edgeHandleMinOpacity = 0.42;
+	const edgeHandleMinOpacity = 0.54;
 	const [faction, setFaction] = useState<Faction | null>(null);
 	const [avatar, setAvatar] = useState<string | null>(null);
 	const [isFactionDetailVisible, setIsFactionDetailVisible] = useState(false);
@@ -550,16 +550,38 @@ function RegisterStep({ username, onSubmit }: {
 				position: "fixed", inset: 0, overflow: "hidden",
 				background: "linear-gradient(180deg, var(--color-bg-2) 0%, var(--color-bg-1) 48%, var(--color-bg-0) 100%)",
 			}}
-			>
-					<div style={{
-						position: "absolute",
-						inset: 0,
-					transform: `translateX(${chooserUiTranslate})`,
-					transition: `transform ${swipeDurationMs}ms cubic-bezier(0.22, 1, 0.36, 1)`,
-					willChange: "transform",
+		>
+			<img
+				src="/img/choix-faction/affrontement.jpg"
+				alt=""
+				draggable={false}
+				style={{
+					position: "absolute",
+					inset: 0,
+					width: "100%",
+					height: "100%",
+					objectFit: "cover",
+					objectPosition: "center center",
+					transform: "scale(1.02) translate(calc(var(--px, 0) * -4px), calc(var(--py, 0) * -3px))",
+					willChange: "transform, opacity",
+					userSelect: "none",
 					pointerEvents: "none",
-					zIndex: 3,
-				}}>
+					filter: "brightness(0.92) saturate(0.96)",
+					opacity: isCampView ? 1 : 0,
+					transition: `opacity ${swipeDurationMs}ms cubic-bezier(0.22, 1, 0.36, 1)`,
+					zIndex: 2,
+				}}
+			/>
+
+			<div style={{
+				position: "absolute",
+				inset: 0,
+				transform: `translateX(${chooserUiTranslate})`,
+				transition: `transform ${swipeDurationMs}ms cubic-bezier(0.22, 1, 0.36, 1)`,
+				willChange: "transform",
+				pointerEvents: "none",
+				zIndex: 3,
+			}}>
 				<div style={{
 					position: "absolute",
 					top: 0,
@@ -841,25 +863,25 @@ function RegisterStep({ username, onSubmit }: {
 									style={{
 										position: "relative",
 										zIndex: 1,
-										width: "30px",
-										height: "30px",
-										transform: layerIsPirates ? "translateX(-12px)" : "translateX(12px)",
-										filter: `drop-shadow(0 0 10px ${layerData.glow})`,
+										width: "38px",
+										height: "38px",
+										transform: layerIsPirates ? "translateX(-10px)" : "translateX(10px)",
+										filter: `drop-shadow(0 0 12px ${layerData.glow}) drop-shadow(0 0 18px rgba(255, 255, 255, 0.28))`,
 									}}
 								>
 									<path
 										d={layerIsPirates ? "M10 5 L17 12 L10 19" : "M14 5 L7 12 L14 19"}
 										fill="none"
-										stroke="rgba(255, 255, 255, 0.28)"
-										strokeWidth="5"
+										stroke="rgba(7, 12, 22, 0.52)"
+										strokeWidth="7"
 										strokeLinecap="round"
 										strokeLinejoin="round"
 									/>
 									<path
 										d={layerIsPirates ? "M10 5 L17 12 L10 19" : "M14 5 L7 12 L14 19"}
 										fill="none"
-										stroke="rgba(255, 249, 240, 0.98)"
-										strokeWidth="2.9"
+										stroke="rgba(255, 252, 247, 1)"
+										strokeWidth="3.8"
 										strokeLinecap="round"
 										strokeLinejoin="round"
 									/>
