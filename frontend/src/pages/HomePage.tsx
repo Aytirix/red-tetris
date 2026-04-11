@@ -1081,6 +1081,8 @@ export default function HomePage() {
 	const navigate = useNavigate();
 	const location = useLocation();
 	const { socket } = useSocket();
+	const stepTransitionMs = 760;
+	const stepTransitionSwitchMs = 320;
 
 	// Detect room-join mode: returnTo with exactly 2 non-empty path parts (e.g. /room/username)
 	const returnTo = (location.state as { returnTo?: string } | null)?.returnTo ?? "";
@@ -1096,11 +1098,48 @@ export default function HomePage() {
 	);
 	const [checkState, setCheckState] = useState<CheckState>("idle");
 	const [isRegistered, setIsRegistered] = useState(false);
+	const [sceneTransition, setSceneTransition] = useState<null | "to-register">(null);
+	const [isSceneTransitionActive, setIsSceneTransitionActive] = useState(false);
 	const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+	const transitionRafRef = useRef<number | null>(null);
+	const transitionTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
 
 	// Ref to read latest username inside the socket handler without stale closure
 	const usernameRef = useRef(username);
 	useEffect(() => { usernameRef.current = username; }, [username]);
+
+	function clearSceneTransitionTimers() {
+		if (transitionRafRef.current !== null) {
+			cancelAnimationFrame(transitionRafRef.current);
+			transitionRafRef.current = null;
+		}
+		transitionTimersRef.current.forEach(clearTimeout);
+		transitionTimersRef.current = [];
+	}
+
+	useEffect(() => {
+		return () => {
+			clearSceneTransitionTimers();
+		};
+	}, []);
+
+	function startRegisterStepTransition() {
+		clearSceneTransitionTimers();
+		setSceneTransition("to-register");
+		setIsSceneTransitionActive(false);
+		transitionRafRef.current = requestAnimationFrame(() => {
+			setIsSceneTransitionActive(true);
+			transitionRafRef.current = null;
+		});
+		transitionTimersRef.current.push(setTimeout(() => {
+			setStep("register");
+		}, stepTransitionSwitchMs));
+		transitionTimersRef.current.push(setTimeout(() => {
+			setSceneTransition(null);
+			setIsSceneTransitionActive(false);
+			transitionTimersRef.current = [];
+		}, stepTransitionMs));
+	}
 
 	useEffect(() => {
 		const trimmed = username.trim();
@@ -1131,7 +1170,11 @@ export default function HomePage() {
 			setCheckState("available");
 			if (isRoomJoin && !data.is_register) {
 				// Available + not registered → skip to faction selection
-				setStep("register");
+				if (step === "username") {
+					startRegisterStepTransition();
+				} else {
+					setStep("register");
+				}
 			} else if (isRoomJoin && data.is_register) {
 				// Available + already registered → show username step with "Jouer →"
 				setStep("username");
@@ -1140,7 +1183,7 @@ export default function HomePage() {
 		}
 		socket.on("user:ResultUsernameAvailable", onResult);
 		return () => { socket.off("user:ResultUsernameAvailable", onResult); };
-	}, [socket]); // isRoomJoin is stable (derived from location.state)
+	}, [isRoomJoin, socket, step]); // isRoomJoin is stable (derived from location.state)
 
 	function resolveDestination(newUsername: string): string {
 		if (!returnTo) return "/dashboard";
@@ -1152,7 +1195,7 @@ export default function HomePage() {
 		const trimmed = username.trim();
 		localStorage.setItem("username", trimmed);
 		if (isRegistered) { navigate(resolveDestination(trimmed)); return; }
-		setStep("register");
+		startRegisterStepTransition();
 	}
 
 	function handleRegisterSubmit(faction: Faction, avatar: string) {
@@ -1162,10 +1205,10 @@ export default function HomePage() {
 		navigate(resolveDestination(trimmed));
 	}
 
-	return (
-		<>
-			{step === "username" && (
-				<UsernameStep
+		return (
+			<>
+				{step === "username" && (
+					<UsernameStep
 					username={username}
 					setUsername={setUsername}
 					checkState={checkState}
@@ -1173,10 +1216,60 @@ export default function HomePage() {
 					onConfirm={handleUsernameConfirm}
 				/>
 			)}
-			{step === "register" && (
-				<RegisterStep username={usernameRef.current.trim()} onSubmit={handleRegisterSubmit} />
-			)}
-			{/* step === "loading": renders nothing while the initial room-join check is pending */}
-		</>
-	);
-}
+				{step === "register" && (
+					<RegisterStep username={usernameRef.current.trim()} onSubmit={handleRegisterSubmit} />
+				)}
+				{sceneTransition === "to-register" && (
+					<div
+						aria-hidden="true"
+						style={{
+							position: "fixed",
+							inset: 0,
+							overflow: "hidden",
+							pointerEvents: "none",
+							zIndex: 90,
+						}}
+					>
+						<div style={{
+							position: "absolute",
+							inset: 0,
+							background: "radial-gradient(circle at center, rgba(255, 247, 235, 0.24) 0%, rgba(12, 18, 30, 0.72) 34%, rgba(4, 8, 16, 0.96) 100%)",
+							opacity: isSceneTransitionActive ? 1 : 0,
+							transition: `opacity ${Math.round(stepTransitionMs * 0.28)}ms ease`,
+						}} />
+						<div style={{
+							position: "absolute",
+							top: "-24%",
+							left: "-100vw",
+							width: "92vw",
+							height: "148vh",
+							transform: isSceneTransitionActive
+								? "translateX(208vw) rotate(-8deg)"
+								: "translateX(0vw) rotate(-8deg)",
+							transformOrigin: "center center",
+							transition: `transform ${stepTransitionMs}ms cubic-bezier(0.22, 1, 0.36, 1)`,
+							background: "linear-gradient(90deg, rgba(205, 68, 58, 0) 0%, rgba(205, 68, 58, 0.26) 24%, rgba(255, 250, 242, 0.96) 50%, rgba(41, 132, 212, 0.28) 76%, rgba(41, 132, 212, 0) 100%)",
+							filter: "blur(18px)",
+							opacity: 0.98,
+						}} />
+						<div style={{
+							position: "absolute",
+							top: "-28%",
+							left: "-72vw",
+							width: "34vw",
+							height: "156vh",
+							transform: isSceneTransitionActive
+								? "translateX(226vw) rotate(-8deg)"
+								: "translateX(0vw) rotate(-8deg)",
+							transformOrigin: "center center",
+							transition: `transform ${stepTransitionMs}ms cubic-bezier(0.22, 1, 0.36, 1)`,
+							background: "linear-gradient(180deg, rgba(255, 255, 255, 0) 0%, rgba(255, 252, 247, 0.98) 50%, rgba(255, 255, 255, 0) 100%)",
+							boxShadow: "0 0 40px rgba(255, 251, 244, 0.5), 0 0 80px rgba(49, 130, 205, 0.24), 0 0 80px rgba(205, 74, 62, 0.24)",
+							opacity: 0.94,
+						}} />
+					</div>
+				)}
+				{/* step === "loading": renders nothing while the initial room-join check is pending */}
+			</>
+		);
+	}
