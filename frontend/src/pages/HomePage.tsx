@@ -419,9 +419,7 @@ function RegisterStep({ username, onSubmit }: {
 	const currentRef = useRef({ x: 0, y: 0 });
 	const rafRef = useRef<number>(0);
 	const swipeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-	const f = faction ? FACTIONS[faction] : null;
-	const characters = faction ? CHARACTERS[faction] : [];
+	const revealFrameRef = useRef<number | null>(null);
 
 	// Parallax animation loop — no React state, pure DOM updates
 	useEffect(() => {
@@ -440,6 +438,9 @@ function RegisterStep({ username, onSubmit }: {
 
 	useEffect(() => {
 		return () => {
+			if (revealFrameRef.current !== null) {
+				cancelAnimationFrame(revealFrameRef.current);
+			}
 			if (swipeTimerRef.current) {
 				clearTimeout(swipeTimerRef.current);
 			}
@@ -449,7 +450,7 @@ function RegisterStep({ username, onSubmit }: {
 	useEffect(() => {
 		const host = containerRef.current;
 		if (!host) return;
-		if (!faction) {
+		if (!faction || !isFactionDetailVisible) {
 			host.style.setProperty("--edge-handle-offset", `${edgeHandleBaseOffset}px`);
 			host.style.setProperty("--edge-handle-opacity", "0");
 			return;
@@ -459,7 +460,7 @@ function RegisterStep({ username, onSubmit }: {
 			faction === "pirates" ? `${edgeHandleBaseOffset}px` : `-${edgeHandleBaseOffset}px`,
 		);
 		host.style.setProperty("--edge-handle-opacity", `${edgeHandleMinOpacity}`);
-	}, [edgeHandleBaseOffset, edgeHandleMinOpacity, faction]);
+	}, [edgeHandleBaseOffset, edgeHandleMinOpacity, faction, isFactionDetailVisible]);
 
 	function handleMouseMove(e: React.MouseEvent<HTMLDivElement>) {
 		const rect = e.currentTarget.getBoundingClientRect();
@@ -469,7 +470,7 @@ function RegisterStep({ username, onSubmit }: {
 		};
 
 		const host = containerRef.current;
-		if (!host || !faction) {
+		if (!host || !faction || !isFactionDetailVisible) {
 			host?.style.setProperty("--edge-handle-offset", `${edgeHandleBaseOffset}px`);
 			host?.style.setProperty("--edge-handle-opacity", "0");
 			return;
@@ -492,20 +493,28 @@ function RegisterStep({ username, onSubmit }: {
 	}
 
 	function handleFactionSelect(nextFaction: Faction) {
+		if (revealFrameRef.current !== null) {
+			cancelAnimationFrame(revealFrameRef.current);
+			revealFrameRef.current = null;
+		}
 		if (swipeTimerRef.current) {
 			clearTimeout(swipeTimerRef.current);
 		}
 		setAvatar(null);
 		setFaction(nextFaction);
 		setIsFactionDetailVisible(false);
-		swipeTimerRef.current = setTimeout(() => {
+		revealFrameRef.current = requestAnimationFrame(() => {
 			setIsFactionDetailVisible(true);
-			swipeTimerRef.current = null;
-		}, 24);
+			revealFrameRef.current = null;
+		});
 	}
 
 	function handleFactionBack() {
 		if (!faction) return;
+		if (revealFrameRef.current !== null) {
+			cancelAnimationFrame(revealFrameRef.current);
+			revealFrameRef.current = null;
+		}
 		if (swipeTimerRef.current) {
 			clearTimeout(swipeTimerRef.current);
 		}
@@ -518,25 +527,19 @@ function RegisterStep({ username, onSubmit }: {
 	}
 
 	const isPirates = faction === "pirates";
-	const chooserUiOpacity = !faction || !isFactionDetailVisible ? 1 : 0;
-	const chooserUiTranslate = !faction || !isFactionDetailVisible ? "0%" : (isPirates ? "8%" : "-8%");
-	const detailBackgroundClipPath = !faction
-		? "inset(0 50% 0 50%)"
-		: isFactionDetailVisible
-			? "inset(0 0 0 0)"
-			: (isPirates ? "inset(0 50% 0 0)" : "inset(0 0 0 50%)");
-	const detailContentTranslate = isFactionDetailVisible ? "0vw" : (isPirates ? "-28vw" : "28vw");
-	const detailPanelOffset = isPirates ? "-25rem" : "25rem";
-	const edgeHandleTranslate = isFactionDetailVisible
-		? `var(--edge-handle-offset, ${edgeHandleBaseOffset}px)`
-		: (isPirates ? "92px" : "-92px");
+	const chooserUiTranslate = !faction || !isFactionDetailVisible
+		? "0vw"
+		: (isPirates ? "110vw" : "-110vw");
 
 	return (
 		<div
 			ref={containerRef}
 			onMouseMove={handleMouseMove}
 			onMouseLeave={() => {
-				containerRef.current?.style.setProperty("--edge-handle-opacity", faction ? `${edgeHandleMinOpacity}` : "0");
+				containerRef.current?.style.setProperty(
+					"--edge-handle-opacity",
+					faction && isFactionDetailVisible ? `${edgeHandleMinOpacity}` : "0",
+				);
 				containerRef.current?.style.setProperty(
 					"--edge-handle-offset",
 					faction === "marines" ? `-${edgeHandleBaseOffset}px` : `${edgeHandleBaseOffset}px`,
@@ -579,15 +582,15 @@ function RegisterStep({ username, onSubmit }: {
 				}} />
 			</div>
 
-			<div style={{
-				position: "absolute",
-				inset: 0,
-				opacity: chooserUiOpacity,
-				transform: `translateX(${chooserUiTranslate})`,
-				transition: `opacity ${swipeDurationMs}ms ease, transform ${swipeDurationMs}ms cubic-bezier(0.22, 1, 0.36, 1)`,
-				pointerEvents: "none",
-				zIndex: 3,
-			}}>
+				<div style={{
+					position: "absolute",
+					inset: 0,
+					transform: `translateX(${chooserUiTranslate})`,
+					transition: `transform ${swipeDurationMs}ms cubic-bezier(0.22, 1, 0.36, 1)`,
+					willChange: "transform",
+					pointerEvents: "none",
+					zIndex: 3,
+				}}>
 				<div style={{
 					position: "absolute",
 					top: 0,
@@ -749,23 +752,35 @@ function RegisterStep({ username, onSubmit }: {
 				})}
 			</div>
 
-			{faction && f && (
-				<div style={{
-					position: "absolute",
-					inset: 0,
-					overflow: "hidden",
-					pointerEvents: isFactionDetailVisible ? "auto" : "none",
-					zIndex: 4,
-				}}>
-					<div style={{
-						position: "absolute",
-						inset: 0,
-						clipPath: detailBackgroundClipPath,
-						transition: `clip-path ${swipeDurationMs}ms cubic-bezier(0.22, 1, 0.36, 1)`,
-						willChange: "clip-path",
-					}}>
+			{(Object.entries(FACTIONS) as [Faction, typeof FACTIONS.pirates][]).map(([layerFaction, layerData]) => {
+				const layerIsPirates = layerFaction === "pirates";
+				const layerIsActive = faction === layerFaction;
+				const layerIsVisible = layerIsActive && isFactionDetailVisible;
+				const layerTranslate = layerIsVisible
+					? "0vw"
+					: (layerIsPirates ? "calc(-112vw - 140px)" : "calc(112vw + 140px)");
+				const layerPanelOffset = layerIsPirates ? "-25rem" : "25rem";
+				const layerHandleTranslate = layerIsVisible
+					? `var(--edge-handle-offset, ${edgeHandleBaseOffset}px)`
+					: (layerIsPirates ? "92px" : "-92px");
+				const layerCharacters = CHARACTERS[layerFaction];
+
+				return (
+					<div
+						key={layerFaction}
+						style={{
+							position: "absolute",
+							inset: 0,
+							overflow: "hidden",
+							pointerEvents: layerIsVisible ? "auto" : "none",
+							zIndex: layerIsActive ? 4 : 2,
+							transform: `translateX(${layerTranslate})`,
+							transition: `transform ${swipeDurationMs}ms cubic-bezier(0.22, 1, 0.36, 1)`,
+							willChange: "transform",
+						}}
+					>
 						<img
-							src={f.image}
+							src={layerData.image}
 							alt=""
 							draggable={false}
 							style={{
@@ -788,23 +803,16 @@ function RegisterStep({ username, onSubmit }: {
 							background: "linear-gradient(180deg, rgba(8, 18, 34, 0.12) 0%, rgba(8, 18, 34, 0.08) 38%, rgba(8, 18, 34, 0.18) 100%)",
 							pointerEvents: "none",
 						}} />
-					</div>
-					<div style={{
-						position: "absolute",
-						inset: 0,
-						transform: `translateX(${detailContentTranslate})`,
-						transition: `transform ${swipeDurationMs}ms cubic-bezier(0.22, 1, 0.36, 1)`,
-						willChange: "transform",
-						zIndex: 4,
-					}}>
+
 						<button
 							type="button"
 							onClick={handleFactionBack}
+							tabIndex={layerIsVisible ? 0 : -1}
 							style={{
 								all: "unset",
 								position: "absolute",
 								top: 0,
-								[isPirates ? "right" : "left"]: 0,
+								[layerIsPirates ? "right" : "left"]: 0,
 								width: "88px",
 								height: "100%",
 								display: "flex",
@@ -813,9 +821,9 @@ function RegisterStep({ username, onSubmit }: {
 								cursor: "pointer",
 								zIndex: 5,
 								opacity: "var(--edge-handle-opacity, 0)",
-								transform: `translateX(${edgeHandleTranslate})`,
+								transform: `translateX(${layerHandleTranslate})`,
 								transition: "opacity 180ms ease, transform 320ms cubic-bezier(0.22, 1, 0.36, 1)",
-								filter: `drop-shadow(0 10px 24px rgba(0, 0, 0, 0.14)) drop-shadow(0 0 14px ${f.glow})`,
+								filter: `drop-shadow(0 10px 24px rgba(0, 0, 0, 0.14)) drop-shadow(0 0 14px ${layerData.glow})`,
 							}}
 						>
 							<svg
@@ -831,7 +839,7 @@ function RegisterStep({ username, onSubmit }: {
 								}}
 							>
 								<defs>
-									<linearGradient id={`edge-handle-fill-${faction}`} x1={isPirates ? "0%" : "100%"} y1="0%" x2={isPirates ? "100%" : "0%"} y2="0%">
+									<linearGradient id={`edge-handle-fill-${layerFaction}`} x1={layerIsPirates ? "0%" : "100%"} y1="0%" x2={layerIsPirates ? "100%" : "0%"} y2="0%">
 										<stop offset="0%" stopColor="rgba(7, 12, 22, 0)" />
 										<stop offset="18%" stopColor="rgba(7, 12, 22, 0.04)" />
 										<stop offset="52%" stopColor="rgba(7, 12, 22, 0.14)" />
@@ -839,10 +847,10 @@ function RegisterStep({ username, onSubmit }: {
 									</linearGradient>
 								</defs>
 								<path
-									d={isPirates
+									d={layerIsPirates
 										? "M88 0 H30 C16 4 8 18 6 34 C2 43 0 47 0 50 C0 53 2 57 6 66 C8 82 16 96 30 100 H88 Z"
 										: "M0 0 H58 C72 4 80 18 82 34 C86 43 88 47 88 50 C88 53 86 57 82 66 C80 82 72 96 58 100 H0 Z"}
-									fill={`url(#edge-handle-fill-${faction})`}
+									fill={`url(#edge-handle-fill-${layerFaction})`}
 								/>
 							</svg>
 							<svg
@@ -853,12 +861,12 @@ function RegisterStep({ username, onSubmit }: {
 									zIndex: 1,
 									width: "30px",
 									height: "30px",
-									transform: isPirates ? "translateX(-12px)" : "translateX(12px)",
-									filter: `drop-shadow(0 0 10px ${f.glow})`,
+									transform: layerIsPirates ? "translateX(-12px)" : "translateX(12px)",
+									filter: `drop-shadow(0 0 10px ${layerData.glow})`,
 								}}
 							>
 								<path
-									d={isPirates ? "M10 5 L17 12 L10 19" : "M14 5 L7 12 L14 19"}
+									d={layerIsPirates ? "M10 5 L17 12 L10 19" : "M14 5 L7 12 L14 19"}
 									fill="none"
 									stroke="rgba(255, 255, 255, 0.28)"
 									strokeWidth="5"
@@ -866,7 +874,7 @@ function RegisterStep({ username, onSubmit }: {
 									strokeLinejoin="round"
 								/>
 								<path
-									d={isPirates ? "M10 5 L17 12 L10 19" : "M14 5 L7 12 L14 19"}
+									d={layerIsPirates ? "M10 5 L17 12 L10 19" : "M14 5 L7 12 L14 19"}
 									fill="none"
 									stroke="rgba(255, 249, 240, 0.98)"
 									strokeWidth="2.9"
@@ -880,14 +888,14 @@ function RegisterStep({ username, onSubmit }: {
 							position: "absolute",
 							top: "50%",
 							left: "50%",
-							transform: `translate(-50%, -50%) translateX(${detailPanelOffset})`,
+							transform: `translate(-50%, -50%) translateX(${layerPanelOffset})`,
 							width: "min(560px, calc(100vw - 2rem))",
 							display: "grid",
 							gap: "1rem",
 							zIndex: 4,
 						}}>
 							<div style={{ textAlign: "center" }}>
-								<p className="eyebrow" style={{ color: f.color }}>
+								<p className="eyebrow" style={{ color: layerData.color }}>
 									{username || "Toto"}
 								</p>
 								<h2 style={{
@@ -905,9 +913,9 @@ function RegisterStep({ username, onSubmit }: {
 								borderRadius: "36px",
 								aspectRatio: "1 / 1",
 								background: "linear-gradient(180deg, rgba(14, 23, 37, 0.82) 0%, rgba(14, 23, 37, 0.56) 100%)",
-								border: `1px solid ${f.border}`,
+								border: `1px solid ${layerData.border}`,
 								backdropFilter: "blur(14px) saturate(130%)",
-								boxShadow: `0 28px 64px rgba(6, 12, 22, 0.38), 0 0 48px ${f.glow}`,
+								boxShadow: `0 28px 64px rgba(6, 12, 22, 0.38), 0 0 48px ${layerData.glow}`,
 							}}>
 								<div style={{
 									position: "absolute",
@@ -924,7 +932,7 @@ function RegisterStep({ username, onSubmit }: {
 										<path
 											d="M58 0 L68 12 L49 27 L61 42 L43 56 L55 72 L39 86 L47 100"
 											fill="none"
-											stroke={f.selected}
+											stroke={layerData.selected}
 											strokeWidth="10"
 											strokeLinecap="round"
 											strokeLinejoin="round"
@@ -960,7 +968,7 @@ function RegisterStep({ username, onSubmit }: {
 											fontSize: "0.95rem",
 											letterSpacing: "0.08em",
 										}}>
-											{f.icon} {f.label}
+											{layerData.icon} {layerData.label}
 										</span>
 										<span style={{
 											color: "rgba(255, 248, 240, 0.62)",
@@ -978,12 +986,13 @@ function RegisterStep({ username, onSubmit }: {
 										gap: "0.55rem",
 										alignContent: "start",
 									}}>
-										{characters.map(char => {
-											const selected = avatar === char.id;
+										{layerCharacters.map(char => {
+											const selected = layerIsActive && avatar === char.id;
 											return (
 												<button
 													key={char.id}
 													type="button"
+													tabIndex={layerIsVisible ? 0 : -1}
 													onClick={() => setAvatar(char.id)}
 													style={{
 														all: "unset",
@@ -996,21 +1005,21 @@ function RegisterStep({ username, onSubmit }: {
 														borderRadius: "20px",
 														border: "1px solid transparent",
 														background: selected
-															? `linear-gradient(180deg, ${f.colorSoft} 0%, rgba(255, 255, 255, 0) 100%)`
+															? `linear-gradient(180deg, ${layerData.colorSoft} 0%, rgba(255, 255, 255, 0) 100%)`
 															: "transparent",
-														boxShadow: selected ? `0 14px 28px ${f.glow}` : "none",
+														boxShadow: selected ? `0 14px 28px ${layerData.glow}` : "none",
 														transform: selected ? "translateY(-2px)" : "none",
 														transition: "all var(--transition-soft)",
 													}}
 												>
 													<div style={{ width: "clamp(58px, 5vw, 72px)", height: "clamp(58px, 5vw, 72px)" }}>
 														<AvatarPreview
-															faction={faction}
+															faction={layerFaction}
 															characterId={char.id}
 															characterName={char.name}
 															selected={selected}
-															color={f.color}
-															selectedGlow={f.selected}
+															color={layerData.color}
+															selectedGlow={layerData.selected}
 														/>
 													</div>
 													<span style={{
@@ -1032,17 +1041,17 @@ function RegisterStep({ username, onSubmit }: {
 								</div>
 							</div>
 
-							{avatar && (
+							{layerIsActive && avatar && (
 								<div style={{ display: "flex", justifyContent: "center" }}>
-									<button className="button button-primary" onClick={() => onSubmit(faction, avatar)}>
+									<button className="button button-primary" onClick={() => onSubmit(layerFaction, avatar)}>
 										Rejoindre la bataille
 									</button>
 								</div>
 							)}
 						</div>
 					</div>
-				</div>
-			)}
+				);
+			})}
 		</div>
 	);
 }
