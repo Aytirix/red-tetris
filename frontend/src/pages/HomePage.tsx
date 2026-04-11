@@ -249,25 +249,77 @@ function UsernameStep({ username, setUsername, checkState, isRegistered, onConfi
 	isRegistered: boolean;
 	onConfirm: () => void;
 }) {
+	const containerRef = useRef<HTMLDivElement>(null);
+	const targetRef = useRef({ x: 0, y: 0 });
+	const currentRef = useRef({ x: 0, y: 0 });
+	const rafRef = useRef<number>(0);
+
+	useEffect(() => {
+		function tick() {
+			const cur = currentRef.current;
+			const tgt = targetRef.current;
+			cur.x += (tgt.x - cur.x) * 0.08;
+			cur.y += (tgt.y - cur.y) * 0.08;
+			containerRef.current?.style.setProperty("--px", cur.x.toFixed(4));
+			containerRef.current?.style.setProperty("--py", cur.y.toFixed(4));
+			rafRef.current = requestAnimationFrame(tick);
+		}
+
+		rafRef.current = requestAnimationFrame(tick);
+		return () => cancelAnimationFrame(rafRef.current);
+	}, []);
+
 	return (
-		<div style={{
-			position: "fixed", inset: 0,
-			backgroundImage: "url('/img/Luffy-vs-Akainu.png')",
-			backgroundSize: "cover",
-			backgroundPosition: "calc(50% + 18px) center",
-			backgroundRepeat: "no-repeat",
-		}}>
+		<div
+			ref={containerRef}
+			onMouseMove={(e) => {
+				const rect = e.currentTarget.getBoundingClientRect();
+				targetRef.current = {
+					x: ((e.clientX - rect.left) / rect.width - 0.5) * 2,
+					y: ((e.clientY - rect.top) / rect.height - 0.5) * 2,
+				};
+			}}
+			onMouseLeave={() => {
+				targetRef.current = { x: 0, y: 0 };
+			}}
+			style={{
+				position: "fixed",
+				inset: 0,
+				overflow: "hidden",
+				background: "#05080e",
+			}}
+		>
+			<img
+				src="/img/Luffy-vs-Akainu.jpg"
+				alt=""
+				draggable={false}
+				style={{
+					position: "absolute",
+					inset: 0,
+					width: "100%",
+					height: "100%",
+					objectFit: "cover",
+					objectPosition: "center center",
+					transform: "scale(1.03) translate(calc(var(--px, 0) * -18px), calc(var(--py, 0) * -12px))",
+					transformOrigin: "center center",
+					willChange: "transform",
+					userSelect: "none",
+					pointerEvents: "none",
+				}}
+			/>
+
 			{/* Zone de saisie centrée en haut */}
 			<div style={{
 				position: "absolute",
 				top: "6%",
 				left: "50%",
-				transform: "translateX(-50%)",
+				transform: "translate(calc(-50% - 5px + (var(--px, 0) * 5px)), calc(var(--py, 0) * 4px))",
 				display: "flex",
 				flexDirection: "column",
 				alignItems: "center",
 				gap: "0.75rem",
 				width: "min(360px, 90vw)",
+				willChange: "transform",
 			}}>
 				<h1 style={{
 					margin: 0,
@@ -275,8 +327,8 @@ function UsernameStep({ username, setUsername, checkState, isRegistered, onConfi
 					fontFamily: "var(--font-display)",
 					letterSpacing: "0.12em",
 					textTransform: "uppercase",
-					color: "var(--color-text)",
-					textShadow: "0 0 30px var(--color-primary), 0 2px 8px var(--color-scrim)",
+					color: "rgba(255, 250, 244, 0.98)",
+					textShadow: "0 0 24px rgba(255, 255, 255, 0.16), 0 2px 12px rgba(5, 8, 14, 0.8)",
 					textAlign: "center",
 				}}>
 					{APP_NAME}
@@ -296,8 +348,8 @@ function UsernameStep({ username, setUsername, checkState, isRegistered, onConfi
 							padding: "0.85rem 2.8rem 0.85rem 1.1rem",
 							background: "var(--color-surface-strong)",
 							border: `1px solid ${checkState === "available" ? "var(--color-secondary)" :
-									checkState === "unavailable" ? "var(--color-primary)" :
-										"var(--color-border)"
+								checkState === "unavailable" ? "var(--color-primary)" :
+									"var(--color-border)"
 								}`,
 							borderRadius: "12px",
 							color: "var(--color-text)",
@@ -466,15 +518,14 @@ function RegisterStep({ username, onSubmit }: {
 	}
 
 	const isPirates = faction === "pirates";
-	const panoramaTranslate = !faction
-		? "-50vw"
-		: isFactionDetailVisible
-			? (isPirates ? "0vw" : "-100vw")
-			: "-50vw";
 	const chooserUiOpacity = !faction || !isFactionDetailVisible ? 1 : 0;
 	const chooserUiTranslate = !faction || !isFactionDetailVisible ? "0%" : (isPirates ? "8%" : "-8%");
-	const detailUiTranslate = isFactionDetailVisible ? "0vw" : (isPirates ? "-100vw" : "100vw");
-	const detailContentTranslate = isFactionDetailVisible ? "0vw" : (isPirates ? "-18vw" : "18vw");
+	const detailBackgroundClipPath = !faction
+		? "inset(0 50% 0 50%)"
+		: isFactionDetailVisible
+			? "inset(0 0 0 0)"
+			: (isPirates ? "inset(0 50% 0 0)" : "inset(0 0 0 50%)");
+	const detailContentTranslate = isFactionDetailVisible ? "0vw" : (isPirates ? "-28vw" : "28vw");
 	const detailPanelOffset = isPirates ? "-25rem" : "25rem";
 	const edgeHandleTranslate = isFactionDetailVisible
 		? `var(--edge-handle-offset, ${edgeHandleBaseOffset}px)`
@@ -495,67 +546,30 @@ function RegisterStep({ username, onSubmit }: {
 				position: "fixed", inset: 0, overflow: "hidden",
 				background: "linear-gradient(180deg, var(--color-bg-2) 0%, var(--color-bg-1) 48%, var(--color-bg-0) 100%)",
 			}}
-		>
-			<div style={{
-				position: "absolute",
-				inset: 0,
-				overflow: "hidden",
-			}}>
+			>
 				<div style={{
 					position: "absolute",
-					top: 0,
-					left: 0,
-					height: "100%",
-					width: "200vw",
-					display: "grid",
-					gridTemplateColumns: "50vw 100vw 50vw",
-					transform: `translateX(${panoramaTranslate})`,
-					transition: `transform ${swipeDurationMs}ms cubic-bezier(0.22, 1, 0.36, 1)`,
-					willChange: "transform",
+					inset: 0,
+					overflow: "hidden",
 				}}>
-					<img
-						src="/img/choix-faction/pirates.jpg"
-						alt=""
-						draggable={false}
-						style={{
-							width: "50vw",
-							height: "100vh",
-							objectFit: "cover",
-							objectPosition: "right center",
-							userSelect: "none",
-							pointerEvents: "none",
-							filter: "brightness(0.94) saturate(0.98)",
-						}}
-					/>
 					<img
 						src="/img/choix-faction/affrontement.jpg"
 						alt=""
 						draggable={false}
 						style={{
-							width: "100vw",
-							height: "100vh",
+							position: "absolute",
+							inset: 0,
+							width: "100%",
+							height: "100%",
 							objectFit: "cover",
 							objectPosition: "center center",
+							transform: "scale(1.02) translate(calc(var(--px, 0) * -4px), calc(var(--py, 0) * -3px))",
+							willChange: "transform",
 							userSelect: "none",
 							pointerEvents: "none",
 							filter: "brightness(0.92) saturate(0.96)",
 						}}
 					/>
-					<img
-						src="/img/choix-faction/marine.jpg"
-						alt=""
-						draggable={false}
-						style={{
-							width: "50vw",
-							height: "100vh",
-							objectFit: "cover",
-							objectPosition: "left center",
-							userSelect: "none",
-							pointerEvents: "none",
-							filter: "brightness(0.94) saturate(0.98)",
-						}}
-					/>
-				</div>
 
 				<div style={{
 					position: "absolute",
@@ -739,37 +753,42 @@ function RegisterStep({ username, onSubmit }: {
 				<div style={{
 					position: "absolute",
 					inset: 0,
-					transform: `translateX(${detailUiTranslate})`,
-					transition: `transform ${swipeDurationMs}ms cubic-bezier(0.22, 1, 0.36, 1)`,
-					willChange: "transform",
 					overflow: "hidden",
 					pointerEvents: isFactionDetailVisible ? "auto" : "none",
 					zIndex: 4,
 				}}>
-					<img
-						src={f.image}
-						alt=""
-						draggable={false}
-						style={{
-							position: "absolute",
-							inset: 0,
-							width: "100%",
-							height: "100%",
-							objectFit: "cover",
-							objectPosition: "center center",
-							transform: "scale(1.03) translate(calc(var(--px, 0) * -6px), calc(var(--py, 0) * -4px))",
-							willChange: "transform",
-							userSelect: "none",
-							pointerEvents: "none",
-							filter: "brightness(0.95) saturate(1)",
-						}}
-					/>
 					<div style={{
 						position: "absolute",
 						inset: 0,
-						background: "linear-gradient(180deg, rgba(8, 18, 34, 0.12) 0%, rgba(8, 18, 34, 0.08) 38%, rgba(8, 18, 34, 0.18) 100%)",
-						pointerEvents: "none",
-					}} />
+						clipPath: detailBackgroundClipPath,
+						transition: `clip-path ${swipeDurationMs}ms cubic-bezier(0.22, 1, 0.36, 1)`,
+						willChange: "clip-path",
+					}}>
+						<img
+							src={f.image}
+							alt=""
+							draggable={false}
+							style={{
+								position: "absolute",
+								inset: 0,
+								width: "100%",
+								height: "100%",
+								objectFit: "cover",
+								objectPosition: "center center",
+								transform: "scale(1.03) translate(calc(var(--px, 0) * -6px), calc(var(--py, 0) * -4px))",
+								willChange: "transform",
+								userSelect: "none",
+								pointerEvents: "none",
+								filter: "brightness(0.95) saturate(1)",
+							}}
+						/>
+						<div style={{
+							position: "absolute",
+							inset: 0,
+							background: "linear-gradient(180deg, rgba(8, 18, 34, 0.12) 0%, rgba(8, 18, 34, 0.08) 38%, rgba(8, 18, 34, 0.18) 100%)",
+							pointerEvents: "none",
+						}} />
+					</div>
 					<div style={{
 						position: "absolute",
 						inset: 0,
@@ -867,151 +886,151 @@ function RegisterStep({ username, onSubmit }: {
 							gap: "1rem",
 							zIndex: 4,
 						}}>
-						<div style={{ textAlign: "center" }}>
-							<p className="eyebrow" style={{ color: f.color }}>
-								{username || "Toto"}
-							</p>
-							<h2 style={{
-								marginTop: "0.35rem",
-								color: "rgba(255, 250, 244, 0.98)",
-								textShadow: "0 4px 22px rgba(7, 12, 23, 0.66)",
-							}}>
-								Choisissez votre personnage
-							</h2>
-						</div>
-
-						<div style={{
-							position: "relative",
-							overflow: "hidden",
-							borderRadius: "36px",
-							aspectRatio: "1 / 1",
-							background: "linear-gradient(180deg, rgba(14, 23, 37, 0.82) 0%, rgba(14, 23, 37, 0.56) 100%)",
-							border: `1px solid ${f.border}`,
-							backdropFilter: "blur(14px) saturate(130%)",
-							boxShadow: `0 28px 64px rgba(6, 12, 22, 0.38), 0 0 48px ${f.glow}`,
-						}}>
-							<div style={{
-								position: "absolute",
-								inset: "5% 35% 5% 35%",
-								opacity: 0.28,
-								pointerEvents: "none",
-							}}>
-								<svg
-									viewBox="0 0 100 100"
-									preserveAspectRatio="none"
-									aria-hidden="true"
-									style={{ width: "100%", height: "100%" }}
-								>
-									<path
-										d="M58 0 L68 12 L49 27 L61 42 L43 56 L55 72 L39 86 L47 100"
-										fill="none"
-										stroke={f.selected}
-										strokeWidth="10"
-										strokeLinecap="round"
-										strokeLinejoin="round"
-									/>
-									<path
-										d="M58 0 L68 12 L49 27 L61 42 L43 56 L55 72 L39 86 L47 100"
-										fill="none"
-										stroke="rgba(255, 248, 236, 0.72)"
-										strokeWidth="3"
-										strokeLinecap="round"
-										strokeLinejoin="round"
-									/>
-								</svg>
+							<div style={{ textAlign: "center" }}>
+								<p className="eyebrow" style={{ color: f.color }}>
+									{username || "Toto"}
+								</p>
+								<h2 style={{
+									marginTop: "0.35rem",
+									color: "rgba(255, 250, 244, 0.98)",
+									textShadow: "0 4px 22px rgba(7, 12, 23, 0.66)",
+								}}>
+									Choisissez votre personnage
+								</h2>
 							</div>
 
 							<div style={{
 								position: "relative",
-								zIndex: 1,
-								height: "100%",
-								display: "grid",
-								gridTemplateRows: "auto 1fr",
-								padding: "1rem",
+								overflow: "hidden",
+								borderRadius: "36px",
+								aspectRatio: "1 / 1",
+								background: "linear-gradient(180deg, rgba(14, 23, 37, 0.82) 0%, rgba(14, 23, 37, 0.56) 100%)",
+								border: `1px solid ${f.border}`,
+								backdropFilter: "blur(14px) saturate(130%)",
+								boxShadow: `0 28px 64px rgba(6, 12, 22, 0.38), 0 0 48px ${f.glow}`,
 							}}>
 								<div style={{
-									display: "flex",
-									alignItems: "center",
-									justifyContent: "space-between",
-									marginBottom: "0.6rem",
+									position: "absolute",
+									inset: "5% 35% 5% 35%",
+									opacity: 0.28,
+									pointerEvents: "none",
 								}}>
-									<span style={{
-										color: "rgba(255, 248, 240, 0.88)",
-										fontFamily: "var(--font-display)",
-										fontSize: "0.95rem",
-										letterSpacing: "0.08em",
-									}}>
-										{f.icon} {f.label}
-									</span>
-									<span style={{
-										color: "rgba(255, 248, 240, 0.62)",
-										fontSize: "0.78rem",
-										letterSpacing: "0.08em",
-										textTransform: "uppercase",
-									}}>
-										10 personnages
-									</span>
+									<svg
+										viewBox="0 0 100 100"
+										preserveAspectRatio="none"
+										aria-hidden="true"
+										style={{ width: "100%", height: "100%" }}
+									>
+										<path
+											d="M58 0 L68 12 L49 27 L61 42 L43 56 L55 72 L39 86 L47 100"
+											fill="none"
+											stroke={f.selected}
+											strokeWidth="10"
+											strokeLinecap="round"
+											strokeLinejoin="round"
+										/>
+										<path
+											d="M58 0 L68 12 L49 27 L61 42 L43 56 L55 72 L39 86 L47 100"
+											fill="none"
+											stroke="rgba(255, 248, 236, 0.72)"
+											strokeWidth="3"
+											strokeLinecap="round"
+											strokeLinejoin="round"
+										/>
+									</svg>
 								</div>
 
 								<div style={{
+									position: "relative",
+									zIndex: 1,
+									height: "100%",
 									display: "grid",
-									gridTemplateColumns: "repeat(5, 1fr)",
-									gap: "0.55rem",
-									alignContent: "start",
+									gridTemplateRows: "auto 1fr",
+									padding: "1rem",
 								}}>
-									{characters.map(char => {
-										const selected = avatar === char.id;
-										return (
-											<button
-												key={char.id}
-												type="button"
-												onClick={() => setAvatar(char.id)}
-												style={{
-													all: "unset",
-													cursor: "pointer",
-													display: "flex",
-													flexDirection: "column",
-													alignItems: "center",
-													gap: "0.45rem",
-													padding: "0.35rem 0.15rem 0.45rem",
-													borderRadius: "20px",
-													border: "1px solid transparent",
-													background: selected
-														? `linear-gradient(180deg, ${f.colorSoft} 0%, rgba(255, 255, 255, 0) 100%)`
-														: "transparent",
-													boxShadow: selected ? `0 14px 28px ${f.glow}` : "none",
-													transform: selected ? "translateY(-2px)" : "none",
-													transition: "all var(--transition-soft)",
-												}}
-											>
-												<div style={{ width: "clamp(58px, 5vw, 72px)", height: "clamp(58px, 5vw, 72px)" }}>
-													<AvatarPreview
-														faction={faction}
-														characterId={char.id}
-														characterName={char.name}
-														selected={selected}
-														color={f.color}
-														selectedGlow={f.selected}
-													/>
-												</div>
-												<span style={{
-													color: selected ? "rgba(255, 250, 243, 0.98)" : "rgba(233, 238, 246, 0.92)",
-													fontSize: "0.78rem",
-													fontWeight: 700,
-													fontFamily: "var(--font-display)",
-													letterSpacing: "0.04em",
-													lineHeight: 1.1,
-													textAlign: "center",
-													textShadow: "0 1px 14px rgba(6, 12, 22, 0.7)",
-												}}>
-													{char.name}
-												</span>
-											</button>
-										);
-									})}
+									<div style={{
+										display: "flex",
+										alignItems: "center",
+										justifyContent: "space-between",
+										marginBottom: "0.6rem",
+									}}>
+										<span style={{
+											color: "rgba(255, 248, 240, 0.88)",
+											fontFamily: "var(--font-display)",
+											fontSize: "0.95rem",
+											letterSpacing: "0.08em",
+										}}>
+											{f.icon} {f.label}
+										</span>
+										<span style={{
+											color: "rgba(255, 248, 240, 0.62)",
+											fontSize: "0.78rem",
+											letterSpacing: "0.08em",
+											textTransform: "uppercase",
+										}}>
+											10 personnages
+										</span>
+									</div>
+
+									<div style={{
+										display: "grid",
+										gridTemplateColumns: "repeat(5, 1fr)",
+										gap: "0.55rem",
+										alignContent: "start",
+									}}>
+										{characters.map(char => {
+											const selected = avatar === char.id;
+											return (
+												<button
+													key={char.id}
+													type="button"
+													onClick={() => setAvatar(char.id)}
+													style={{
+														all: "unset",
+														cursor: "pointer",
+														display: "flex",
+														flexDirection: "column",
+														alignItems: "center",
+														gap: "0.45rem",
+														padding: "0.35rem 0.15rem 0.45rem",
+														borderRadius: "20px",
+														border: "1px solid transparent",
+														background: selected
+															? `linear-gradient(180deg, ${f.colorSoft} 0%, rgba(255, 255, 255, 0) 100%)`
+															: "transparent",
+														boxShadow: selected ? `0 14px 28px ${f.glow}` : "none",
+														transform: selected ? "translateY(-2px)" : "none",
+														transition: "all var(--transition-soft)",
+													}}
+												>
+													<div style={{ width: "clamp(58px, 5vw, 72px)", height: "clamp(58px, 5vw, 72px)" }}>
+														<AvatarPreview
+															faction={faction}
+															characterId={char.id}
+															characterName={char.name}
+															selected={selected}
+															color={f.color}
+															selectedGlow={f.selected}
+														/>
+													</div>
+													<span style={{
+														color: selected ? "rgba(255, 250, 243, 0.98)" : "rgba(233, 238, 246, 0.92)",
+														fontSize: "0.78rem",
+														fontWeight: 700,
+														fontFamily: "var(--font-display)",
+														letterSpacing: "0.04em",
+														lineHeight: 1.1,
+														textAlign: "center",
+														textShadow: "0 1px 14px rgba(6, 12, 22, 0.7)",
+													}}>
+														{char.name}
+													</span>
+												</button>
+											);
+										})}
+									</div>
 								</div>
 							</div>
-						</div>
 
 							{avatar && (
 								<div style={{ display: "flex", justifyContent: "center" }}>
