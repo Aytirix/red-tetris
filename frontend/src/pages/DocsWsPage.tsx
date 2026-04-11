@@ -79,6 +79,20 @@ function formatLogValue(value: unknown): string {
 	}
 }
 
+function normalizeJson(s: string): string {
+	const trimmed = s.trim();
+	if (!trimmed) return "";
+	try {
+		return JSON.stringify(JSON.parse(trimmed));
+	} catch {
+		return trimmed;
+	}
+}
+
+function getMockStorageKey(eventId: string): string {
+	return `docsWs:mock:${eventId}`;
+}
+
 function groupBy(events: WsEvent[]): [string, WsEvent[]][] {
 	const map = new Map<string, WsEvent[]>();
 	for (const e of events) {
@@ -344,6 +358,14 @@ export default function DocsWsPage() {
 	const testMockResponseRef = useRef<HTMLTextAreaElement | null>(null);
 	const [testStatus, setTestStatus] = useState<"idle" | "sent" | "waiting" | "received" | "timeout" | "error">("idle");
 	const [testResponse, setTestResponse] = useState("");
+	const [autoMockEvents, setAutoMockEvents] = useState<Set<string>>(() => {
+		try {
+			const stored = localStorage.getItem("docsWs:autoMockEvents");
+			return stored ? new Set(JSON.parse(stored) as string[]) : new Set();
+		} catch {
+			return new Set();
+		}
+	});
 	const [wsLogs, setWsLogs] = useState<WsLogEntry[]>([]);
 	const testListenerRef = useRef<{ eventName: string; handler: (data: unknown) => void } | null>(null);
 	const testTimeoutRef = useRef<number | null>(null);
@@ -431,7 +453,8 @@ export default function DocsWsPage() {
 		clearTestListener();
 		setTesting(event);
 		setTestPayload(getTestPayloadSeed(event.payload));
-		setTestMockResponse(getTestPayloadSeed(event.response));
+		const savedMock = localStorage.getItem(getMockStorageKey(event.id));
+		setTestMockResponse(savedMock !== null ? savedMock : getTestPayloadSeed(event.response));
 		setTestError("");
 		setTestResponse("");
 		setTestStatus("idle");
@@ -495,6 +518,49 @@ export default function DocsWsPage() {
 	}, [testing, testPayload, testMockResponse]);
 
 	useEffect(() => closeTestModal, []);
+
+	useEffect(() => {
+		if (!testing) return;
+		const key = getMockStorageKey(testing.id);
+		const seed = getTestPayloadSeed(testing.response);
+		if (normalizeJson(testMockResponse) !== normalizeJson(seed)) {
+			localStorage.setItem(key, testMockResponse);
+		} else {
+			localStorage.removeItem(key);
+		}
+	}, [testMockResponse, testing]);
+
+	useEffect(() => {
+		localStorage.setItem("docsWs:autoMockEvents", JSON.stringify([...autoMockEvents]));
+	}, [autoMockEvents]);
+
+	useEffect(() => {
+		function handleOutgoing(eventName: string, ...args: unknown[]) {
+			if (eventName.startsWith(DOCS_WS_INTERNAL_EVENT_PREFIX)) return;
+			const autoEvent = events.find(
+				(e) => e.name === eventName && autoMockEvents.has(e.id) && e.responseName
+			);
+			if (!autoEvent) return;
+			const savedMock = localStorage.getItem(getMockStorageKey(autoEvent.id));
+			const seed = getTestPayloadSeed(autoEvent.response);
+			const mockValue = savedMock !== null ? savedMock : seed;
+			if (normalizeJson(mockValue) === normalizeJson(seed)) return;
+			let parsedMock: unknown;
+			try {
+				parsedMock = mockValue.trim() ? JSON.parse(mockValue) : undefined;
+			} catch {
+				return;
+			}
+			socket.emit(`${DOCS_WS_INTERNAL_EVENT_PREFIX}emitMockResponse`, {
+				eventName: autoEvent.name,
+				responseName: autoEvent.responseName,
+				response: parsedMock,
+				requestPayload: args.length > 0 ? args[0] : undefined,
+			});
+		}
+		socket.onAnyOutgoing(handleOutgoing);
+		return () => { socket.offAnyOutgoing(handleOutgoing); };
+	}, [events, autoMockEvents]);
 
 	useEffect(() => {
 		const incomingListener = (event: string, ...args: unknown[]) => appendWsLog("incoming", event, args);
@@ -605,6 +671,7 @@ export default function DocsWsPage() {
 		} else {
 			socket.emit(testing.name, parsedPayload);
 		}
+
 	}
 
 	function handlePrepareMockResponse() {
@@ -644,6 +711,10 @@ export default function DocsWsPage() {
 			requestPayload: parsedRequestPayload,
 		});
 	}
+
+	const isMockModified = testing
+		? normalizeJson(testMockResponse) !== normalizeJson(getTestPayloadSeed(testing.response))
+		: false;
 
 	const filtered = selectedGroup ? events.filter((e) => (e.group || "Général") === selectedGroup) : events;
 	const frontToBack = filtered.filter((e) => e.direction === "front-to-back");
@@ -1260,11 +1331,40 @@ export default function DocsWsPage() {
 
 							{testError && <p style={{ color: "var(--color-primary)", fontSize: "0.85rem", margin: 0 }}>{testError}</p>}
 
-							<div style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem" }}>
+							<div style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem", flexWrap: "wrap" }}>
 								{testing.responseName && (
-									<button type="button" className="button button-secondary" onClick={handlePrepareMockResponse}>
-										Envoyer la réponse mock
-									</button>
+									<>
+										<button type="button" className="button button-secondary" onClick={handlePrepareMockResponse}>
+											Envoyer la réponse mock
+										</button>
+										<button
+											type="button"
+											className="button"
+											onClick={() =>
+												setAutoMockEvents((prev) => {
+													const next = new Set(prev);
+													if (next.has(testing.id)) next.delete(testing.id);
+													else next.add(testing.id);
+													return next;
+												})
+											}
+											style={{
+												border: `1px solid ${autoMockEvents.has(testing.id) ? "var(--color-accent)" : "var(--color-border)"}`,
+												background: autoMockEvents.has(testing.id) ? "var(--color-accent-soft)" : "transparent",
+												color: autoMockEvents.has(testing.id) ? "var(--color-accent)" : "var(--color-text-muted)",
+												boxShadow: autoMockEvents.has(testing.id) && isMockModified ? "var(--shadow-neon-accent)" : "none",
+												opacity: autoMockEvents.has(testing.id) && !isMockModified ? 0.55 : 1,
+												transition: "all var(--transition-soft)",
+											}}
+											title={
+												autoMockEvents.has(testing.id) && !isMockModified
+													? "Activé — répondra dès que la réponse mock sera modifiée"
+													: ""
+											}
+										>
+											Réponse automatique
+										</button>
+									</>
 								)}
 								<button type="button" className="button button-primary" onClick={handleSendTestPayload}>
 									Envoyer le payload
