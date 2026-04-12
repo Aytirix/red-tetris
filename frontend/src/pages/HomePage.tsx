@@ -791,71 +791,71 @@ function RegisterStep({ username, onSubmit, sceneEnterActive = false }: {
 				})}
 			</div>
 
-				{(Object.entries(FACTIONS) as [Faction, typeof FACTIONS.pirates][]).map(([layerFaction, layerData]) => {
-					const layerIsPirates = layerFaction === "pirates";
-					const layerIsActive = faction === layerFaction;
-					const layerIsVisible = layerIsActive && isFactionDetailVisible;
-					const layerTranslate = isCampView
-						? (layerIsPirates ? "-50vw" : "50vw")
-						: layerIsVisible
-							? "0vw"
-							: (layerIsPirates ? "-100vw" : "100vw");
-					const layerUiTranslate = layerIsVisible
+			{(Object.entries(FACTIONS) as [Faction, typeof FACTIONS.pirates][]).map(([layerFaction, layerData]) => {
+				const layerIsPirates = layerFaction === "pirates";
+				const layerIsActive = faction === layerFaction;
+				const layerIsVisible = layerIsActive && isFactionDetailVisible;
+				const layerTranslate = isCampView
+					? (layerIsPirates ? "-50vw" : "50vw")
+					: layerIsVisible
 						? "0vw"
-						: (layerIsPirates ? "calc(-120vw - 160px)" : "calc(120vw + 160px)");
-					const layerPanelOffset = layerIsPirates ? "-25rem" : "25rem";
-					const layerHandleTranslate = layerIsVisible
-						? `var(--edge-handle-offset, ${edgeHandleBaseOffset}px)`
-						: (layerIsPirates ? "92px" : "-92px");
-					const layerCharacters = CHARACTERS[layerFaction];
+						: (layerIsPirates ? "-100vw" : "100vw");
+				const layerUiTranslate = layerIsVisible
+					? "0vw"
+					: (layerIsPirates ? "calc(-120vw - 160px)" : "calc(120vw + 160px)");
+				const layerPanelOffset = layerIsPirates ? "-25rem" : "25rem";
+				const layerHandleTranslate = layerIsVisible
+					? `var(--edge-handle-offset, ${edgeHandleBaseOffset}px)`
+					: (layerIsPirates ? "92px" : "-92px");
+				const layerCharacters = CHARACTERS[layerFaction];
 
-					return (
-						<div
-							key={layerFaction}
+				return (
+					<div
+						key={layerFaction}
+						style={{
+							position: "absolute",
+							inset: 0,
+							overflow: "hidden",
+							pointerEvents: layerIsVisible ? "auto" : "none",
+							zIndex: layerIsVisible ? 4 : 1,
+							transform: `translateX(${layerTranslate})`,
+							transition: `transform ${swipeDurationMs}ms cubic-bezier(0.22, 1, 0.36, 1)`,
+							willChange: "transform",
+						}}
+					>
+						<img
+							src={layerData.image}
+							alt=""
+							draggable={false}
 							style={{
 								position: "absolute",
 								inset: 0,
-								overflow: "hidden",
-								pointerEvents: layerIsVisible ? "auto" : "none",
-								zIndex: layerIsVisible ? 4 : 1,
-								transform: `translateX(${layerTranslate})`,
-								transition: `transform ${swipeDurationMs}ms cubic-bezier(0.22, 1, 0.36, 1)`,
+								width: "100%",
+								height: "100%",
+								objectFit: "cover",
+								objectPosition: "center center",
+								transform: "scale(1.03) translate(calc(var(--px, 0) * -6px), calc(var(--py, 0) * -4px))",
 								willChange: "transform",
-							}}
-						>
-							<img
-								src={layerData.image}
-								alt=""
-								draggable={false}
-								style={{
-									position: "absolute",
-									inset: 0,
-									width: "100%",
-									height: "100%",
-									objectFit: "cover",
-									objectPosition: "center center",
-									transform: "scale(1.03) translate(calc(var(--px, 0) * -6px), calc(var(--py, 0) * -4px))",
-									willChange: "transform",
-									userSelect: "none",
-									pointerEvents: "none",
-									filter: "brightness(0.95) saturate(1)",
-								}}
-							/>
-							<div style={{
-								position: "absolute",
-								inset: 0,
-								background: "linear-gradient(180deg, rgba(8, 18, 34, 0.12) 0%, rgba(8, 18, 34, 0.08) 38%, rgba(8, 18, 34, 0.18) 100%)",
+								userSelect: "none",
 								pointerEvents: "none",
-							}} />
+								filter: "brightness(0.95) saturate(1)",
+							}}
+						/>
+						<div style={{
+							position: "absolute",
+							inset: 0,
+							background: "linear-gradient(180deg, rgba(8, 18, 34, 0.12) 0%, rgba(8, 18, 34, 0.08) 38%, rgba(8, 18, 34, 0.18) 100%)",
+							pointerEvents: "none",
+						}} />
 
-							<div style={{
-								position: "absolute",
-								inset: 0,
-								transform: `translateX(${layerUiTranslate})`,
-								transition: `transform ${swipeDurationMs}ms cubic-bezier(0.22, 1, 0.36, 1)`,
-								willChange: "transform",
-								zIndex: 4,
-							}}>
+						<div style={{
+							position: "absolute",
+							inset: 0,
+							transform: `translateX(${layerUiTranslate})`,
+							transition: `transform ${swipeDurationMs}ms cubic-bezier(0.22, 1, 0.36, 1)`,
+							willChange: "transform",
+							zIndex: 4,
+						}}>
 							<button
 								type="button"
 								onClick={handleFactionBack}
@@ -946,176 +946,176 @@ function RegisterStep({ username, onSubmit, sceneEnterActive = false }: {
 								gap: "1rem",
 								zIndex: 4,
 							}}>
-							<div style={{ textAlign: "center" }}>
-								<p className="eyebrow" style={{ color: layerData.color }}>
-									{username || "Toto"}
-								</p>
-								<h2 style={{
-									marginTop: "0.35rem",
-									color: "rgba(255, 250, 244, 0.98)",
-									textShadow: "0 4px 22px rgba(7, 12, 23, 0.66)",
-								}}>
-									Choisissez votre personnage
-								</h2>
-							</div>
-
-							<div style={{
-								position: "relative",
-								overflow: "hidden",
-								borderRadius: "36px",
-								aspectRatio: "1 / 1",
-								background: "linear-gradient(180deg, rgba(14, 23, 37, 0.82) 0%, rgba(14, 23, 37, 0.56) 100%)",
-								border: `1px solid ${layerData.border}`,
-								backdropFilter: "blur(14px) saturate(130%)",
-								boxShadow: `0 28px 64px rgba(6, 12, 22, 0.38), 0 0 48px ${layerData.glow}`,
-							}}>
-								<div style={{
-									position: "absolute",
-									inset: "5% 35% 5% 35%",
-									opacity: 0.28,
-									pointerEvents: "none",
-								}}>
-									<svg
-										viewBox="0 0 100 100"
-										preserveAspectRatio="none"
-										aria-hidden="true"
-										style={{ width: "100%", height: "100%" }}
-									>
-										<path
-											d="M58 0 L68 12 L49 27 L61 42 L43 56 L55 72 L39 86 L47 100"
-											fill="none"
-											stroke={layerData.selected}
-											strokeWidth="10"
-											strokeLinecap="round"
-											strokeLinejoin="round"
-										/>
-										<path
-											d="M58 0 L68 12 L49 27 L61 42 L43 56 L55 72 L39 86 L47 100"
-											fill="none"
-											stroke="rgba(255, 248, 236, 0.72)"
-											strokeWidth="3"
-											strokeLinecap="round"
-											strokeLinejoin="round"
-										/>
-									</svg>
+								<div style={{ textAlign: "center" }}>
+									<p className="eyebrow" style={{ color: layerData.color }}>
+										{username || "Toto"}
+									</p>
+									<h2 style={{
+										marginTop: "0.35rem",
+										color: "rgba(255, 250, 244, 0.98)",
+										textShadow: "0 4px 22px rgba(7, 12, 23, 0.66)",
+									}}>
+										Choisissez votre personnage
+									</h2>
 								</div>
 
 								<div style={{
 									position: "relative",
-									zIndex: 1,
-									height: "100%",
-									display: "grid",
-									gridTemplateRows: "auto 1fr",
-									padding: "1rem",
+									overflow: "hidden",
+									borderRadius: "36px",
+									aspectRatio: "1 / 1",
+									background: "linear-gradient(180deg, rgba(14, 23, 37, 0.82) 0%, rgba(14, 23, 37, 0.56) 100%)",
+									border: `1px solid ${layerData.border}`,
+									backdropFilter: "blur(14px) saturate(130%)",
+									boxShadow: `0 28px 64px rgba(6, 12, 22, 0.38), 0 0 48px ${layerData.glow}`,
 								}}>
 									<div style={{
-										display: "flex",
-										alignItems: "center",
-										justifyContent: "space-between",
-										marginBottom: "0.6rem",
+										position: "absolute",
+										inset: "5% 35% 5% 35%",
+										opacity: 0.28,
+										pointerEvents: "none",
 									}}>
-										<span style={{
-											color: "rgba(255, 248, 240, 0.88)",
-											fontFamily: "var(--font-display)",
-											fontSize: "0.95rem",
-											letterSpacing: "0.08em",
-										}}>
-											{layerData.icon} {layerData.label}
-										</span>
-										<span style={{
-											color: "rgba(255, 248, 240, 0.62)",
-											fontSize: "0.78rem",
-											letterSpacing: "0.08em",
-											textTransform: "uppercase",
-										}}>
-											10 personnages
-										</span>
+										<svg
+											viewBox="0 0 100 100"
+											preserveAspectRatio="none"
+											aria-hidden="true"
+											style={{ width: "100%", height: "100%" }}
+										>
+											<path
+												d="M58 0 L68 12 L49 27 L61 42 L43 56 L55 72 L39 86 L47 100"
+												fill="none"
+												stroke={layerData.selected}
+												strokeWidth="10"
+												strokeLinecap="round"
+												strokeLinejoin="round"
+											/>
+											<path
+												d="M58 0 L68 12 L49 27 L61 42 L43 56 L55 72 L39 86 L47 100"
+												fill="none"
+												stroke="rgba(255, 248, 236, 0.72)"
+												strokeWidth="3"
+												strokeLinecap="round"
+												strokeLinejoin="round"
+											/>
+										</svg>
 									</div>
 
 									<div style={{
+										position: "relative",
+										zIndex: 1,
+										height: "100%",
 										display: "grid",
-										gridTemplateColumns: "repeat(5, 1fr)",
-										gap: "0.55rem",
-										alignContent: "start",
+										gridTemplateRows: "auto 1fr",
+										padding: "1rem",
 									}}>
-										{layerCharacters.map(char => {
-											const selected = layerIsActive && avatar === char.id;
-											return (
-												<button
-													key={char.id}
-													type="button"
-													tabIndex={layerIsVisible ? 0 : -1}
-													onClick={() => setAvatar(char.id)}
-													style={{
-														all: "unset",
-														cursor: "pointer",
-														display: "flex",
-														flexDirection: "column",
-														alignItems: "center",
-														gap: "0.45rem",
-														padding: "0.35rem 0.15rem 0.45rem",
-														borderRadius: "20px",
-														border: "1px solid transparent",
-														background: selected
-															? `linear-gradient(180deg, ${layerData.colorSoft} 0%, rgba(255, 255, 255, 0) 100%)`
-															: "transparent",
-														boxShadow: selected ? `0 14px 28px ${layerData.glow}` : "none",
-														transform: selected ? "translateY(-2px)" : "none",
-														transition: "all var(--transition-soft)",
-													}}
-												>
-													<div style={{ width: "clamp(58px, 5vw, 72px)", height: "clamp(58px, 5vw, 72px)" }}>
-														<AvatarPreview
-															faction={layerFaction}
-															characterId={char.id}
-															characterName={char.name}
-															selected={selected}
-															color={layerData.color}
-															selectedGlow={layerData.selected}
-														/>
-													</div>
-													<span style={{
-														color: selected ? "rgba(255, 250, 243, 0.98)" : "rgba(233, 238, 246, 0.92)",
-														fontSize: "0.78rem",
-														fontWeight: 700,
-														fontFamily: "var(--font-display)",
-														letterSpacing: "0.04em",
-														lineHeight: 1.1,
-														textAlign: "center",
-														textShadow: "0 1px 14px rgba(6, 12, 22, 0.7)",
-													}}>
-														{char.name}
-													</span>
-												</button>
-											);
-										})}
+										<div style={{
+											display: "flex",
+											alignItems: "center",
+											justifyContent: "space-between",
+											marginBottom: "0.6rem",
+										}}>
+											<span style={{
+												color: "rgba(255, 248, 240, 0.88)",
+												fontFamily: "var(--font-display)",
+												fontSize: "0.95rem",
+												letterSpacing: "0.08em",
+											}}>
+												{layerData.icon} {layerData.label}
+											</span>
+											<span style={{
+												color: "rgba(255, 248, 240, 0.62)",
+												fontSize: "0.78rem",
+												letterSpacing: "0.08em",
+												textTransform: "uppercase",
+											}}>
+												10 personnages
+											</span>
+										</div>
+
+										<div style={{
+											display: "grid",
+											gridTemplateColumns: "repeat(5, 1fr)",
+											gap: "0.55rem",
+											alignContent: "start",
+										}}>
+											{layerCharacters.map(char => {
+												const selected = layerIsActive && avatar === char.id;
+												return (
+													<button
+														key={char.id}
+														type="button"
+														tabIndex={layerIsVisible ? 0 : -1}
+														onClick={() => setAvatar(char.id)}
+														style={{
+															all: "unset",
+															cursor: "pointer",
+															display: "flex",
+															flexDirection: "column",
+															alignItems: "center",
+															gap: "0.45rem",
+															padding: "0.35rem 0.15rem 0.45rem",
+															borderRadius: "20px",
+															border: "1px solid transparent",
+															background: selected
+																? `linear-gradient(180deg, ${layerData.colorSoft} 0%, rgba(255, 255, 255, 0) 100%)`
+																: "transparent",
+															boxShadow: selected ? `0 14px 28px ${layerData.glow}` : "none",
+															transform: selected ? "translateY(-2px)" : "none",
+															transition: "all var(--transition-soft)",
+														}}
+													>
+														<div style={{ width: "clamp(58px, 5vw, 72px)", height: "clamp(58px, 5vw, 72px)" }}>
+															<AvatarPreview
+																faction={layerFaction}
+																characterId={char.id}
+																characterName={char.name}
+																selected={selected}
+																color={layerData.color}
+																selectedGlow={layerData.selected}
+															/>
+														</div>
+														<span style={{
+															color: selected ? "rgba(255, 250, 243, 0.98)" : "rgba(233, 238, 246, 0.92)",
+															fontSize: "0.78rem",
+															fontWeight: 700,
+															fontFamily: "var(--font-display)",
+															letterSpacing: "0.04em",
+															lineHeight: 1.1,
+															textAlign: "center",
+															textShadow: "0 1px 14px rgba(6, 12, 22, 0.7)",
+														}}>
+															{char.name}
+														</span>
+													</button>
+												);
+											})}
+										</div>
 									</div>
 								</div>
-							</div>
 
-							{layerIsActive && (
-								<div style={{ display: "flex", justifyContent: "center" }}>
-									<button
-										className="button button-primary"
-										disabled={!avatar}
-										onClick={() => {
-											if (!avatar) return;
-											onSubmit(layerFaction, avatar);
-										}}
-										style={{
-											opacity: avatar ? 1 : 0.42,
-											cursor: avatar ? "pointer" : "not-allowed",
-											filter: avatar ? "none" : "grayscale(0.2)",
-											transition: "opacity var(--transition-soft), filter var(--transition-soft)",
-										}}
-									>
-										Rejoindre la bataille
-									</button>
-								</div>
-							)}
+								{layerIsActive && (
+									<div style={{ display: "flex", justifyContent: "center" }}>
+										<button
+											className="button button-primary"
+											disabled={!avatar}
+											onClick={() => {
+												if (!avatar) return;
+												onSubmit(layerFaction, avatar);
+											}}
+											style={{
+												opacity: avatar ? 1 : 0.42,
+												cursor: avatar ? "pointer" : "not-allowed",
+												filter: avatar ? "none" : "grayscale(0.2)",
+												transition: "opacity var(--transition-soft), filter var(--transition-soft)",
+											}}
+										>
+											Rejoindre la bataille
+										</button>
+									</div>
+								)}
+							</div>
 						</div>
 					</div>
-				</div>
 				);
 			})}
 		</div>
@@ -1214,7 +1214,7 @@ export default function HomePage() {
 				if (transitionTokenRef.current !== transitionToken) return;
 				setIsRegisterSceneEntering(true);
 				setStep("register");
-					registerEnterRafRef.current = requestAnimationFrame(() => {
+				registerEnterRafRef.current = requestAnimationFrame(() => {
 					if (transitionTokenRef.current !== transitionToken) return;
 					setIsRegisterSceneEntering(false);
 					registerEnterRafRef.current = null;
@@ -1243,10 +1243,10 @@ export default function HomePage() {
 	}, [username]);
 
 	useEffect(() => {
-		function onResult(data: { available: boolean; is_register: boolean }) {
+		function onResult(data: { available: boolean; user_faction: boolean }) {
 			if (!data.available) {
 				setCheckState("unavailable");
-				setIsRegistered(data.is_register);
+				setIsRegistered(data.user_faction);
 				if (isRoomJoin) {
 					// URL username is taken → let user pick a new one
 					setStep("username");
@@ -1254,16 +1254,16 @@ export default function HomePage() {
 				return;
 			}
 			// available: true
-			setIsRegistered(data.is_register);
+			setIsRegistered(data.user_faction);
 			setCheckState("available");
-			if (isRoomJoin && !data.is_register) {
+			if (isRoomJoin && !data.user_faction) {
 				// Available + not registered → skip to faction selection
 				if (step === "username") {
 					startRegisterStepTransition();
 				} else {
 					setStep("register");
 				}
-			} else if (isRoomJoin && data.is_register) {
+			} else if (isRoomJoin && data.user_faction) {
 				// Available + already registered → show username step with "Jouer →"
 				setStep("username");
 			}
@@ -1293,67 +1293,66 @@ export default function HomePage() {
 		navigate(resolveDestination(trimmed));
 	}
 
-		return (
-			<>
-				{step === "username" && (
-					<UsernameStep
-						username={username}
-						setUsername={setUsername}
-						checkState={checkState}
-						isRegistered={isRegistered}
-						onConfirm={handleUsernameConfirm}
-						sceneExitActive={sceneTransition === "to-register" && step === "username" && isSceneTransitionActive}
-					/>
-				)}
-					{step === "register" && (
-						<RegisterStep
-							username={usernameRef.current.trim()}
-							onSubmit={handleRegisterSubmit}
-							sceneEnterActive={isRegisterSceneEntering}
-						/>
-					)}
-				{sceneTransition === "to-register" && (
-					<div
-						aria-hidden="true"
-						style={{
-							position: "fixed",
-							inset: 0,
-							overflow: "hidden",
-							pointerEvents: "none",
-							zIndex: 90,
-						}}
-					>
+	return (
+		<>
+			{step === "username" && (
+				<UsernameStep
+					username={username}
+					setUsername={setUsername}
+					checkState={checkState}
+					isRegistered={isRegistered}
+					onConfirm={handleUsernameConfirm}
+					sceneExitActive={sceneTransition === "to-register" && step === "username" && isSceneTransitionActive}
+				/>
+			)}
+			{step === "register" && (
+				<RegisterStep
+					username={usernameRef.current.trim()}
+					onSubmit={handleRegisterSubmit}
+					sceneEnterActive={isRegisterSceneEntering}
+				/>
+			)}
+			{sceneTransition === "to-register" && (
+				<div
+					aria-hidden="true"
+					style={{
+						position: "fixed",
+						inset: 0,
+						overflow: "hidden",
+						pointerEvents: "none",
+						zIndex: 90,
+					}}
+				>
+					<div style={{
+						position: "absolute",
+						top: 0,
+						left: "-112vw",
+						width: "112vw",
+						height: "100%",
+						transform: `translate3d(${!isSceneTransitionActive
+								? "0vw"
+								: step === "username"
+									? "112vw"
+									: "224vw"
+							}, 0, 0)`,
+						transformOrigin: "left center",
+						transition: `transform ${stepTransitionMs}ms cubic-bezier(0.22, 1, 0.36, 1)`,
+						background: "linear-gradient(90deg, rgba(5, 9, 16, 0.98) 0%, rgba(6, 10, 18, 0.97) 76%, rgba(255, 250, 242, 0.18) 100%)",
+						boxShadow: "18px 0 42px rgba(255, 248, 236, 0.08)",
+						willChange: "transform",
+					}}>
 						<div style={{
 							position: "absolute",
 							top: 0,
-							left: "-112vw",
-							width: "112vw",
+							right: 0,
+							width: "4px",
 							height: "100%",
-							transform: `translate3d(${
-								!isSceneTransitionActive
-									? "0vw"
-									: step === "username"
-										? "112vw"
-										: "224vw"
-							}, 0, 0)`,
-							transformOrigin: "left center",
-							transition: `transform ${stepTransitionMs}ms cubic-bezier(0.22, 1, 0.36, 1)`,
-							background: "linear-gradient(90deg, rgba(5, 9, 16, 0.98) 0%, rgba(6, 10, 18, 0.97) 76%, rgba(255, 250, 242, 0.18) 100%)",
-							boxShadow: "18px 0 42px rgba(255, 248, 236, 0.08)",
-							willChange: "transform",
-						}}>
-							<div style={{
-								position: "absolute",
-								top: 0,
-								right: 0,
-								width: "4px",
-								height: "100%",
-								background: "linear-gradient(180deg, rgba(255, 250, 242, 0.1) 0%, rgba(255, 250, 242, 0.46) 50%, rgba(255, 250, 242, 0.1) 100%)",
-							}} />
-						</div>
+							background: "linear-gradient(180deg, rgba(255, 250, 242, 0.1) 0%, rgba(255, 250, 242, 0.46) 50%, rgba(255, 250, 242, 0.1) 100%)",
+						}} />
 					</div>
-					)}
-				{/* step === "loading": renders nothing while the initial room-join check is pending */}
-			</>
-		);
-	}
+				</div>
+			)}
+			{/* step === "loading": renders nothing while the initial room-join check is pending */}
+		</>
+	);
+}

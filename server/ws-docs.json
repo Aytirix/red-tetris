@@ -7,8 +7,8 @@
     "description": "",
     "payload": "{\n  \"username\": string\n}",
     "payloadDescription": "",
-    "response": "{\n  \"available\": boolean,\n  \"is_register\": boolean,\n  \"username\": string\n}",
+    "response": "{\n  \"available\": boolean,\n  \"user_faction\": null | pirate | marine,\n  \"username\": string\n}",
     "responseName": "user:ResultUsernameAvailable",
-    "responseDescription": "available = true = Si le pseudo est dispo (+ le réserver pour l'utilisateur) et false = le pseudo est déjà utiliser par une personne\nis_register = true si le pseudo est déjà enregistrer et false =  si c'est la 1er utilisation du pseudo\n\nle pseudo doit être compris entre 3 et 15 caractères"
+    "responseDescription": "available = true = Si le pseudo est dispo (+ le réserver pour l'utilisateur) et false = le pseudo est déjà utiliser par une personne\nuser_faction = nom de la faction si le pseudo est déjà enregistrer et qu'il à une faction assigné et false =  si c'est la 1er utilisation du pseudo ou pas de faction assigné\n\nle pseudo doit être compris entre 1 et 15 caractères"
   }
 ]

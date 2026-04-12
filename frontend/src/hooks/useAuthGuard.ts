@@ -15,8 +15,8 @@ import { emitCheckUsernameAvailable } from "../socket/events/user";
  *
  * Redirects:
  *  - available=false → "/" + alert
- *  - available=true, is_register=false → "/" with state { step:"register", returnTo: current path }
- *  - available=true, is_register=true → stay
+ *  - available=true, user_faction=false → "/" with state { step:"register", returnTo: current path }
+ *  - available=true, user_faction=true → stay
  */
 export function useAuthGuard() {
 	const { socket } = useSocket();
@@ -32,7 +32,7 @@ export function useAuthGuard() {
 
 	// Socket listener — ignored when already on "/" (HomePage handles it there)
 	useEffect(() => {
-		function handleResult(data: { available: boolean; is_register: boolean }) {
+		function handleResult(data: { available: boolean; user_faction: boolean }) {
 			if (pathnameRef.current === "/") return;
 
 			if (!data.available) {
@@ -45,7 +45,7 @@ export function useAuthGuard() {
 				});
 				return;
 			}
-			if (!data.is_register) {
+			if (!data.user_faction) {
 				navigate("/", {
 					state: { step: "register", returnTo: pathnameRef.current },
 				});

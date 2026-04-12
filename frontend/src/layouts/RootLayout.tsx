@@ -7,8 +7,9 @@ export default function RootLayout() {
 	useAuthGuard();
 	const isDocsWsPage = pathname.startsWith("/docs-ws");
 	const isHomePage = pathname === "/";
+	const isDashboard = pathname.startsWith("/dashboard");
 
-	if (isHomePage) {
+	if (isHomePage || isDashboard) {
 		return (
 			<>
 				<Outlet />
