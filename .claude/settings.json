@@ -8,7 +8,13 @@
       "Bash(node_modules/.bin/tsc --noEmit -p frontend/tsconfig.app.json)",
       "Bash(node_modules/.bin/tsc --noEmit)",
       "Bash(identify /home/theo/Documents/42/red-tetris/frontend/public/choix-faction/luffy.png)",
-      "Bash(grep -rE \"--color|--shadow|--font\" /home/theo/Documents/42/red-tetris/frontend/src/styles.css)"
+      "Bash(grep -rE \"--color|--shadow|--font\" /home/theo/Documents/42/red-tetris/frontend/src/styles.css)",
+      "Bash(ls /home/theo/Documents/42/red-tetris/frontend/src/*.d.ts /home/theo/Documents/42/red-tetris/frontend/*.d.ts)",
+      "Bash(cat /home/theo/Documents/42/red-tetris/frontend/tsconfig*.json)",
+      "Bash(echo \"EXIT=$?\")",
+      "Bash(npx vite:*)",
+      "Bash(echo \"TS=$?\")",
+      "Bash(echo \"VITE=$?\")"
     ]
   }
 }

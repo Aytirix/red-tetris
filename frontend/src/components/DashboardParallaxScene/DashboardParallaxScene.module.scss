@@ -1,0 +1,233 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// DashboardParallaxScene — layered parallax background
+//
+// CSS custom properties (set by JS each frame on .scene):
+//   --px   mouse X position in [-1, 1]  (0 = center)
+//   --py   mouse Y position in [-1, 1]  (0 = center)
+//
+// SCSS constants (compile-time layout / alignment):
+//   Tweak the "Tuning" block to align the pirate ship and size all elements.
+// ─────────────────────────────────────────────────────────────────────────────
+
+// ── Tuning ───────────────────────────────────────────────────────────────────
+
+// Pirate ship group
+// Width of the hull+mast container. Increase for a larger ship.
+$ship-group-width:     clamp(340px, 50vw, 800px);
+
+// Mast image width relative to the group. Adjust if the mast has side padding.
+$ship-mast-width:      90%;
+
+// How far above the group bottom the mast image sits, as % of hull height.
+// 0% = mast bottom at hull bottom  |  ~75% = mast bottom near deck level.
+// Increase if the mast appears too low, decrease if it floats too high.
+$ship-mast-bottom:     72%;
+
+// Marine headquarters ship
+$hq-ship-width:        clamp(300px, 44vw, 680px);
+
+// Foreground panels (both sides)
+$fg-panel-width:       clamp(180px, 28vw, 480px);
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+.scene {
+  // Runtime mouse position — updated by requestAnimationFrame in TypeScript
+  --px: 0;
+  --py: 0;
+
+  // Parallax amplitude — amount of movement at depth = 1.
+  // Reduced on tablet, zeroed on touch / motion-disabled (see @media below).
+  --amp-x: 38px;
+  --amp-y: 24px;
+
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #050816; // fallback color while images load
+  contain: layout paint;
+  isolation: isolate;
+}
+
+// ── Base rule shared by all parallax layers ──────────────────────────────────
+
+.layer {
+  position: absolute;
+  pointer-events: none;
+  will-change: transform;
+}
+
+// ── Full-screen cover layers (sky, sea, flags/architecture overlay) ───────────
+// scale(1.08) adds an 8% buffer on each side to absorb parallax motion
+// without exposing the edge of the image at any cursor position.
+
+.fullscreen {
+  inset: 0;
+  transform: translate3d(
+      calc(var(--px, 0) * var(--depth, 0) * var(--amp-x, 38px)),
+      calc(var(--py, 0) * var(--depth, 0) * var(--amp-y, 24px)),
+      0
+    )
+    scale(1.08);
+  transform-origin: center center;
+}
+
+.coverImg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center center;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+// ── Pirate ship group ─────────────────────────────────────────────────────────
+// Contains hull (in-flow, defines group height) and mast (absolute, above hull).
+// Both images move together under the same parallax transform on .shipGroup.
+
+.shipGroup {
+  left: 50%;
+  bottom: 0;
+  width: $ship-group-width;
+  // -50% centers the group; parallax offsets are added on top.
+  transform: translate3d(
+    calc(-50% + var(--px, 0) * var(--depth, 0) * var(--amp-x, 38px)),
+    calc(var(--py, 0) * var(--depth, 0) * var(--amp-y, 24px)),
+    0
+  );
+}
+
+// Hull is in normal flow → its rendered height determines .shipGroup height,
+// which is the reference for .shipMast's bottom: $ship-mast-bottom.
+.shipHull {
+  display: block;
+  position: relative;
+  width: 100%;
+  height: auto;
+  z-index: 2; // hull renders above mast at the overlap zone
+}
+
+// Mast is absolutely positioned so it extends above the hull.
+// bottom: $ship-mast-bottom is % of .shipGroup height (= hull rendered height).
+// The mast image's bottom edge sits at that height above the group's base.
+.shipMast {
+  position: absolute;
+  bottom: $ship-mast-bottom;
+  left: 50%;
+  transform: translateX(-50%);
+  width: $ship-mast-width;
+  height: auto;
+  z-index: 1;
+}
+
+// ── Marine headquarters ship — lower-center decorative ────────────────────────
+.hqShip {
+  left: 50%;
+  bottom: 0;
+  width: $hq-ship-width;
+  transform: translate3d(
+    calc(-50% + var(--px, 0) * var(--depth, 0) * var(--amp-x, 38px)),
+    calc(var(--py, 0) * var(--depth, 0) * var(--amp-y, 24px)),
+    0
+  );
+}
+
+.hqImg {
+  display: block;
+  width: 100%;
+  height: auto;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+// ── Foreground panels — anchored to left / right edges ───────────────────────
+
+.fgLeft {
+  left: 0;
+  bottom: 0;
+  width: $fg-panel-width;
+  transform: translate3d(
+    calc(var(--px, 0) * var(--depth, 0) * var(--amp-x, 38px)),
+    calc(var(--py, 0) * var(--depth, 0) * var(--amp-y, 24px)),
+    0
+  );
+}
+
+.fgRight {
+  right: 0;
+  bottom: 0;
+  width: $fg-panel-width;
+  transform: translate3d(
+    calc(var(--px, 0) * var(--depth, 0) * var(--amp-x, 38px)),
+    calc(var(--py, 0) * var(--depth, 0) * var(--amp-y, 24px)),
+    0
+  );
+}
+
+.fgImg {
+  display: block;
+  width: 100%;
+  height: auto;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+// ── Readability scrim ─────────────────────────────────────────────────────────
+// Minimal center vignette — keeps dashboard text legible without hiding the art.
+
+.scrim {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse 60% 55% at 50% 50%,
+    rgba(5, 8, 22, 0.42) 0%,
+    rgba(5, 8, 22, 0.18) 45%,
+    transparent 75%
+  );
+}
+
+// ── Content container ─────────────────────────────────────────────────────────
+// Centered overlay for dashboard UI — all child elements are pointer-events: auto.
+
+.content {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  > * {
+    pointer-events: auto;
+  }
+}
+
+// ── Responsive & accessibility ────────────────────────────────────────────────
+
+// Tablet: weaker parallax
+@media (max-width: 900px) {
+  .scene {
+    --amp-x: 16px;
+    --amp-y: 10px;
+  }
+}
+
+// Touch / coarse pointer: no mouse parallax (mouse events won't fire anyway,
+// but zeroing the amplitude is the safest fallback)
+@media (hover: none), (pointer: coarse) {
+  .scene {
+    --amp-x: 0px;
+    --amp-y: 0px;
+  }
+}
+
+// Reduced motion: disable all parallax movement
+@media (prefers-reduced-motion: reduce) {
+  .scene {
+    --amp-x: 0px;
+    --amp-y: 0px;
+  }
+}
