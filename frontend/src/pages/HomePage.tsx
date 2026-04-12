@@ -2,12 +2,15 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { ClipLoader } from "react-spinners";
 import { useSocket } from "../contexts/SocketContext";
+import { useRememberCurrentUserFaction } from "../contexts/WsStateContext";
 import { emitCheckUsernameAvailable } from "../socket/events/user";
 import { APP_NAME } from "../config";
+import {
+	normalizeUsernameAvailability,
+	type AppFaction as Faction,
+} from "../socket/userState";
 
 // ─── Data ───────────────────────────────────────────────────────────────────
-
-type Faction = "pirates" | "marines";
 
 type FactionData = {
 	label: string; tone: "red" | "cyan"; icon: string; image: string;
@@ -1128,6 +1131,7 @@ export default function HomePage() {
 	const navigate = useNavigate();
 	const location = useLocation();
 	const { socket } = useSocket();
+	const rememberCurrentUserFaction = useRememberCurrentUserFaction();
 	const stepTransitionMs = 440;
 	const stepTransitionSwitchMs = 180;
 
@@ -1159,6 +1163,7 @@ export default function HomePage() {
 	// Ref to read latest username inside the socket handler without stale closure
 	const usernameRef = useRef(username);
 	useEffect(() => { usernameRef.current = username; }, [username]);
+	const availableFactionRef = useRef<Faction | null>(null);
 
 	function ensureRegisterSceneReady() {
 		if (registerSceneReadyRef.current) {
@@ -1243,10 +1248,15 @@ export default function HomePage() {
 	}, [username]);
 
 	useEffect(() => {
-		function onResult(data: { available: boolean; user_faction: boolean }) {
-			if (!data.available) {
+		function onResult(data: unknown) {
+			const result = normalizeUsernameAvailability(data);
+			if (!result) return;
+
+			availableFactionRef.current = result.available ? result.user_faction : null;
+
+			if (!result.available) {
 				setCheckState("unavailable");
-				setIsRegistered(data.user_faction);
+				setIsRegistered(result.isRegistered);
 				if (isRoomJoin) {
 					// URL username is taken → let user pick a new one
 					setStep("username");
@@ -1254,16 +1264,16 @@ export default function HomePage() {
 				return;
 			}
 			// available: true
-			setIsRegistered(data.user_faction);
+			setIsRegistered(result.isRegistered);
 			setCheckState("available");
-			if (isRoomJoin && !data.user_faction) {
+			if (isRoomJoin && !result.isRegistered) {
 				// Available + not registered → skip to faction selection
 				if (step === "username") {
 					startRegisterStepTransition();
 				} else {
 					setStep("register");
 				}
-			} else if (isRoomJoin && data.user_faction) {
+			} else if (isRoomJoin && result.isRegistered) {
 				// Available + already registered → show username step with "Jouer →"
 				setStep("username");
 			}
@@ -1282,13 +1292,18 @@ export default function HomePage() {
 	function handleUsernameConfirm() {
 		const trimmed = username.trim();
 		localStorage.setItem("username", trimmed);
-		if (isRegistered) { navigate(resolveDestination(trimmed)); return; }
+		if (isRegistered) {
+			rememberCurrentUserFaction(availableFactionRef.current);
+			navigate(resolveDestination(trimmed));
+			return;
+		}
 		startRegisterStepTransition();
 	}
 
 	function handleRegisterSubmit(faction: Faction, avatar: string) {
 		const trimmed = usernameRef.current.trim();
 		localStorage.setItem("username", trimmed);
+		rememberCurrentUserFaction(faction);
 		socket.emit("user:Register", { username: trimmed, faction, avatar });
 		navigate(resolveDestination(trimmed));
 	}
