@@ -2,7 +2,9 @@ import { useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useSocket } from "../contexts/SocketContext";
 import { useAlert } from "../components/Alert";
+import { useClearCurrentUserFaction } from "../contexts/WsStateContext";
 import { emitCheckUsernameAvailable } from "../socket/events/user";
+import { normalizeUsernameAvailability } from "../socket/userState";
 
 /**
  * Global auth guard — runs in RootLayout on every page.
@@ -15,14 +17,15 @@ import { emitCheckUsernameAvailable } from "../socket/events/user";
  *
  * Redirects:
  *  - available=false → "/" + alert
- *  - available=true, user_faction=false → "/" with state { step:"register", returnTo: current path }
- *  - available=true, user_faction=true → stay
+ *  - available=true, no faction yet → "/" with state { step:"register", returnTo: current path }
+ *  - available=true, faction already assigned → stay
  */
 export function useAuthGuard() {
 	const { socket } = useSocket();
 	const navigate = useNavigate();
 	const location = useLocation();
 	const { alert } = useAlert();
+	const clearCurrentUserFaction = useClearCurrentUserFaction();
 
 	// Keep a ref so the socket listener always reads the current pathname
 	const pathnameRef = useRef(location.pathname);
@@ -32,10 +35,12 @@ export function useAuthGuard() {
 
 	// Socket listener — ignored when already on "/" (HomePage handles it there)
 	useEffect(() => {
-		function handleResult(data: { available: boolean; user_faction: boolean }) {
+		function handleResult(data: unknown) {
+			const result = normalizeUsernameAvailability(data);
+			if (!result) return;
 			if (pathnameRef.current === "/") return;
 
-			if (!data.available) {
+			if (!result.available) {
 				const returnTo = pathnameRef.current;
 				navigate("/", { state: { returnTo } });
 				alert({
@@ -45,7 +50,7 @@ export function useAuthGuard() {
 				});
 				return;
 			}
-			if (!data.user_faction) {
+			if (!result.isRegistered) {
 				navigate("/", {
 					state: { step: "register", returnTo: pathnameRef.current },
 				});
@@ -73,6 +78,7 @@ export function useAuthGuard() {
 			if (e.key !== "username") return;
 			const newUsername = e.newValue?.trim();
 			if (!newUsername) {
+				clearCurrentUserFaction();
 				navigate("/");
 				return;
 			}
@@ -80,7 +86,7 @@ export function useAuthGuard() {
 		}
 		window.addEventListener("storage", handleStorage);
 		return () => window.removeEventListener("storage", handleStorage);
-	}, [navigate]);
+	}, [clearCurrentUserFaction, navigate]);
 
 	// Poll for same-tab localStorage deletion (DevTools, etc.)
 	// The native "storage" event does NOT fire for changes in the same tab.
@@ -89,9 +95,10 @@ export function useAuthGuard() {
 			if (pathnameRef.current === "/") return;
 			const username = localStorage.getItem("username")?.trim();
 			if (!username) {
+				clearCurrentUserFaction();
 				navigate("/");
 			}
 		}, 1000);
 		return () => clearInterval(interval);
-	}, [navigate]);
+	}, [clearCurrentUserFaction, navigate]);
 }
