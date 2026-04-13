@@ -27,7 +27,7 @@ export function createApp(): express.Express {
 	// 	`);
 	// });
 
-	if (isDev) {
+	if (process.env.NODE_ENV === "development") {
 		app.use(wsDocsRouter);
 	}
 
