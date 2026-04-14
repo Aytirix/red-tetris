@@ -1,6 +1,6 @@
 import { Socket } from "socket.io";
 import { findUserByUsername } from "../repositories/userRepositories.js";
-import { userSocketStore } from "../gateways/socket/socketInit.js";
+import { userSocketStore } from "../gateways/socket/userSocketStore.js";
 
 export async function checkUsernameAvailability(socket: Socket, username: string): Promise<void> {
 	const user = await findUserByUsername(username);
@@ -12,6 +12,6 @@ export async function checkUsernameAvailability(socket: Socket, username: string
 			username: username,
 		})
 		userSocketStore.set(socket.id, username);
-		console.log(`Username available: ${username}`);
+		console.log(`Username available: ${username.length}`);
 	}
 }

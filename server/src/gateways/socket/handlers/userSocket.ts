@@ -5,7 +5,11 @@ import { checkUsernameAvailability } from "../../../services/userService.js";
 export function registerUserSocket(socket: Socket): void {
 	socket.on("user:CheckUsernameAvailable", async (msg) => {
 		if (!isValidUsername(msg.username)) {
-			socket.emit("user:UsernameInvalid", { username: msg.username });
+			socket.emit("user:ResultUsernameAvailable", { 
+				"available": "invalid",
+				"user_faction": null,
+				"username": msg.username
+			});
 			console.log(`Invalid username attempt: ${msg.username}`);
 			return;
 		}
