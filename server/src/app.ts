@@ -2,6 +2,8 @@ import express from "express";
 import { wsDocsRouter } from "./routes/wsDocs.js";
 import { corsMiddleware } from "./middlesware/cors.js";
 
+const isDev = process.env.NODE_ENV !== "production";
+
 export function createApp(): express.Express {
 	const app = express();
 	app.use((corsMiddleware));
@@ -26,6 +28,7 @@ export function createApp(): express.Express {
 	// 		</html>
 	// 	`);
 	// });
+
 
 	if (isDev) {
 		app.use(wsDocsRouter);
