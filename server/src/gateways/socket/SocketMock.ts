@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import type { Socket } from "socket.io";
 
 interface WsDocEvent {
@@ -9,6 +9,9 @@ interface WsDocEvent {
 }
 
 const docsPath = new URL("../../../ws-docs.json", import.meta.url);
+if (!existsSync(docsPath)) {
+	writeFileSync(docsPath, "[]", "utf-8");
+}
 const wsDocs = JSON.parse(readFileSync(docsPath, "utf-8")) as WsDocEvent[];
 const mockableEvents = new Map(
 	wsDocs

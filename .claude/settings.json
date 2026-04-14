@@ -14,7 +14,8 @@
       "Bash(echo \"EXIT=$?\")",
       "Bash(npx vite:*)",
       "Bash(echo \"TS=$?\")",
-      "Bash(echo \"VITE=$?\")"
+      "Bash(echo \"VITE=$?\")",
+      "Bash(npm audit:*)"
     ]
   }
 }
