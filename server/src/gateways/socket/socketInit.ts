@@ -6,7 +6,7 @@ import { registerUserSocket } from "./handlers/userSocket.js";
 import { registerSocketHandlers } from "./registerSocketHandlers.js";
 import { registerSystemSocket } from "./handlers/systemSocket.js";
 
-export const userSocketStore = new Map<string, string>();
+
 const isDev = process.env.NODE_ENV === "development";
 
 export function initSocket(server: HttpServer) : SocketIOServer {

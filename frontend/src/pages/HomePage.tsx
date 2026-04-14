@@ -381,7 +381,7 @@ function UsernameStep({ username, setUsername, checkState, isRegistered, onConfi
 						value={username}
 						onChange={(e) => setUsername(e.target.value)}
 						placeholder="Votre pseudo…"
-						maxLength={10}
+						maxLength={15}
 						autoComplete="off"
 						spellCheck={false}
 						style={{
