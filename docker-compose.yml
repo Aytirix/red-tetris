@@ -73,9 +73,12 @@ services:
       PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:?PGADMIN_DEFAULT_PASSWORD is required}
     ports:
       - "${PGADMIN_PORT:?PGADMIN_PORT is required}:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
 
 volumes:
   frontend_node_modules:
   backend_node_modules:
   frontend_dist:
   db_data:
+  pgadmin_data:

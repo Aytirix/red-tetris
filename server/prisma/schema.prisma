@@ -12,21 +12,25 @@ datasource db {
   provider = "postgresql"
 }
 
-model User {
-  id        Int       @id @default(autoincrement())
-  username  String    @unique
-  createdAt DateTime  @default(now())
-
-  sessions  Session[]
+enum Faction {
+  marine
+  pirate
 }
 
-model Session {
-  id             Int       @id @default(autoincrement())
-  sid            String    @unique
-  userId         Int?
-  expiresAt      DateTime
-  createdAt      DateTime  @default(now())
-  lastUsedAt     DateTime  @updatedAt
+model User {
+  id        Int      @id @default(autoincrement())
+  username  String   @unique
+  faction   Faction?
+  wins      Int      @default(0)
+  losses    Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
 
-  user           User?     @relation(fields: [userId], references: [id])
+model FactionStats {
+  id        Int      @id @default(autoincrement())
+  faction   Faction  @unique
+  wins      Int      @default(0)
+  losses    Int      @default(0)
+  updatedAt DateTime @updatedAt
 }
