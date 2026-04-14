@@ -5,6 +5,7 @@ import { corsMiddleware } from "./middlesware/cors.js";
 export function createApp(): express.Express {
 	const app = express();
 	app.use((corsMiddleware));
+	app.use(express.json());
 
 	// app.get("/", (_req, res) => {
 	// 	res.send(`
