@@ -1,26 +1,24 @@
 import type { Server as HttpServer } from "node:http";
 import { Server as SocketIOServer } from "socket.io";
-import { registerSocketMock } from "./SocketMock";
+import { registerSocketMock } from "./SocketMock.js";
+import { socketConfig } from "../../config/socketConfig.js";
+import { registerUserSocket } from "./handlers/userSocket.js";
+import { registerSocketHandlers } from "./registerSocketHandlers.js";
+import { registerSystemSocket } from "./handlers/systemSocket.js";
+
 
 const isDev = process.env.NODE_ENV === "development";
 
 export function initSocket(server: HttpServer) : SocketIOServer {
-	const io = new SocketIOServer(server, {
-		cors: {
-			origin: "http://localhost:5173",
-			methods: ["GET", "POST"],
-		},
-	});
+	const io = new SocketIOServer(server, socketConfig);
 
 	io.on("connection", (socket) => {
-		console.log("A user connected: " + socket.id);
 		if (isDev) {
 			registerSocketMock(socket);
 		}
-
-		socket.on("disconnect", () => {
-			console.log("User disconnected: " + socket.id);
-		});
+		registerSocketHandlers(socket);
+		registerUserSocket(socket);
+		registerSystemSocket(socket);
 	});
 	return io;
 }

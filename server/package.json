@@ -8,9 +8,11 @@
     "build": "tsc"
   },
   "dependencies": {
+    "@prisma/adapter-pg": "^7.7.0",
     "@prisma/client": "^7.7.0",
     "express": "^5.2.1",
     "express-session": "^1.19.0",
+    "pg": "^8.20.0",
     "socket.io": "^4.8.3"
   },
   "devDependencies": {

@@ -2,6 +2,7 @@
 FROM node:22-alpine AS base
 WORKDIR /app
 COPY package*.json ./
+RUN npm ci
 
 # L'image de développement
 FROM base AS dev
@@ -10,6 +11,5 @@ EXPOSE ${PORT_DEV_FRONTEND}
 
 # L'image de production
 FROM base AS build
-RUN npm ci
 COPY . .
 RUN npm run build
