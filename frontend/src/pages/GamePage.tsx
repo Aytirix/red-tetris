@@ -3,15 +3,22 @@ import { useParams, useNavigate } from "react-router-dom";
 import { ClipLoader } from "react-spinners";
 import { useSocket } from "../contexts/SocketContext";
 import { normalizeUsernameAvailability } from "../socket/userState";
-import { emitJoinRoom, emitLeaveRoom, emitKickPlayer, emitStartGame } from "../socket/events/room";
+import { emitJoinRoom, emitLeaveRoom, emitKickPlayer, emitStartGame, emitSetGameMode, emitSetPrivate } from "../socket/events/room";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 type GameView = "connecting" | "lobby" | "game" | "gameover";
 
+const GAME_MODES = [
+	{ id: "classic", label: "Classique" },
+	{ id: "sprint", label: "Sprint" },
+	{ id: "ultra", label: "Ultra" },
+];
+
 type RoomPlayer = {
 	username: string;
-	isHost?: boolean;
+	avatar: string;
+	faction: "pirate" | "marine" | null;
 };
 
 // ─── Connecting ──────────────────────────────────────────────────────────────
@@ -38,96 +45,76 @@ function LobbyView({
 	roomName,
 	playerName,
 	players,
+	gameMode,
+	isPrivate,
 	onLeave,
 }: {
 	roomName: string;
 	playerName: string;
 	players: RoomPlayer[];
+	gameMode: string;
+	isPrivate: boolean;
 	onLeave: () => void;
 }) {
 	const isAdmin = players.length === 0 || players[0]?.username === playerName;
 
 	return (
 		<div className="game-lobby">
-			{/* ── Sidebar ── */}
-			<aside className="game-lobby__sidebar">
-				<div className="game-lobby__brand">
-					<span className="eyebrow">Red Piece</span>
-				</div>
-
-				<div className="game-lobby__room-info">
-					<p className="game-lobby__room-label">Salle</p>
-					<h1 className="game-lobby__room-name">{roomName}</h1>
-					<span className={`game-lobby__status-badge${isAdmin ? " game-lobby__status-badge--admin" : ""}`}>
-						{isAdmin ? "Admin" : "Joueur"}
-					</span>
-				</div>
-
-				<div className="game-lobby__sidebar-actions">
-					{isAdmin && (
-						<button
-							className="button button-primary game-lobby__start-btn"
-							onClick={emitStartGame}
-						>
-							<span className="game-lobby__btn-icon">▶</span>
-							Lancer la partie
-						</button>
-					)}
-					{!isAdmin && (
-						<div className="game-lobby__waiting-hint">
-							<ClipLoader color="var(--color-secondary)" size={14} />
-							<span>En attente de l'admin…</span>
-						</div>
-					)}
-					<button className="button button-outline game-lobby__leave-btn" onClick={onLeave}>
-						<span className="game-lobby__btn-icon">←</span>
-						Quitter
-					</button>
-				</div>
-
-				<div className="game-lobby__sidebar-footer">
-					<p className="game-lobby__player-self">
-						<span className="game-lobby__player-self-dot" />
-						{playerName}
-					</p>
-				</div>
-			</aside>
-
-			{/* ── Main ── */}
-			<main className="game-lobby__main">
-				<header className="game-lobby__main-header">
-					<h2 className="game-lobby__players-title">
-						Joueurs
-					</h2>
-					<span className="game-lobby__player-count-badge">
-						{players.length}
-					</span>
+			<div className="game-lobby__card">
+				{/* ── Header ── */}
+				<header className="game-lobby__header">
+					<div className="game-lobby__header-left">
+						<span className="eyebrow">Salle</span>
+						<h1 className="game-lobby__room-name">{roomName}</h1>
+					</div>
+					<div className="game-lobby__header-right">
+						<span className={`game-lobby__status-badge${isAdmin ? " game-lobby__status-badge--admin" : ""}`}>
+							{isAdmin ? "Admin" : "Joueur"}
+						</span>
+						<span className="game-lobby__player-count-badge">
+							{players.length} joueur{players.length > 1 ? "s" : ""}
+						</span>
+					</div>
 				</header>
 
+				{/* ── Player list ── */}
 				<ul className="game-lobby__player-list">
 					{players.map((p, i) => {
 						const isMe = p.username === playerName;
-						const isFirst = i === 0;
+						const isPirate = p.faction === "pirate";
+						const isMarine = p.faction === "marine";
+						const factionDir = p.faction === "pirate" ? "pirates" : "marines";
+						const avatarSrc = p.faction && p.avatar
+							? `/img/avatar/${factionDir}/${p.avatar}.png`
+							: null;
+
 						return (
 							<li
 								key={p.username}
 								className={[
 									"game-lobby__player-item",
+									isPirate ? "game-lobby__player-item--pirate" : "",
+									isMarine ? "game-lobby__player-item--marine" : "",
 									isMe ? "game-lobby__player-item--me" : "",
-									isFirst ? "game-lobby__player-item--host" : "",
 								].filter(Boolean).join(" ")}
 							>
-								<span className="game-lobby__player-rank">#{i + 1}</span>
-
-								<span className="game-lobby__player-avatar">
-									{p.username.slice(0, 2).toUpperCase()}
-								</span>
+								<div className="game-lobby__player-avatar">
+									{avatarSrc
+										? <img src={avatarSrc} alt={p.username} draggable={false} />
+										: <span>{p.username.slice(0, 2).toUpperCase()}</span>
+									}
+								</div>
 
 								<span className="game-lobby__player-name">
 									{p.username}
-									{isMe && <span className="game-lobby__player-tag game-lobby__player-tag--me">Vous</span>}
-									{isFirst && <span className="game-lobby__player-tag game-lobby__player-tag--host">Admin</span>}
 								</span>
+
+								<div className="game-lobby__player-badges">
+									{isMe && <span className="game-lobby__player-tag game-lobby__player-tag--me">Vous</span>}
+									{i === 0 && <span className="game-lobby__player-tag game-lobby__player-tag--host">Admin</span>}
+									{isPirate && <span className="game-lobby__player-tag game-lobby__player-tag--pirate">☠ Pirate</span>}
+									{isMarine && <span className="game-lobby__player-tag game-lobby__player-tag--marine">⚓ Marine</span>}
+								</div>
 
 								{isAdmin && !isMe && (
 									<button
@@ -144,13 +131,62 @@ function LobbyView({
 
 					{players.length === 0 && (
 						<li className="game-lobby__player-empty">
-							<ClipLoader color="var(--color-primary)" size={20} />
+							<ClipLoader color="var(--color-primary)" size={18} />
 							<span>Connexion à la salle…</span>
 						</li>
 					)}
 				</ul>
 
-			</main>
+				{/* ── Settings ── */}
+				<div className="game-lobby__settings">
+					<div className="game-lobby__setting">
+						<span className="game-lobby__setting-label">Mode de jeu</span>
+						<div className="game-lobby__mode-list">
+							{GAME_MODES.map((m) => (
+								<button
+									key={m.id}
+									className={`game-lobby__mode-btn${gameMode === m.id ? " game-lobby__mode-btn--active" : ""}`}
+									onClick={() => isAdmin && emitSetGameMode(m.id)}
+									disabled={!isAdmin}
+								>
+									{m.label}
+								</button>
+							))}
+						</div>
+					</div>
+
+					<div className="game-lobby__setting">
+						<span className="game-lobby__setting-label">Accès</span>
+						<button
+							className={`game-lobby__privacy-btn${isPrivate ? " game-lobby__privacy-btn--private" : ""}`}
+							onClick={() => isAdmin && emitSetPrivate(!isPrivate)}
+							disabled={!isAdmin}
+						>
+							{isPrivate ? "🔒 Privée" : "🌐 Publique"}
+						</button>
+					</div>
+				</div>
+
+				{/* ── Footer actions ── */}
+				<footer className="game-lobby__footer">
+					{!isAdmin && (
+						<div className="game-lobby__waiting-hint">
+							<ClipLoader color="var(--color-secondary)" size={13} />
+							<span>En attente de l'admin…</span>
+						</div>
+					)}
+					<div className="game-lobby__footer-actions">
+						<button className="button button-ghost" onClick={onLeave}>
+							Quitter
+						</button>
+						{isAdmin && (
+							<button className="button button-primary" onClick={emitStartGame}>
+								▶ Lancer
+							</button>
+						)}
+					</div>
+				</footer>
+			</div>
 		</div>
 	);
 }
@@ -206,6 +242,8 @@ export default function GamePage() {
 	const navigate = useNavigate();
 	const [view, setView] = useState<GameView>("connecting");
 	const [players, setPlayers] = useState<RoomPlayer[]>([]);
+	const [gameMode, setGameMode] = useState("classic");
+	const [isPrivate, setIsPrivate] = useState(false);
 
 	// Keep stable refs for use in socket callbacks
 	const roomNameRef = useRef(roomName);
@@ -228,18 +266,21 @@ export default function GamePage() {
 
 	// Room events
 	useEffect(() => {
+		type RawPlayer = { username: string; avatar?: string; faction?: string };
+
+		function parsePlayer(p: RawPlayer): RoomPlayer {
+			const faction = p.faction === "pirate" || p.faction === "marine" ? p.faction : null;
+			return { username: p.username, avatar: p.avatar ?? "", faction };
+		}
+
 		function handleRoomJoined(room: unknown) {
-			const r = room as { players?: { username: string }[] } | null;
-			if (r?.players) {
-				setPlayers(r.players.map((p, i) => ({ username: p.username, isHost: i === 0 })));
-			}
+			const r = room as { players?: RawPlayer[] } | null;
+			if (r?.players) setPlayers(r.players.map(parsePlayer));
 			setView("lobby");
 		}
 		function handleRoomPlayers(data: unknown) {
-			const list = data as { username: string }[] | null;
-			if (Array.isArray(list)) {
-				setPlayers(list.map((p, i) => ({ username: p.username, isHost: i === 0 })));
-			}
+			const list = data as RawPlayer[] | null;
+			if (Array.isArray(list)) setPlayers(list.map(parsePlayer));
 		}
 		socket.on("room:joined", handleRoomJoined);
 		socket.on("room:players", handleRoomPlayers);
@@ -247,6 +288,18 @@ export default function GamePage() {
 			socket.off("room:joined", handleRoomJoined);
 			socket.off("room:players", handleRoomPlayers);
 		};
+	}, [socket]);
+
+	// Room settings
+	useEffect(() => {
+		function handleSettings(data: unknown) {
+			const s = data as { mode?: string; private?: boolean } | null;
+			if (!s) return;
+			if (typeof s.mode === "string") setGameMode(s.mode);
+			if (typeof s.private === "boolean") setIsPrivate(s.private);
+		}
+		socket.on("room:settings", handleSettings);
+		return () => { socket.off("room:settings", handleSettings); };
 	}, [socket]);
 
 	// Game events
@@ -276,6 +329,8 @@ export default function GamePage() {
 					roomName={roomName}
 					playerName={playerName}
 					players={players}
+					gameMode={gameMode}
+					isPrivate={isPrivate}
 					onLeave={handleLeave}
 				/>
 			)}

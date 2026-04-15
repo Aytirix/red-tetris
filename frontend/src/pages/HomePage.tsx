@@ -21,7 +21,7 @@ type FactionData = {
 };
 
 const FACTIONS: Record<Faction, FactionData> = {
-	pirates: {
+	pirate: {
 		label: "Pirates",
 		tone: "red",
 		icon: "☠",
@@ -36,7 +36,7 @@ const FACTIONS: Record<Faction, FactionData> = {
 		selected: "var(--color-primary-selected)",
 		dropShadow: "var(--shadow-drop-primary)",
 	},
-	marines: {
+	marine: {
 		label: "Marines",
 		tone: "cyan",
 		icon: "⚓",
@@ -54,7 +54,7 @@ const FACTIONS: Record<Faction, FactionData> = {
 };
 
 const CHARACTERS: Record<Faction, { id: string; name: string }[]> = {
-	pirates: [
+	pirate: [
 		{ id: "luffy", name: "Luffy" },
 		{ id: "zoro", name: "Zoro" },
 		{ id: "nami", name: "Nami" },
@@ -66,7 +66,7 @@ const CHARACTERS: Record<Faction, { id: string; name: string }[]> = {
 		{ id: "brook", name: "Brook" },
 		{ id: "jinbei", name: "Jinbei" },
 	],
-	marines: [
+	marine: [
 		{ id: "garp", name: "Garp" },
 		{ id: "smoker", name: "Smoker" },
 		{ id: "tashigi", name: "Tashigi" },
@@ -125,7 +125,8 @@ function preloadImageAsset(src: string): Promise<void> {
 }
 
 function getCharacterAvatarSrc(faction: Faction, characterId: string): string {
-	return `/img/avatar/${faction}/${characterId}.png`;
+	const dir = faction === "pirate" ? "pirates" : "marines";
+	return `/img/avatar/${dir}/${characterId}.png`;
 }
 
 function computeAvatarCrop(src: string): Promise<AvatarCrop> {
@@ -502,7 +503,7 @@ function RegisterStep({ username, onSubmit, sceneEnterActive = false }: {
 		}
 		host.style.setProperty(
 			"--edge-handle-offset",
-			faction === "pirates" ? `${edgeHandleBaseOffset}px` : `-${edgeHandleBaseOffset}px`,
+			faction === "pirate" ? `${edgeHandleBaseOffset}px` : `-${edgeHandleBaseOffset}px`,
 		);
 		host.style.setProperty("--edge-handle-opacity", `${edgeHandleMinOpacity}`);
 	}, [edgeHandleBaseOffset, edgeHandleMinOpacity, faction, isFactionDetailVisible]);
@@ -521,7 +522,7 @@ function RegisterStep({ username, onSubmit, sceneEnterActive = false }: {
 			return;
 		}
 
-		const edgeDistance = faction === "pirates"
+		const edgeDistance = faction === "pirate"
 			? rect.right - e.clientX
 			: e.clientX - rect.left;
 		const reveal = Math.max(0, Math.min(1, 1 - edgeDistance / 160));
@@ -529,7 +530,7 @@ function RegisterStep({ username, onSubmit, sceneEnterActive = false }: {
 
 		host.style.setProperty(
 			"--edge-handle-offset",
-			faction === "pirates" ? `${offset}px` : `${-offset}px`,
+			faction === "pirate" ? `${offset}px` : `${-offset}px`,
 		);
 		host.style.setProperty(
 			"--edge-handle-opacity",
@@ -571,7 +572,7 @@ function RegisterStep({ username, onSubmit, sceneEnterActive = false }: {
 		}, swipeDurationMs);
 	}
 
-	const isPirates = faction === "pirates";
+	const isPirate = faction === "pirate";
 	const isCampView = !faction || !isFactionDetailVisible;
 	const chooserUiTranslate = !faction || !isFactionDetailVisible
 		? "0vw"
@@ -588,7 +589,7 @@ function RegisterStep({ username, onSubmit, sceneEnterActive = false }: {
 				);
 				containerRef.current?.style.setProperty(
 					"--edge-handle-offset",
-					faction === "marines" ? `-${edgeHandleBaseOffset}px` : `${edgeHandleBaseOffset}px`,
+					faction === "marine" ? `-${edgeHandleBaseOffset}px` : `${edgeHandleBaseOffset}px`,
 				);
 			}}
 			style={{
@@ -716,7 +717,7 @@ function RegisterStep({ username, onSubmit, sceneEnterActive = false }: {
 				</div>
 
 				{(Object.entries(FACTIONS) as [Faction, typeof FACTIONS.pirates][]).map(([key, fc]) => {
-					const isLeft = key === "pirates";
+					const isLeft = key === "pirate";
 					return (
 						<button
 							key={key}
@@ -795,7 +796,7 @@ function RegisterStep({ username, onSubmit, sceneEnterActive = false }: {
 			</div>
 
 			{(Object.entries(FACTIONS) as [Faction, typeof FACTIONS.pirates][]).map(([layerFaction, layerData]) => {
-				const layerIsPirates = layerFaction === "pirates";
+				const layerIsPirates = layerFaction === "pirate";
 				const layerIsActive = faction === layerFaction;
 				const layerIsVisible = layerIsActive && isFactionDetailVisible;
 				const layerTranslate = isCampView

@@ -9,7 +9,7 @@ import type { CSSProperties, ReactNode } from "react";
 import { useEffect, useRef } from "react";
 import styles from "./DashboardParallaxScene.module.scss";
 
-export type SceneTheme = "pirates" | "marines";
+export type SceneTheme = "pirate" | "marine";
 
 type Props = {
 	theme: SceneTheme;
@@ -71,7 +71,7 @@ export default function DashboardParallaxScene({ theme, children }: Props) {
 
 	return (
 		<div ref={sceneRef} className={styles.scene} aria-hidden="true">
-			{theme === "pirates" ? <PirateLayers /> : <MarineLayers />}
+			{theme === "pirate" ? <PirateLayers /> : <MarineLayers />}
 			<div className={styles.scrim} />
 			{children !== undefined && (
 				<div className={styles.content} aria-hidden="false">

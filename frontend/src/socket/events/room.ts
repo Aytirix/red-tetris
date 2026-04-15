@@ -34,3 +34,11 @@ export function emitKickPlayer(username: string) {
 export function emitStartGame() {
 	socket.emit("room:start");
 }
+
+export function emitSetGameMode(mode: string) {
+	socket.emit("room:setMode", { mode });
+}
+
+export function emitSetPrivate(isPrivate: boolean) {
+	socket.emit("room:setPrivate", { private: isPrivate });
+}
