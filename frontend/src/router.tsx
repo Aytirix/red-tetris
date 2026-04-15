@@ -6,6 +6,7 @@ import ThemePage from "./pages/ThemePage";
 import RouteErrorPage from "./pages/RouteErrorPage";
 import DocsWsPage from "./pages/DocsWsPage";
 import DashboardPage from "./pages/DashboardPage";
+import GamePage from "./pages/GamePage";
 
 const docsWsRoute = import.meta.env.DEV
 	? [{ path: "docs-ws", element: <DocsWsPage /> }]
@@ -21,6 +22,16 @@ export const router = createBrowserRouter([
 			{ path: "dashboard", element: <DashboardPage /> },
 			{ path: "theme", element: <ThemePage /> },
 			...docsWsRoute,
+			{
+				path: ":roomName/:playerName",
+				loader: ({ params }) => {
+					if (params.playerName) {
+						localStorage.setItem("username", params.playerName);
+					}
+					return null;
+				},
+				element: <GamePage />,
+			},
 			{ path: "*", element: <NotFoundPage /> },
 		],
 	},

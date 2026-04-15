@@ -29,6 +29,26 @@ Toutes les pages et composants frontend **doivent** utiliser le thème arcade ne
 - **Events WS** : déclarés dans `frontend/src/socket/events/` (un fichier par domaine)
 - **Doc WS** : page `/docs-ws`, données dans `server/ws-docs.json`
 
+## Events WebSocket — règle obligatoire
+
+**À chaque ajout ou modification d'un event WS côté frontend** (dans `frontend/src/socket/events/`), il faut **impérativement** mettre à jour `server/ws-docs.json` pour que la doc `/docs-ws` reste à jour.
+
+Format d'une entrée dans `ws-docs.json` :
+```json
+{
+  "id": "<uuid>",
+  "name": "domaine:NomEvent",
+  "direction": "front-to-back" | "back-to-front",
+  "group": "domaine",
+  "description": "",
+  "payload": "{ ... }",
+  "payloadDescription": "",
+  "response": "{ ... }",
+  "responseName": "domaine:NomReponse",
+  "responseDescription": ""
+}
+```
+
 ## Backend
 
 - Ne pas modifier le backend sans accord explicite — c'est géré par une autre personne de l'équipe

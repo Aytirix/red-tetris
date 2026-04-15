@@ -15,7 +15,9 @@
       "Bash(npx vite:*)",
       "Bash(echo \"TS=$?\")",
       "Bash(echo \"VITE=$?\")",
-      "Bash(npm audit:*)"
+      "Bash(npm audit:*)",
+      "Bash(./node_modules/.bin/tsc --noEmit)",
+      "Bash(/home/theo/Documents/42/red-tetris/frontend/node_modules/.bin/tsc --noEmit -p /home/theo/Documents/42/red-tetris/frontend/tsconfig.json)"
     ]
   }
 }
