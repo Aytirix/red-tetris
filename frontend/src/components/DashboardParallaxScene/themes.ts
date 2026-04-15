@@ -33,7 +33,7 @@ export type ParallaxLayer = {
 	floatDelay?: number;
 };
 
-export type SceneTheme = "pirates" | "marines";
+export type SceneTheme = "pirate" | "marine";
 
 const PIRATES_BASE = "/img/dashboard/pirates";
 const MARINES_BASE = "/img/dashboard/marines";
@@ -41,7 +41,7 @@ const MARINES_BASE = "/img/dashboard/marines";
 const FULL_COVER = { top: "0", left: "0", width: "100%", height: "100%" } as const;
 
 export const SCENE_THEMES: Record<SceneTheme, ParallaxLayer[]> = {
-	pirates: [
+	pirate: [
 		{
 			key: "sky",
 			src: `${PIRATES_BASE}/pirates_sky.jpg`,
@@ -98,7 +98,7 @@ export const SCENE_THEMES: Record<SceneTheme, ParallaxLayer[]> = {
 		},
 		// pirates_foreground_left.png intentionally omitted — asset not present.
 	],
-	marines: [
+	marine: [
 		{
 			key: "sky",
 			src: `${MARINES_BASE}/marines_sky.jpg`,

@@ -1,6 +1,6 @@
 export const USER_RESULT_USERNAME_AVAILABLE_EVENT = "user:ResultUsernameAvailable";
 
-export type AppFaction = "pirates" | "marines";
+export type AppFaction = "pirate" | "marine";
 
 export type UsernameAvailabilityPayload = {
 	available: boolean;
@@ -17,10 +17,10 @@ export type NormalizedUsernameAvailability = {
 };
 
 const FACTION_ALIASES: Record<string, AppFaction> = {
-	pirate: "pirates",
-	pirates: "pirates",
-	marine: "marines",
-	marines: "marines",
+	pirate: "pirate",
+	pirates: "pirate",
+	marine: "marine",
+	marines: "marine",
 };
 
 export function normalizeUserFaction(value: unknown): AppFaction | null {

@@ -6,7 +6,7 @@ export default function DashboardPage() {
 
 	// Theme follows the player's registered faction automatically.
 	// Falls back to "pirates" when faction is null (not yet registered / loading).
-	const theme = faction ?? "pirates";
+	const theme = faction ?? "pirate";
 
 	return (
 		<DashboardParallaxScene theme={theme}>
