@@ -19,10 +19,18 @@ export function registerRoomListeners(sock: Socket) {
 
 // --- Emitters (appelables depuis n'importe quel composant) ---
 
-export function emitJoinRoom(roomId: string, playerName: string) {
-	socket.emit("room:join", { roomId, playerName });
+export function emitJoinRoom(roomId: string) {
+	socket.emit("room:join", { roomId });
 }
 
 export function emitLeaveRoom() {
 	socket.emit("room:leave");
+}
+
+export function emitKickPlayer(username: string) {
+	socket.emit("room:kick", { username });
+}
+
+export function emitStartGame() {
+	socket.emit("room:start");
 }

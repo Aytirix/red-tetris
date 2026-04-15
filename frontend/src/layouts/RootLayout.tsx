@@ -8,8 +8,9 @@ export default function RootLayout() {
 	const isDocsWsPage = pathname.startsWith("/docs-ws");
 	const isHomePage = pathname === "/";
 	const isDashboard = pathname.startsWith("/dashboard");
+	const isGamePage = pathname.split("/").filter(Boolean).length === 2;
 
-	if (isHomePage || isDashboard) {
+	if (isHomePage || isDashboard || isGamePage) {
 		return (
 			<>
 				<Outlet />
