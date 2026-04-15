@@ -4,6 +4,12 @@ export type CheckUsernamePayload = {
 	username: string;
 };
 
-export type SocketValidator = (socket: Socket, payload: unknown) => boolean;
+export type userRegisterPayload = {
+	username: string;
+	faction: string;
+	avatar: string;
+}
+
+export type SocketValidator = (payload: unknown) => boolean;
 
 export type SocketValidatorMap = Record<string, SocketValidator>;

@@ -1,15 +1,16 @@
 import type { Socket } from "socket.io";
-import { isValidUsername } from "../../../utils/unsernameValidator.js";
+import { postUsername } from "../../../repositories/userRepositories.js";
 import { checkUsernameAvailability } from "../../../services/userService.js";
-import { userSocketStore, isUsernameTaken } from "../userSocketStore.js";
-import { validateSocketEvent } from "../validators/validateSocketEvent.js";
+import { isValidUsername } from "../../../utils/unsernameValidator.js";
+import { emitError } from "../emitters/systemEmitters.js";
 import { emitUsernameUnavailable } from "../emitters/userEmitters.js";
-import { emitInvalidPayloadError } from "../emitters/systemEmitters.js";
+import { isUsernameTaken, userSocketStore } from "../userSocketStore.js";
+import { validateSocketEvent } from "../validators/validateSocketEvent.js";
 
 export function registerUserSocket(socket: Socket): void {
 	socket.on("user:CheckUsernameAvailable", async (msg) => {
 		if (!validateSocketEvent(socket, "user:CheckUsernameAvailable", msg)) {
-			emitInvalidPayloadError(socket, "user:CheckUsernameAvailable")
+			emitError(socket, "user:CheckUsernameAvailable", "Invalid payload")
 			console.log("Error: payload invalid")
 			return
 		}
@@ -23,9 +24,25 @@ export function registerUserSocket(socket: Socket): void {
 			console.log(`Username already in use: ${msg.username}`);
 			return;
 		}
-		await checkUsernameAvailability(socket, msg.username);
+		try {
+			await checkUsernameAvailability(socket, msg.username);
+		} catch (error) {
+			console.error("Database error in CheckUsernameAvailable:", error);
+			emitError(socket, "user:CheckUsernameAvailable", "Username check failed")
+			//envoyer au front l erreur
+		}
 	});
 	socket.on("user:Register", async (msg) => {
-		
+		if (!validateSocketEvent(socket, "user:Register", msg)) {
+			emitError(socket, "user:Register", "Invalid payload")
+			console.log("Error: payload invalid")
+			return
+		}
+		try {
+			await postUsername(msg.username, msg.faction, msg.avatar);
+		} catch (error) {
+			console.error("Database error in Register:", error);
+			emitError(socket, "user:Register", "Registration failed")
+		}
 	})
 }

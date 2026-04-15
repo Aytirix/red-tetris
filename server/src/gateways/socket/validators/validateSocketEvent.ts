@@ -1,12 +1,27 @@
 import type { Socket } from "socket.io";
-import type { CheckUsernamePayload, SocketValidatorMap } from "../../../types/socket/userSocketTypes.js";
+import type { CheckUsernamePayload, SocketValidatorMap, userRegisterPayload } from "../../../types/socket/userSocketTypes.js";
 
 const validators: SocketValidatorMap = {
 	"user:CheckUsernameAvailable": validateCheckUsername,
+	"user:Register": validateRegister,
 };
 
+export function validateRegister(
+	payload: unknown,
+) : payload is userRegisterPayload {
+	const isValid =
+	typeof payload === "object"
+	&& payload !== null
+	&& Object.keys(payload).length === 3
+	&& "username" in payload
+	&& "faction" in payload
+	&& "avatar" in payload
+	if (!isValid)
+		return false
+	return true
+}
+
 export function validateCheckUsername(
-	socket: Socket,
 	payload: unknown,
 ): payload is CheckUsernamePayload {
 	const isValid =
@@ -14,7 +29,6 @@ export function validateCheckUsername(
 		&& payload !== null
 		&& Object.keys(payload).length === 1
 		&& "username" in payload
-		&& typeof payload.username === "string";
 	if (!isValid)
 		return false;
 	return true;
@@ -24,5 +38,5 @@ export function validateSocketEvent(socket: Socket, eventName: string, payload: 
 	const validator = validators[eventName]
 	if (!validator)
 		return false
-	return validator(socket, payload)
+	return validator(payload)
 }
