@@ -12,7 +12,7 @@ export async function checkUsernameAvailability(socket: Socket, username: string
 		console.log(`Username available: ${username}`);
 	}
 	else {
-		emitUsernameAvailable(socket, username, user.user_faction)
+		emitUsernameAvailable(socket, username, user.faction)
 		console.log(`Known username found in database: ${user.username}`);
 	}
 }
