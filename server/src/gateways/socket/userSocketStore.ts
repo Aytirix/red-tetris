@@ -1,4 +1,4 @@
-import { Socket } from "socket.io";
+import type { Socket } from "socket.io";
 
 export const userSocketStore = new Map<string, string | null>();
 
