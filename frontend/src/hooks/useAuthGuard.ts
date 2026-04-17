@@ -36,9 +36,25 @@ export function useAuthGuard() {
 	// Socket listener — ignored when already on "/" (HomePage handles it there)
 	useEffect(() => {
 		function handleResult(data: unknown) {
+			if (pathnameRef.current === "/") return;
+
+			if (
+				data && typeof data === "object" &&
+				(data as Record<string, unknown>).available === "invalid"
+			) {
+				const returnTo = pathnameRef.current;
+				localStorage.removeItem("username");
+				navigate("/", { state: { step: "register", returnTo } });
+				alert({
+					title: "Pseudo invalide",
+					message: "Les pseudos acceptés doivent respecter ces règles :\n• Entre 1 et 15 caractères\n• Lettres (a-z, A-Z)\n• Chiffres (0-9)\n• Underscore (_)",
+					danger: true,
+				});
+				return;
+			}
+
 			const result = normalizeUsernameAvailability(data);
 			if (!result) return;
-			if (pathnameRef.current === "/") return;
 
 			if (!result.available) {
 				const returnTo = pathnameRef.current;

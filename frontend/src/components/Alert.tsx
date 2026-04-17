@@ -106,6 +106,7 @@ export function AlertProvider({ children }: { children: React.ReactNode }) {
 									color: "var(--color-text-muted)",
 									fontSize: "0.9rem",
 									lineHeight: 1.6,
+									whiteSpace: "pre-line",
 								}}>
 									{state.message}
 								</p>

@@ -236,14 +236,25 @@ function GameOverView({ onLeave }: { onLeave: () => void }) {
 
 // ─── GamePage ─────────────────────────────────────────────────────────────────
 
+const MAX_NAME_LENGTH = 15;
+
 export default function GamePage() {
-	const { roomName = "", playerName = "" } = useParams<{ roomName: string; playerName: string }>();
+	const { roomName: rawRoom = "", playerName = "" } = useParams<{ roomName: string; playerName: string }>();
 	const { socket } = useSocket();
 	const navigate = useNavigate();
 	const [view, setView] = useState<GameView>("connecting");
 	const [players, setPlayers] = useState<RoomPlayer[]>([]);
 	const [gameMode, setGameMode] = useState("classic");
 	const [isPrivate, setIsPrivate] = useState(false);
+
+	const roomName = rawRoom.slice(0, MAX_NAME_LENGTH);
+
+	// Redirect to truncated URL if room name exceeded the limit
+	useEffect(() => {
+		if (rawRoom !== roomName) {
+			navigate(`/${roomName}/${playerName}`, { replace: true });
+		}
+	}, []); // eslint-disable-line react-hooks/exhaustive-deps
 
 	// Keep stable refs for use in socket callbacks
 	const roomNameRef = useRef(roomName);

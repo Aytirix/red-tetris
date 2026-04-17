@@ -42,8 +42,8 @@
     "group": "room",
     "description": "Rejoint une salle existante ou en crée une nouvelle si elle n'existe pas. Le pseudo du joueur est récupéré depuis la session socket.",
     "payload": "{\n  \"roomId\": \"ma-room\"\n}",
-    "payloadDescription": "roomId : identifiant de la salle (correspond au premier segment de l'URL, ex: /ma-room/pseudo)",
-    "response": "{\n  \"roomId\": \"ma-room\",\n  \"players\": [\n    { \"username\": \"luffy\", \"avatar\": \"luffy\", \"faction\": \"pirate\" },\n    { \"username\": \"garp\", \"avatar\": \"garp\", \"faction\": \"marine\" }\n  ]\n}",
+    "payloadDescription": "roomId : identifiant de la salle (correspond au premier segment de l'URL, ex: /ma-room/pseudo)\nmax 15 caractères pour le nom de la room",
+    "response": "{\n  \"roomId\": \"ma-room\",\n  \"players\": [\n    {\n      \"username\": \"luffy\",\n      \"avatar\": \"luffy\",\n      \"faction\": \"pirate\"\n    },\n    {\n      \"username\": \"garp\",\n      \"avatar\": \"garp\",\n      \"faction\": \"marine\"\n    }\n  ]\n}",
     "responseName": "room:joined",
     "responseDescription": "Envoyé uniquement au joueur qui vient de rejoindre. Contient la liste des joueurs déjà présents. Le premier joueur de la liste est l'admin de la salle."
   },
