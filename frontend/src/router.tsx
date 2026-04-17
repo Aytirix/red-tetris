@@ -7,6 +7,7 @@ import RouteErrorPage from "./pages/RouteErrorPage";
 import DocsWsPage from "./pages/DocsWsPage";
 import DashboardPage from "./pages/DashboardPage";
 import GamePage from "./pages/GamePage";
+import TestPage from "./test/TestPage";
 
 const docsWsRoute = import.meta.env.DEV
 	? [{ path: "docs-ws", element: <DocsWsPage /> }]
@@ -32,6 +33,7 @@ export const router = createBrowserRouter([
 				},
 				element: <GamePage />,
 			},
+			{ path: "test", element: <TestPage /> },
 			{ path: "*", element: <NotFoundPage /> },
 		],
 	},
