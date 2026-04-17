@@ -1,4 +1,4 @@
-# Red Piece — Instructions Claude
+# Project Red Piece — Instructions Claude
 
 ## Thème frontend
 
