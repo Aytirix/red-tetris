@@ -189,19 +189,25 @@ function MarineLayers() {
 				/>
 			</div>
 
-			{/* 2 — Headquarters ship */}
+			{/* 2 — Headquarters ship (no parallax, wave only) */}
 			<div
 				className={`${styles.layer} ${styles.hqShip}`}
-				style={{ zIndex: 2, "--depth": D.MAIN } as WithDepth}
+				style={{ zIndex: 2, "--depth": 0 } as WithDepth}
 			>
-				<img
-					className={styles.hqImg}
-					src="/img/dashboard/marine/marine_headquarters_ship.png"
-					alt=""
-					draggable={false}
-					loading="eager"
-					decoding="async"
-				/>
+				<div className={styles.hqArriveWrapper}>
+					<div className={styles.hqWaveWrapper}>
+						<div className={styles.hqChopWrapper}>
+							<img
+								className={styles.hqImg}
+								src="/img/dashboard/marine/marine_headquarters_ship.png"
+								alt=""
+								draggable={false}
+								loading="eager"
+								decoding="async"
+							/>
+						</div>
+					</div>
+				</div>
 			</div>
 
 			{/* 3 — Flags / architecture framing */}
