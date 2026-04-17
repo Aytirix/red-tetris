@@ -5,7 +5,7 @@ export default function DashboardPage() {
 	const { faction } = useWsSession();
 
 	// Theme follows the player's registered faction automatically.
-	// Falls back to "pirates" when faction is null (not yet registered / loading).
+	// Falls back to "pirate" when faction is null (not yet registered / loading).
 	const theme = faction ?? "pirate";
 
 	return (

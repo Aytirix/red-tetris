@@ -87,7 +87,7 @@ $marine-fg-bottom-offset: -15px;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Marines flags / architecture — full-viewport PNG overlay
+// Marine flags / architecture — full-viewport PNG overlay
 // ─────────────────────────────────────────────────────────────────────────────
 
 .fullscreenPng {
@@ -200,7 +200,7 @@ $marine-fg-bottom-offset: -15px;
 	);
 }
 
-// Marines override — slightly different sizing and offsets
+// Marine override — slightly different sizing and offsets
 .fgLeft.marineFg {
 	left: $marine-fg-side-offset;
 	bottom: $marine-fg-bottom-offset;

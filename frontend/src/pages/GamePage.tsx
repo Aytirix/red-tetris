@@ -83,7 +83,7 @@ function LobbyView({
 						const isMe = p.username === playerName;
 						const isPirate = p.faction === "pirate";
 						const isMarine = p.faction === "marine";
-						const factionDir = p.faction === "pirate" ? "pirates" : "marines";
+						const factionDir = p.faction === "pirate" ? "pirate" : "marine";
 						const avatarSrc = p.faction && p.avatar
 							? `/img/avatar/${factionDir}/${p.avatar}.png`
 							: null;

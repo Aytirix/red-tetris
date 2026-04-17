@@ -99,7 +99,7 @@ function FgImg({ src }: { src: string }) {
 	);
 }
 
-// ─── Pirates ──────────────────────────────────────────────────────────────────
+// ─── Pirate ──────────────────────────────────────────────────────────────────
 // sky → ship group → fg left / fg right
 
 function PirateLayers() {
@@ -112,7 +112,7 @@ function PirateLayers() {
 			>
 				<img
 					className={styles.skyImg}
-					src="/img/dashboard/pirates/pirates_sky.jpg"
+					src="/img/dashboard/pirate/pirate_sky.jpg"
 					alt=""
 					draggable={false}
 					loading="eager"
@@ -127,7 +127,7 @@ function PirateLayers() {
 			>
 				<img
 					className={styles.shipMast}
-					src="/img/dashboard/pirates/pirates_ship_masts_sails.png"
+					src="/img/dashboard/pirate/pirate_ship_masts_sails.png"
 					alt=""
 					draggable={false}
 					loading="eager"
@@ -135,7 +135,7 @@ function PirateLayers() {
 				/>
 				<img
 					className={styles.shipHull}
-					src="/img/dashboard/pirates/pirates_ship_hull.png"
+					src="/img/dashboard/pirate/pirate_ship_hull.png"
 					alt=""
 					draggable={false}
 					loading="eager"
@@ -148,7 +148,7 @@ function PirateLayers() {
 				className={`${styles.layer} ${styles.fgLeft}`}
 				style={{ zIndex: 3, "--depth": D.FG } as WithDepth}
 			>
-				<FgImg src="/img/dashboard/pirates/pirates_foreground_left.png" />
+				<FgImg src="/img/dashboard/pirate/pirate_foreground_left.png" />
 			</div>
 
 			{/* 3 — Foreground right */}
@@ -156,13 +156,13 @@ function PirateLayers() {
 				className={`${styles.layer} ${styles.fgRight}`}
 				style={{ zIndex: 3, "--depth": D.FG } as WithDepth}
 			>
-				<FgImg src="/img/dashboard/pirates/pirates_foreground_right.png" />
+				<FgImg src="/img/dashboard/pirate/pirate_foreground_right.png" />
 			</div>
 		</>
 	);
 }
 
-// ─── Marines ──────────────────────────────────────────────────────────────────
+// ─── Marine ──────────────────────────────────────────────────────────────────
 // sky → headquarters ship → flags/architecture → fg left / fg right
 
 function MarineLayers() {
@@ -175,7 +175,7 @@ function MarineLayers() {
 			>
 				<img
 					className={styles.skyImg}
-					src="/img/dashboard/marines/marines_sky.jpg"
+					src="/img/dashboard/marine/marine_sky.jpg"
 					alt=""
 					draggable={false}
 					loading="eager"
@@ -190,7 +190,7 @@ function MarineLayers() {
 			>
 				<img
 					className={styles.hqImg}
-					src="/img/dashboard/marines/marines_headquarters_ship.png"
+					src="/img/dashboard/marine/marine_headquarters_ship.png"
 					alt=""
 					draggable={false}
 					loading="eager"
@@ -205,7 +205,7 @@ function MarineLayers() {
 			>
 				<img
 					className={styles.fullscreenPngImg}
-					src="/img/dashboard/marines/marines_flags_architecture.png"
+					src="/img/dashboard/marine/marine_flags_architecture.png"
 					alt=""
 					draggable={false}
 					loading="eager"
@@ -218,7 +218,7 @@ function MarineLayers() {
 				className={`${styles.layer} ${styles.fgLeft} ${styles.marineFg}`}
 				style={{ zIndex: 4, "--depth": D.FG } as WithDepth}
 			>
-				<FgImg src="/img/dashboard/marines/marines_foreground_left.png" />
+				<FgImg src="/img/dashboard/marine/marine_foreground_left.png" />
 			</div>
 
 			{/* 4 — Foreground right */}
@@ -226,7 +226,7 @@ function MarineLayers() {
 				className={`${styles.layer} ${styles.fgRight} ${styles.marineFg}`}
 				style={{ zIndex: 4, "--depth": D.FG } as WithDepth}
 			>
-				<FgImg src="/img/dashboard/marines/marines_foreground_right.png" />
+				<FgImg src="/img/dashboard/marine/marine_foreground_right.png" />
 			</div>
 		</>
 	);
