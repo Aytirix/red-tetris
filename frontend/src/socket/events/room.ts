@@ -42,3 +42,11 @@ export function emitSetGameMode(mode: string) {
 export function emitSetPrivate(isPrivate: boolean) {
 	socket.emit("room:setPrivate", { private: isPrivate });
 }
+
+export function emitSubscribeRooms() {
+	socket.emit("room:subscribeList");
+}
+
+export function emitUnsubscribeRooms() {
+	socket.emit("room:unsubscribeList");
+}
