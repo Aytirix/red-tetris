@@ -1250,6 +1250,16 @@ export default function HomePage() {
 
 	useEffect(() => {
 		function onResult(data: unknown) {
+			if (data && typeof data === "object" && (data as Record<string, unknown>).available === "invalid") {
+				localStorage.removeItem("username");
+				setCheckState("idle");
+				setUsername("");
+				if (isRoomJoin) {
+					setStep("username");
+				}
+				return;
+			}
+
 			const result = normalizeUsernameAvailability(data);
 			if (!result) return;
 
@@ -1267,13 +1277,9 @@ export default function HomePage() {
 			// available: true
 			setIsRegistered(result.isRegistered);
 			setCheckState("available");
-			if (isRoomJoin && !result.isRegistered) {
-				// Available + not registered → skip to faction selection
-				if (step === "username") {
-					startRegisterStepTransition();
-				} else {
-					setStep("register");
-				}
+			if (isRoomJoin && !result.isRegistered && step === "loading") {
+				// Initial URL check: available + not registered → auto-advance to faction selection
+				setStep("register");
 			} else if (isRoomJoin && result.isRegistered) {
 				// Available + already registered → show username step with "Jouer →"
 				setStep("username");
