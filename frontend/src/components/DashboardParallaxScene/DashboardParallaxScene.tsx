@@ -120,27 +120,33 @@ function PirateLayers() {
 				/>
 			</div>
 
-			{/* 2 — Ship: mast first (z=1) so hull (z=2) overlaps at the deck zone */}
+			{/* 2 — Ship: approach animation wrapper handles zoom; mast (absolute) + hull (flow) inside */}
 			<div
 				className={`${styles.layer} ${styles.shipGroup}`}
 				style={{ zIndex: 2, "--depth": D.MAIN } as WithDepth}
 			>
-				<img
-					className={styles.shipMast}
-					src="/img/dashboard/pirate/pirate_ship_masts_sails.png"
-					alt=""
-					draggable={false}
-					loading="eager"
-					decoding="async"
-				/>
-				<img
-					className={styles.shipHull}
-					src="/img/dashboard/pirate/pirate_ship_hull.png"
-					alt=""
-					draggable={false}
-					loading="eager"
-					decoding="async"
-				/>
+				<div className={styles.shipApproachWrapper}>
+					<div className={styles.shipWaveWrapper}>
+						<div className={styles.shipChopWrapper}>
+							<img
+								className={styles.shipMast}
+								src="/img/dashboard/pirate/pirate_ship_masts_sails.png"
+								alt=""
+								draggable={false}
+								loading="eager"
+								decoding="async"
+							/>
+							<img
+								className={styles.shipHull}
+								src="/img/dashboard/pirate/pirate_ship_hull.png"
+								alt=""
+								draggable={false}
+								loading="eager"
+								decoding="async"
+							/>
+						</div>
+					</div>
+				</div>
 			</div>
 
 			{/* 3 — Foreground left (missing on disk → onError hides wrapper) */}
