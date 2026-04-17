@@ -1,0 +1,180 @@
+.wrapper {
+	position: absolute;
+	inset: 0;
+}
+
+// ── Corner buttons ────────────────────────────────────────────────────────────
+
+.hideBtn {
+	position: absolute;
+	top: 1.25rem;
+	right: 1.25rem;
+	z-index: 10;
+}
+
+.backBtn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 2rem;
+	height: 2rem;
+	margin-top: -1rem;
+	margin-bottom: 1rem;
+	background: none;
+	border: none;
+	cursor: pointer;
+	color: var(--color-text-on-dark);
+	font-size: 1.75rem;
+	opacity: 0.7;
+	transition: opacity 0.15s;
+
+	&:hover {
+		opacity: 1;
+	}
+}
+
+// ── Glass panel (same for both themes, positioned differently) ────────────────
+
+.panel {
+	position: absolute;
+	bottom: 12vh;
+	left: max(3vw, 2rem);
+	width: min(380px, 92vw);
+	padding: 1rem;
+	border: 1px solid var(--color-glass-border);
+	border-radius: var(--radius-card);
+	background: var(--color-glass);
+	backdrop-filter: blur(20px);
+	-webkit-backdrop-filter: blur(20px);
+
+	h1, h2, h3, h4 {
+		color: var(--color-text-on-dark);
+	}
+}
+
+.panelMarine {
+	left: auto;
+	right: max(3vw, 2rem);
+}
+
+// ── Actions (Solo / Multijoueur) ──────────────────────────────────────────────
+
+.actions {
+	display: flex;
+	flex-direction: column;
+	gap: 0.75rem;
+	margin-top: 1.25rem;
+}
+
+// ── Multiplayer section ───────────────────────────────────────────────────────
+
+.roomListSection {
+	margin-top: 1.25rem;
+	padding-top: 1.25rem;
+	border-top: 1px solid var(--color-glass-divider);
+}
+
+.sectionLabel {
+	margin: 0 0 0.5rem;
+	font-size: 0.76rem;
+	font-weight: 700;
+	letter-spacing: 0.2em;
+	text-transform: uppercase;
+	color: var(--color-text-muted-on-dark);
+}
+
+.createRow {
+	display: flex;
+	gap: 0.5rem;
+}
+
+.input {
+	flex: 1;
+	min-width: 0;
+	background: rgba(255, 255, 255, 0.07);
+	border: 1px solid var(--color-glass-border);
+	border-radius: 6px;
+	padding: 0.6rem 0.75rem;
+	color: var(--color-text-on-dark);
+	font-family: var(--font-body);
+	font-size: 0.9rem;
+
+	&::placeholder {
+		color: var(--color-text-muted-on-dark);
+	}
+
+	&:focus {
+		outline: none;
+		border-color: var(--color-secondary);
+		box-shadow: 0 0 0 2px rgba(61, 231, 255, 0.15);
+	}
+}
+
+// ── Room list ─────────────────────────────────────────────────────────────────
+
+.roomList {
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+	max-height: 220px;
+	overflow-y: auto;
+
+	&::-webkit-scrollbar { width: 4px; }
+	&::-webkit-scrollbar-track { background: transparent; }
+	&::-webkit-scrollbar-thumb {
+		background: var(--color-glass-border);
+		border-radius: 4px;
+	}
+}
+
+.roomItem {
+	display: flex;
+	align-items: center;
+	gap: 0.75rem;
+	padding: 0.6rem 0.75rem;
+	border: 1px solid var(--color-glass-border);
+	border-radius: 8px;
+	background: rgba(255, 255, 255, 0.04);
+	transition: border-color 0.18s;
+
+	&:hover {
+		border-color: var(--color-secondary-border);
+	}
+}
+
+.roomName {
+	flex: 1;
+	font-size: 0.88rem;
+	font-weight: 600;
+	color: var(--color-text-on-dark);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.roomMeta {
+	font-size: 0.78rem;
+	color: var(--color-text-muted-on-dark);
+	white-space: nowrap;
+}
+
+.emptyRooms {
+	padding: 1.5rem 0;
+	text-align: center;
+	font-size: 0.85rem;
+	font-style: italic;
+	color: var(--color-text-muted-on-dark);
+}
+
+// ── Responsive ────────────────────────────────────────────────────────────────
+
+@media (max-width: 640px) {
+	.panel,
+	.panel.panelMarine {
+		left: 50%;
+		right: auto;
+		bottom: 2rem;
+		transform: translateX(-50%);
+		width: 92vw;
+	}
+}

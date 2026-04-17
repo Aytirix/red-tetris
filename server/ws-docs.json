@@ -202,5 +202,29 @@
     "response": "",
     "responseName": "",
     "responseDescription": ""
+  },
+  {
+    "id": "c2d4f6a8-1b3e-4567-89ab-cdef01234501",
+    "name": "room:subscribeList",
+    "direction": "front-to-back",
+    "group": "room",
+    "description": "S'abonner aux mises à jour de la liste des salles publiques disponibles. Le serveur envoie room:list à chaque changement tant que le client est abonné.",
+    "payload": "{}",
+    "payloadDescription": "",
+    "response": "[\n  { \"roomId\": \"maRoom\", \"playerCount\": 2, \"maxPlayers\": 8, \"mode\": \"classic\" }\n]",
+    "responseName": "room:list",
+    "responseDescription": "Tableau des salles publiques disponibles, envoyé en temps réel à chaque changement d'état."
+  },
+  {
+    "id": "d3e5f7a9-2c4d-5678-9abc-def012345602",
+    "name": "room:unsubscribeList",
+    "direction": "front-to-back",
+    "group": "room",
+    "description": "Se désabonner des mises à jour de la liste des salles. Le serveur cesse d'envoyer room:list à ce client.",
+    "payload": "{}",
+    "payloadDescription": "",
+    "response": "",
+    "responseName": "",
+    "responseDescription": ""
   }
 ]
