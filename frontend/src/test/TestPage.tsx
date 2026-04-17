@@ -1,5 +1,7 @@
-import { useReducer, useEffect, useRef } from "react";
+import { useReducer, useEffect, useRef, useCallback } from "react";
 import { Link } from "react-router-dom";
+import { useHandsController } from "./hands_detector";
+import type { GameAction } from "./hands_detector";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -135,6 +137,19 @@ function reducer(state: State, action: Action): State {
 
 export default function TestPage() {
 	const [state, dispatch] = useReducer(reducer, INIT);
+	const videoRef = useRef<HTMLVideoElement | null>(null);
+	const statusRef = useRef(state.status);
+	statusRef.current = state.status;
+
+	const handleHandAction = useCallback((action: GameAction) => {
+		if (statusRef.current === "playing") dispatch({ type: action });
+	}, []);
+
+	const hands = useHandsController({
+		enabled: true,
+		videoRef,
+		onAction: handleHandAction,
+	});
 
 	// Game loop — speed increases every 5 lines
 	useEffect(() => {
@@ -270,6 +285,16 @@ export default function TestPage() {
 						{state.status === "idle" ? "Lancer" : "Rejouer"}
 					</button>
 
+					<div style={{ fontSize: "0.7rem", color: "rgba(255,255,255,0.55)", lineHeight: 1.4 }}>
+						{hands.status === "loading" && "Caméra en cours..."}
+						{hands.status === "running" && "Mains actives"}
+						{hands.status === "error" && (
+							<span style={{ color: "var(--color-primary)" }}>
+								Erreur : {hands.error}
+							</span>
+						)}
+					</div>
+
 					<div style={{ fontSize: "0.7rem", color: "rgba(255,255,255,0.3)", lineHeight: 2, marginTop: "0.25rem" }}>
 						<div>← → Déplacer</div>
 						<div>↑ Tourner</div>
@@ -280,6 +305,46 @@ export default function TestPage() {
 					<Link to="/" style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.35)", display: "block", marginTop: "0.5rem" }}>
 						← Accueil
 					</Link>
+				</div>
+
+				{/* ── Webcam + debug landmarks ── */}
+				<div style={{
+					position: "relative",
+					width: 480,
+					height: 360,
+					borderRadius: "8px",
+					overflow: "hidden",
+					border: "1px solid rgba(255,255,255,0.12)",
+					background: "rgba(0,0,0,0.4)",
+					transform: "scaleX(-1)",
+				}}>
+					<video
+						ref={videoRef}
+						autoPlay
+						playsInline
+						muted
+						style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+					/>
+					{hands.hands.map((h, hi) => {
+						const color = h.handedness === "Right" ? "#3de7ff" : "#ff365f";
+						return (
+							<div key={hi} style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>
+								{h.landmarks.map((lm, li) => (
+									<div key={li} style={{
+										position: "absolute",
+										left: `${lm.x * 100}%`,
+										top: `${lm.y * 100}%`,
+										width: 8,
+										height: 8,
+										borderRadius: "50%",
+										background: color,
+										transform: "translate(-50%, -50%)",
+										boxShadow: `0 0 6px ${color}`,
+									}} />
+								))}
+							</div>
+						);
+					})}
 				</div>
 
 			</div>
