@@ -204,6 +204,47 @@ $marine-fg-bottom-offset: -15px;
 	);
 }
 
+@keyframes hq-arrive {
+	0%   { transform: translateX(80vw); opacity: 0; }
+	6%   { opacity: 1; }
+	100% { transform: translateX(0);    opacity: 1; }
+}
+
+// Front/side view → vertical swell only, tiny roll so the ship stays upright
+@keyframes hq-swell {
+	0%   { transform: translateY(0px)   rotate(0deg); }
+	22%  { transform: translateY(-14px) rotate(0.5deg); }
+	47%  { transform: translateY(-6px)  rotate(-0.3deg); }
+	73%  { transform: translateY(-18px) rotate(0.7deg); }
+	100% { transform: translateY(0px)   rotate(0deg); }
+}
+
+@keyframes hq-chop {
+	0%   { transform: translateY(0px)  rotate(0deg); }
+	30%  { transform: translateY(-4px) rotate(-0.15deg); }
+	65%  { transform: translateY(-2px) rotate(0.12deg); }
+	100% { transform: translateY(0px)  rotate(0deg); }
+}
+
+.hqArriveWrapper {
+	width: 100%;
+	animation: hq-arrive 9s ease-out forwards;
+}
+
+.hqWaveWrapper {
+	position: relative;
+	width: 100%;
+	transform-origin: 50% 85%;
+	animation: hq-swell 9.3s ease-in-out infinite;
+}
+
+.hqChopWrapper {
+	position: relative;
+	width: 100%;
+	transform-origin: 50% 80%;
+	animation: hq-chop 3.7s ease-in-out infinite;
+}
+
 .hqImg {
 	display: block;
 	width: 100%;
