@@ -16,7 +16,7 @@ $ship-mast-width:   78%;
 // % of hull rendered height — mast bottom sits this far above hull base
 $ship-mast-bottom:  80%;
 // How much the ship overflows below the viewport (negative = exits screen)
-$ship-bottom-offset: -8vh;
+$ship-bottom-offset: -12vh;
 
 // Pirate foreground panels
 // side-offset  : négatif = déborde hors écran horizontalement (évite les gaps au parallaxe)
@@ -120,11 +120,53 @@ $marine-fg-bottom-offset: -15px;
 	left: 50%;
 	bottom: $ship-bottom-offset;
 	width: $ship-group-width;
-	transform: translate3d(
-		calc(-50% + var(--px, 0) * var(--depth, 0) * var(--amp-x, 36px)),
-		calc(var(--py, 0) * var(--depth, 0) * var(--amp-y, 22px)),
-		0
-	);
+	transform: translateX(-50%);
+}
+
+// Approach: ship zooms from horizon to filling the screen, then resets.
+@keyframes ship-approach {
+	0%   { transform: scale(0.18); opacity: 0; }
+	8%   { opacity: 1; }
+	100% { transform: scale(1);    opacity: 1; }
+}
+
+.shipApproachWrapper {
+	position: relative;
+	width: 100%;
+	transform-origin: 50% 150%;
+	animation: ship-approach 10s ease-out forwards;
+}
+
+// Swell: slow deep roll (big ocean waves).
+@keyframes ship-swell {
+	0%   { transform: translateY(0px)   rotate(0deg); }
+	22%  { transform: translateY(-18px) rotate(1.4deg); }
+	47%  { transform: translateY(-8px)  rotate(-0.8deg); }
+	73%  { transform: translateY(-22px) rotate(1.9deg); }
+	100% { transform: translateY(0px)   rotate(0deg); }
+}
+
+// Chop: fast light shudder (surface ripples).
+// Duration has no common factor with swell → combo period ≈ 4.5 min before repeat.
+@keyframes ship-chop {
+	0%   { transform: translateY(0px)  rotate(0deg); }
+	30%  { transform: translateY(-5px) rotate(-0.4deg); }
+	65%  { transform: translateY(-2px) rotate(0.35deg); }
+	100% { transform: translateY(0px)  rotate(0deg); }
+}
+
+.shipWaveWrapper {
+	position: relative;
+	width: 100%;
+	transform-origin: 50% 85%;
+	animation: ship-swell 8.7s ease-in-out infinite;
+}
+
+.shipChopWrapper {
+	position: relative;
+	width: 100%;
+	transform-origin: 50% 80%;
+	animation: ship-chop 3.1s ease-in-out infinite;
 }
 
 // Hull in normal flow → its rendered height is the reference for mast % offsets.
