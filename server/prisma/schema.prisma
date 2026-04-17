@@ -13,8 +13,8 @@ datasource db {
 }
 
 enum Faction {
-  marines
-  pirates
+  marine
+  pirate
 }
 
 model User {

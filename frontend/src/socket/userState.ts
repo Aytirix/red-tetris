@@ -18,9 +18,7 @@ export type NormalizedUsernameAvailability = {
 
 const FACTION_ALIASES: Record<string, AppFaction> = {
 	pirate: "pirate",
-	pirates: "pirate",
 	marine: "marine",
-	marines: "marine",
 };
 
 export function normalizeUserFaction(value: unknown): AppFaction | null {

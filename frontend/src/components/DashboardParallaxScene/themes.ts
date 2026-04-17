@@ -3,7 +3,7 @@
  *
  * Each theme is an ordered list of layers (far → near). Layers only reference
  * files that actually exist in `public/img/dashboard/<theme>/`. Missing optional
- * layers (e.g. pirates_foreground_left) are simply omitted — the layout remains
+ * layers (e.g. pirate_foreground_left) are simply omitted — the layout remains
  * balanced because the ship stays centered.
  *
  * Coordinate system:
@@ -35,8 +35,8 @@ export type ParallaxLayer = {
 
 export type SceneTheme = "pirate" | "marine";
 
-const PIRATES_BASE = "/img/dashboard/pirates";
-const MARINES_BASE = "/img/dashboard/marines";
+const PIRATE_BASE = "/img/dashboard/pirate";
+const MARINE_BASE = "/img/dashboard/marine";
 
 const FULL_COVER = { top: "0", left: "0", width: "100%", height: "100%" } as const;
 
@@ -44,7 +44,7 @@ export const SCENE_THEMES: Record<SceneTheme, ParallaxLayer[]> = {
 	pirate: [
 		{
 			key: "sky",
-			src: `${PIRATES_BASE}/pirates_sky.jpg`,
+			src: `${PIRATE_BASE}/pirate_sky.jpg`,
 			depth: 0.05,
 			scale: 1.15,
 			zIndex: 1,
@@ -54,7 +54,7 @@ export const SCENE_THEMES: Record<SceneTheme, ParallaxLayer[]> = {
 		},
 		{
 			key: "sea-horizon",
-			src: `${PIRATES_BASE}/pirates_sea_horizon.jpg`,
+			src: `${PIRATE_BASE}/pirate_sea_horizon.jpg`,
 			depth: 0.12,
 			scale: 1.1,
 			zIndex: 2,
@@ -66,7 +66,7 @@ export const SCENE_THEMES: Record<SceneTheme, ParallaxLayer[]> = {
 		},
 		{
 			key: "ship-hull",
-			src: `${PIRATES_BASE}/pirates_ship_hull.png`,
+			src: `${PIRATE_BASE}/pirate_ship_hull.png`,
 			depth: 0.32,
 			scale: 1,
 			zIndex: 4,
@@ -76,7 +76,7 @@ export const SCENE_THEMES: Record<SceneTheme, ParallaxLayer[]> = {
 		},
 		{
 			key: "ship-masts",
-			src: `${PIRATES_BASE}/pirates_ship_masts_sails.png`,
+			src: `${PIRATE_BASE}/pirate_ship_masts_sails.png`,
 			depth: 0.34,
 			scale: 1,
 			zIndex: 5,
@@ -87,7 +87,7 @@ export const SCENE_THEMES: Record<SceneTheme, ParallaxLayer[]> = {
 		},
 		{
 			key: "foreground-right",
-			src: `${PIRATES_BASE}/pirates_foreground_right.png`,
+			src: `${PIRATE_BASE}/pirate_foreground_right.png`,
 			depth: 0.78,
 			scale: 1,
 			zIndex: 7,
@@ -96,12 +96,12 @@ export const SCENE_THEMES: Record<SceneTheme, ParallaxLayer[]> = {
 			floatDuration: 10000,
 			floatDelay: -1500,
 		},
-		// pirates_foreground_left.png intentionally omitted — asset not present.
+		// pirate_foreground_left.png intentionally omitted — asset not present.
 	],
 	marine: [
 		{
 			key: "sky",
-			src: `${MARINES_BASE}/marines_sky.jpg`,
+			src: `${MARINE_BASE}/marine_sky.jpg`,
 			depth: 0.05,
 			scale: 1.15,
 			zIndex: 1,
@@ -111,7 +111,7 @@ export const SCENE_THEMES: Record<SceneTheme, ParallaxLayer[]> = {
 		},
 		{
 			key: "sea-horizon",
-			src: `${MARINES_BASE}/marines_sea_horizon.jpg`,
+			src: `${MARINE_BASE}/marine_sea_horizon.jpg`,
 			depth: 0.12,
 			scale: 1.1,
 			zIndex: 2,
@@ -123,7 +123,7 @@ export const SCENE_THEMES: Record<SceneTheme, ParallaxLayer[]> = {
 		},
 		{
 			key: "headquarters-ship",
-			src: `${MARINES_BASE}/marines_headquarters_ship.png`,
+			src: `${MARINE_BASE}/marine_headquarters_ship.png`,
 			depth: 0.3,
 			scale: 1,
 			zIndex: 4,
@@ -133,7 +133,7 @@ export const SCENE_THEMES: Record<SceneTheme, ParallaxLayer[]> = {
 		},
 		{
 			key: "flags-architecture",
-			src: `${MARINES_BASE}/marines_flags_architecture.png`,
+			src: `${MARINE_BASE}/marine_flags_architecture.png`,
 			depth: 0.45,
 			scale: 1.02,
 			zIndex: 5,
@@ -145,7 +145,7 @@ export const SCENE_THEMES: Record<SceneTheme, ParallaxLayer[]> = {
 		},
 		{
 			key: "foreground-left",
-			src: `${MARINES_BASE}/marines_foreground_left.png`,
+			src: `${MARINE_BASE}/marine_foreground_left.png`,
 			depth: 0.78,
 			scale: 1,
 			zIndex: 7,
@@ -155,7 +155,7 @@ export const SCENE_THEMES: Record<SceneTheme, ParallaxLayer[]> = {
 		},
 		{
 			key: "foreground-right",
-			src: `${MARINES_BASE}/marines_foreground_right.png`,
+			src: `${MARINE_BASE}/marine_foreground_right.png`,
 			depth: 0.78,
 			scale: 1,
 			zIndex: 7,

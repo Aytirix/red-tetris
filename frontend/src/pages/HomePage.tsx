@@ -22,10 +22,10 @@ type FactionData = {
 
 const FACTIONS: Record<Faction, FactionData> = {
 	pirate: {
-		label: "Pirates",
+		label: "Pirate",
 		tone: "red",
 		icon: "☠",
-		image: "/img/choix-faction/pirates.jpg",
+		image: "/img/choix-faction/pirate.jpg",
 		color: "var(--color-primary)",
 		colorSoft: "var(--color-primary-soft)",
 		shadow: "var(--shadow-neon-red)",
@@ -37,7 +37,7 @@ const FACTIONS: Record<Faction, FactionData> = {
 		dropShadow: "var(--shadow-drop-primary)",
 	},
 	marine: {
-		label: "Marines",
+		label: "Marine",
 		tone: "cyan",
 		icon: "⚓",
 		image: "/img/choix-faction/marine.jpg",
@@ -90,7 +90,7 @@ type AvatarCrop = {
 const avatarCropCache = new Map<string, AvatarCrop>();
 const REGISTER_SCENE_IMAGE_SRCS = [
 	"/img/choix-faction/affrontement.jpg",
-	"/img/choix-faction/pirates.jpg",
+	"/img/choix-faction/pirate.jpg",
 	"/img/choix-faction/marine.jpg",
 ];
 
@@ -125,7 +125,7 @@ function preloadImageAsset(src: string): Promise<void> {
 }
 
 function getCharacterAvatarSrc(faction: Faction, characterId: string): string {
-	const dir = faction === "pirate" ? "pirates" : "marines";
+	const dir = faction === "pirate" ? "pirate" : "marine";
 	return `/img/avatar/${dir}/${characterId}.png`;
 }
 
@@ -576,7 +576,7 @@ function RegisterStep({ username, onSubmit, sceneEnterActive = false }: {
 	const isCampView = !faction || !isFactionDetailVisible;
 	const chooserUiTranslate = !faction || !isFactionDetailVisible
 		? "0vw"
-		: (isPirates ? "110vw" : "-110vw");
+		: (isPirate ? "110vw" : "-110vw");
 
 	return (
 		<div
@@ -716,7 +716,7 @@ function RegisterStep({ username, onSubmit, sceneEnterActive = false }: {
 					</svg>
 				</div>
 
-				{(Object.entries(FACTIONS) as [Faction, typeof FACTIONS.pirates][]).map(([key, fc]) => {
+				{(Object.entries(FACTIONS) as [Faction, typeof FACTIONS.pirate][]).map(([key, fc]) => {
 					const isLeft = key === "pirate";
 					return (
 						<button
@@ -795,22 +795,22 @@ function RegisterStep({ username, onSubmit, sceneEnterActive = false }: {
 				})}
 			</div>
 
-			{(Object.entries(FACTIONS) as [Faction, typeof FACTIONS.pirates][]).map(([layerFaction, layerData]) => {
-				const layerIsPirates = layerFaction === "pirate";
+			{(Object.entries(FACTIONS) as [Faction, typeof FACTIONS.pirate][]).map(([layerFaction, layerData]) => {
+				const layerisPirate = layerFaction === "pirate";
 				const layerIsActive = faction === layerFaction;
 				const layerIsVisible = layerIsActive && isFactionDetailVisible;
 				const layerTranslate = isCampView
-					? (layerIsPirates ? "-50vw" : "50vw")
+					? (layerisPirate ? "-50vw" : "50vw")
 					: layerIsVisible
 						? "0vw"
-						: (layerIsPirates ? "-100vw" : "100vw");
+						: (layerisPirate ? "-100vw" : "100vw");
 				const layerUiTranslate = layerIsVisible
 					? "0vw"
-					: (layerIsPirates ? "calc(-120vw - 160px)" : "calc(120vw + 160px)");
-				const layerPanelOffset = layerIsPirates ? "-25rem" : "25rem";
+					: (layerisPirate ? "calc(-120vw - 160px)" : "calc(120vw + 160px)");
+				const layerPanelOffset = layerisPirate ? "-25rem" : "25rem";
 				const layerHandleTranslate = layerIsVisible
 					? `var(--edge-handle-offset, ${edgeHandleBaseOffset}px)`
-					: (layerIsPirates ? "92px" : "-92px");
+					: (layerisPirate ? "92px" : "-92px");
 				const layerCharacters = CHARACTERS[layerFaction];
 
 				return (
@@ -868,7 +868,7 @@ function RegisterStep({ username, onSubmit, sceneEnterActive = false }: {
 									all: "unset",
 									position: "absolute",
 									top: 0,
-									[layerIsPirates ? "right" : "left"]: 0,
+									[layerisPirate ? "right" : "left"]: 0,
 									width: "88px",
 									height: "100%",
 									display: "flex",
@@ -895,7 +895,7 @@ function RegisterStep({ username, onSubmit, sceneEnterActive = false }: {
 									}}
 								>
 									<defs>
-										<linearGradient id={`edge-handle-fill-${layerFaction}`} x1={layerIsPirates ? "0%" : "100%"} y1="0%" x2={layerIsPirates ? "100%" : "0%"} y2="0%">
+										<linearGradient id={`edge-handle-fill-${layerFaction}`} x1={layerisPirate ? "0%" : "100%"} y1="0%" x2={layerisPirate ? "100%" : "0%"} y2="0%">
 											<stop offset="0%" stopColor="rgba(7, 12, 22, 0)" />
 											<stop offset="18%" stopColor="rgba(7, 12, 22, 0.04)" />
 											<stop offset="52%" stopColor="rgba(7, 12, 22, 0.14)" />
@@ -903,7 +903,7 @@ function RegisterStep({ username, onSubmit, sceneEnterActive = false }: {
 										</linearGradient>
 									</defs>
 									<path
-										d={layerIsPirates
+										d={layerisPirate
 											? "M88 0 H30 C16 4 8 18 6 34 C2 43 0 47 0 50 C0 53 2 57 6 66 C8 82 16 96 30 100 H88 Z"
 											: "M0 0 H58 C72 4 80 18 82 34 C86 43 88 47 88 50 C88 53 86 57 82 66 C80 82 72 96 58 100 H0 Z"}
 										fill={`url(#edge-handle-fill-${layerFaction})`}
@@ -917,12 +917,12 @@ function RegisterStep({ username, onSubmit, sceneEnterActive = false }: {
 										zIndex: 1,
 										width: "38px",
 										height: "38px",
-										transform: layerIsPirates ? "translateX(-10px)" : "translateX(10px)",
+										transform: layerisPirate ? "translateX(-10px)" : "translateX(10px)",
 										filter: `drop-shadow(0 0 12px ${layerData.glow}) drop-shadow(0 0 18px rgba(255, 255, 255, 0.28))`,
 									}}
 								>
 									<path
-										d={layerIsPirates ? "M10 5 L17 12 L10 19" : "M14 5 L7 12 L14 19"}
+										d={layerisPirate ? "M10 5 L17 12 L10 19" : "M14 5 L7 12 L14 19"}
 										fill="none"
 										stroke="rgba(7, 12, 22, 0.52)"
 										strokeWidth="7"
@@ -930,7 +930,7 @@ function RegisterStep({ username, onSubmit, sceneEnterActive = false }: {
 										strokeLinejoin="round"
 									/>
 									<path
-										d={layerIsPirates ? "M10 5 L17 12 L10 19" : "M14 5 L7 12 L14 19"}
+										d={layerisPirate ? "M10 5 L17 12 L10 19" : "M14 5 L7 12 L14 19"}
 										fill="none"
 										stroke="rgba(255, 252, 247, 1)"
 										strokeWidth="3.8"
@@ -1346,10 +1346,10 @@ export default function HomePage() {
 						width: "112vw",
 						height: "100%",
 						transform: `translate3d(${!isSceneTransitionActive
-								? "0vw"
-								: step === "username"
-									? "112vw"
-									: "224vw"
+							? "0vw"
+							: step === "username"
+								? "112vw"
+								: "224vw"
 							}, 0, 0)`,
 						transformOrigin: "left center",
 						transition: `transform ${stepTransitionMs}ms cubic-bezier(0.22, 1, 0.36, 1)`,
