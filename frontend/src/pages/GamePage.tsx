@@ -326,19 +326,20 @@ export default function GamePage() {
 		};
 	}, [rawRoom, roomName, playerName, leaveRoomOnce]);
 
-	// If the automatic auth check already resolved before this page listener ran,
-	// use the stored websocket state to join once it is valid for this URL user.
+	// The auth check is emitted elsewhere. Join once that check is valid for this
+	// URL user, including the freshly registered case confirmed by ResultRegister.
 	useEffect(() => {
 		if (rawRoom !== roomName) return;
 		const username = playerName.trim();
 		const result = session.lastUsernameAvailability;
 
 		if (!roomName || !username || !result) return;
-		if (!result.available || !result.isRegistered) return;
 		if (result.username !== username) return;
+		if (!result.available) return;
+		if (!result.isRegistered && session.faction === null) return;
 
 		joinRoomOnce();
-	}, [rawRoom, roomName, playerName, session.lastUsernameAvailability, joinRoomOnce]);
+	}, [rawRoom, roomName, playerName, session.faction, session.lastUsernameAvailability, joinRoomOnce]);
 
 	// Room events
 	useEffect(() => {

@@ -16,12 +16,12 @@
     "name": "user:Register",
     "direction": "front-to-back",
     "group": "user",
-    "description": "Enregistre un nouvel utilisateur avec son pseudo, sa faction et son avatar. Appelé après que l'utilisateur a choisi sa faction sur la HomePage.",
-    "payload": "{\n  \"username\": \"luffy\",\n  \"faction\": \"pirate\",\n  \"avatar\": \"luffy\"\n}",
-    "payloadDescription": "username : pseudo choisi (1-15 caractères)\nfaction : faction choisie\navatar : identifiant du personnage (ex: \"luffy\", \"garp\")",
-    "response": "",
-    "responseName": "",
-    "responseDescription": ""
+    "description": "Enregistre un nouvel utilisateur avec son pseudo, sa faction et son avatar. Appelé après que l'utilisateur a choisi sa faction sur la HomePage.\n\nOn doit controller que la faction et l'avatar son valide !",
+    "payload": "{\n  \"faction\": \"pirate\",\n  \"avatar\": \"luffy\"\n}",
+    "payloadDescription": "faction : faction choisie\navatar : identifiant du personnage (ex: \"luffy\", \"garp\")\nLe pseudo est récupéré depuis la session socket après user:CheckUsernameAvailable.",
+    "response": "{\n  \"isRegister\": true,\n  \"message\": null\n}",
+    "responseName": "user:ResultRegister",
+    "responseDescription": "isRegister == true si l'inscription a réussi, sinon false.\nmessage : message d'erreur quand isRegister == false."
   },
   {
     "id": "578b5b5e-8cd5-46ce-8b74-870ad2b6ff60",

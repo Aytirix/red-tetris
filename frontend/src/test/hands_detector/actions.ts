@@ -7,7 +7,6 @@ import {
 	COOLDOWN_ROTATE_MS,
 	COOLDOWN_SOFT_DROP_MS,
 } from "./constants";
-import type { HandGesture } from "./gestures";
 
 export type GameAction = "LEFT" | "RIGHT" | "DOWN" | "ROTATE" | "DROP";
 
@@ -20,37 +19,6 @@ export const COOLDOWN_MS: Cooldowns = {
 	ROTATE: COOLDOWN_ROTATE_MS,
 	DROP: COOLDOWN_HARD_DROP_MS,
 };
-
-// Pure: decides which actions the current frame *wants* to trigger.
-// Rules:
-//  - priority absolute to hard drop if both hands are fists
-//  - otherwise, per-hand gestures: thumb+middle → left/right (by handedness),
-//    thumb+index → rotate, thumb+pinky → soft drop
-//  - conflicting left+right on same frame cancels both
-export function gesturesToActions(hands: HandGesture[]): GameAction[] {
-	if (hands.length === 0) return [];
-
-	const fistCount = hands.filter(h => h.fist).length;
-	if (fistCount >= 2) return ["DROP"];
-
-	const actions = new Set<GameAction>();
-
-	for (const h of hands) {
-		if (h.thumbMiddle) {
-			actions.add(h.handedness === "Right" ? "RIGHT" : "LEFT");
-		}
-		if (h.thumbIndex) actions.add("ROTATE");
-		if (h.thumbPinky) actions.add("DOWN");
-	}
-
-	// Cancel conflicting horizontal moves triggered on the same frame.
-	if (actions.has("LEFT") && actions.has("RIGHT")) {
-		actions.delete("LEFT");
-		actions.delete("RIGHT");
-	}
-
-	return Array.from(actions);
-}
 
 // Pure: filter actions by cooldowns. Returns fired actions + updated timestamps.
 // After a DROP, all non-DROP actions are blocked for COOLDOWN_RELEASE_BLOCK_MS.
