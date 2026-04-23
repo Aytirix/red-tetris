@@ -1,5 +1,5 @@
 import type { Socket } from "socket.io";
-import { handlerRoomJoin } from "./roomhandlers.js";
+import { handlerRoomJoin } from "./roomHandlers.js";
 
 
 export function registerRoomSocket(socket: Socket) : void {
