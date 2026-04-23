@@ -8,6 +8,8 @@ import type { GameAction } from "./hands_detector";
 const COLS = 10;
 const ROWS = 20;
 const CELL = 28;
+const CAMERA_WIDTH = 480;
+const CAMERA_HEIGHT = 360;
 
 type PieceId = "I" | "O" | "T" | "S" | "Z" | "J" | "L";
 
@@ -310,8 +312,8 @@ export default function TestPage() {
 				{/* ── Webcam + debug landmarks ── */}
 				<div style={{
 					position: "relative",
-					width: 480,
-					height: 360,
+					width: CAMERA_WIDTH,
+					height: CAMERA_HEIGHT,
 					borderRadius: "8px",
 					overflow: "hidden",
 					border: "1px solid rgba(255,255,255,0.12)",
@@ -332,13 +334,14 @@ export default function TestPage() {
 								{h.landmarks.map((lm, li) => (
 									<div key={li} style={{
 										position: "absolute",
-										left: `${lm.x * 100}%`,
-										top: `${lm.y * 100}%`,
+										left: 0,
+										top: 0,
 										width: 8,
 										height: 8,
 										borderRadius: "50%",
 										background: color,
-										transform: "translate(-50%, -50%)",
+										transform: `translate3d(${lm.x * CAMERA_WIDTH}px, ${lm.y * CAMERA_HEIGHT}px, 0) translate(-50%, -50%)`,
+										willChange: "transform",
 										boxShadow: `0 0 6px ${color}`,
 									}} />
 								))}
