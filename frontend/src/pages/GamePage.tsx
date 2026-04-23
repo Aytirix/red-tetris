@@ -410,7 +410,7 @@ export default function GamePage() {
 
 	function handleLeave() {
 		leaveRoomOnce();
-		navigate("/");
+		navigate("/dashboard");
 	}
 
 	return (
