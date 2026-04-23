@@ -27,7 +27,6 @@ export async function handlerRoomJoin(socket: Socket, payload: unknown): Promise
 		emitRoomJoined(socket, newRoom)
 	}
 	else {
-		// TODO: join existing room - add player to room
 		emitRoomJoined(socket, room)
 	}
 }
