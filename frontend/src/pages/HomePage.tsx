@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { ClipLoader } from "react-spinners";
 import { useSocket } from "../contexts/SocketContext";
 import { useRememberCurrentUserFaction } from "../contexts/WsStateContext";
+import { useAlert } from "../components/Alert";
 import { emitCheckUsernameAvailable } from "../socket/events/user";
 import { APP_NAME } from "../config";
 import {
@@ -18,6 +19,11 @@ type FactionData = {
 	border: string; borderStrong: string;
 	glow: string; glowHover: string; selected: string;
 	dropShadow: string;
+};
+
+type RegisterResultPayload = {
+	isRegister: boolean;
+	message: string | null;
 };
 
 const FACTIONS: Record<Faction, FactionData> = {
@@ -1132,6 +1138,7 @@ export default function HomePage() {
 	const navigate = useNavigate();
 	const location = useLocation();
 	const { socket } = useSocket();
+	const { alert } = useAlert();
 	const rememberCurrentUserFaction = useRememberCurrentUserFaction();
 	const stepTransitionMs = 440;
 	const stepTransitionSwitchMs = 180;
@@ -1160,6 +1167,7 @@ export default function HomePage() {
 	const registerSceneReadyRef = useRef(false);
 	const registerSceneReadyPromiseRef = useRef<Promise<void> | null>(null);
 	const transitionTokenRef = useRef(0);
+	const pendingRegisterRef = useRef<{ faction: Faction; destination: string } | null>(null);
 
 	// Ref to read latest username inside the socket handler without stale closure
 	const usernameRef = useRef(username);
@@ -1290,6 +1298,34 @@ export default function HomePage() {
 		return () => { socket.off("user:ResultUsernameAvailable", onResult); };
 	}, [isRoomJoin, socket, step]); // isRoomJoin is stable (derived from location.state)
 
+	useEffect(() => {
+		function onRegisterResult(data: unknown) {
+			if (!data || typeof data !== "object") return;
+
+			const payload = data as Partial<RegisterResultPayload>;
+			if (typeof payload.isRegister !== "boolean") return;
+
+			const pendingRegister = pendingRegisterRef.current;
+			pendingRegisterRef.current = null;
+
+			if (!payload.isRegister) {
+				void alert({
+					title: "Inscription impossible",
+					message: typeof payload.message === "string" ? payload.message : "Une erreur est survenue.",
+					danger: true,
+				});
+				return;
+			}
+
+			if (!pendingRegister) return;
+			rememberCurrentUserFaction(pendingRegister.faction);
+			navigate(pendingRegister.destination);
+		}
+
+		socket.on("user:ResultRegister", onRegisterResult);
+		return () => { socket.off("user:ResultRegister", onRegisterResult); };
+	}, [alert, navigate, rememberCurrentUserFaction, socket]);
+
 	function resolveDestination(newUsername: string): string {
 		if (!returnTo) return "/dashboard";
 		if (returnToParts.length === 2) return `/${returnToParts[0]}/${newUsername}`;
@@ -1310,9 +1346,8 @@ export default function HomePage() {
 	function handleRegisterSubmit(faction: Faction, avatar: string) {
 		const trimmed = usernameRef.current.trim();
 		localStorage.setItem("username", trimmed);
-		rememberCurrentUserFaction(faction);
-		socket.emit("user:Register", { username: trimmed, faction, avatar });
-		navigate(resolveDestination(trimmed));
+		pendingRegisterRef.current = { faction, destination: resolveDestination(trimmed) };
+		socket.emit("user:Register", { faction, avatar });
 	}
 
 	return (
