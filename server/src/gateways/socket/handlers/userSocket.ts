@@ -20,7 +20,7 @@ export function registerUserSocket(socket: Socket): void {
 			return;
 		}
 		if (isUsernameTaken(userSocketStore, msg.username, socket)) {
-			emitUsernameUnavailable(socket, msg.username, false)
+			emitUsernameUnavailable(socket, msg.username, "invalid")
 			console.log(`Username already in use: ${msg.username}`);
 			return;
 		}

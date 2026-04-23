@@ -47,12 +47,22 @@ export class Room {
 		this.players.splice(index, 1);
 
 		if (playerToRemove.getSocketId() === this.hostPlayerId) {
-			if (this.players.length > 0)
-				this.hostPlayerId = this.players[0].getSocketId();
+			const firstPlayer = this.players[0];
+
+			if (firstPlayer)
+				this.hostPlayerId = firstPlayer.getSocketId();
 			else
 				this.hostPlayerId = null;
 		}
 		return true;
+	}
+	removePlayerBySocketId(socketId: string): boolean {
+		const playerToRemove = this.players.find(
+			(player) => player.getSocketId() === socketId
+		);
+		if (!playerToRemove)
+			return false;
+		return this.removePlayer(playerToRemove);
 	}
 	reassignHost(player: Player) : void {
 		this.hostPlayerId = player.getSocketId()
