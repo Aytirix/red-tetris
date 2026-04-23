@@ -14,3 +14,11 @@ export function isUsernameTaken(
 	}
 	return false;
 }
+
+export function getNameById(socket: Socket) : string | null {
+	for (const [socketId, storedName] of userSocketStore) {
+		if (socket.id === socketId)
+			return storedName
+	}
+	return null
+}
