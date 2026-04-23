@@ -1,7 +1,8 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { ClipLoader } from "react-spinners";
 import { useSocket } from "../contexts/SocketContext";
+import { useWsSession } from "../contexts/WsStateContext";
 import { normalizeUsernameAvailability } from "../socket/userState";
 import { emitJoinRoom, emitLeaveRoom, emitKickPlayer, emitStartGame, emitSetGameMode, emitSetPrivate } from "../socket/events/room";
 
@@ -241,6 +242,7 @@ const MAX_NAME_LENGTH = 15;
 export default function GamePage() {
 	const { roomName: rawRoom = "", playerName = "" } = useParams<{ roomName: string; playerName: string }>();
 	const { socket } = useSocket();
+	const session = useWsSession();
 	const navigate = useNavigate();
 	const [view, setView] = useState<GameView>("connecting");
 	const [players, setPlayers] = useState<RoomPlayer[]>([]);
@@ -257,10 +259,33 @@ export default function GamePage() {
 	}, []); // eslint-disable-line react-hooks/exhaustive-deps
 
 	// Keep stable refs for use in socket callbacks
+	const rawRoomRef = useRef(rawRoom);
 	const roomNameRef = useRef(roomName);
 	const playerNameRef = useRef(playerName);
+	const hasJoinedRoomRef = useRef(false);
+	const hasLeftRoomRef = useRef(false);
+	useEffect(() => { rawRoomRef.current = rawRoom; }, [rawRoom]);
 	useEffect(() => { roomNameRef.current = roomName; }, [roomName]);
 	useEffect(() => { playerNameRef.current = playerName; }, [playerName]);
+
+	const joinRoomOnce = useCallback(() => {
+		if (hasJoinedRoomRef.current || hasLeftRoomRef.current) return;
+		const currentRoom = roomNameRef.current;
+		if (!currentRoom || rawRoomRef.current !== currentRoom) return;
+
+		emitJoinRoom(currentRoom);
+		hasJoinedRoomRef.current = true;
+	}, []);
+
+	const leaveRoomOnce = useCallback(() => {
+		if (hasLeftRoomRef.current) return;
+
+		hasLeftRoomRef.current = true;
+		if (roomNameRef.current) {
+			emitLeaveRoom();
+		}
+		hasJoinedRoomRef.current = false;
+	}, []);
 
 	// Auth result → join room if OK (redirect is handled by useAuthGuard on failure)
 	useEffect(() => {
@@ -268,12 +293,52 @@ export default function GamePage() {
 			const result = normalizeUsernameAvailability(data);
 			if (!result) return;
 			if (result.available && result.isRegistered) {
-				emitJoinRoom(roomNameRef.current);
+				if (result.username !== playerNameRef.current) return;
+				joinRoomOnce();
 			}
 		}
 		socket.on("user:ResultUsernameAvailable", handleAuthResult);
 		return () => { socket.off("user:ResultUsernameAvailable", handleAuthResult); };
-	}, [socket]);
+	}, [socket, joinRoomOnce]);
+
+	// Room page lifecycle: join after the username session is confirmed, leave on any exit.
+	useEffect(() => {
+		if (rawRoom !== roomName) return;
+		const username = playerName.trim();
+		if (!roomName || !username) return;
+
+		hasJoinedRoomRef.current = false;
+		hasLeftRoomRef.current = false;
+		setView("connecting");
+		setPlayers([]);
+
+		function handlePageExit() {
+			leaveRoomOnce();
+		}
+
+		window.addEventListener("pagehide", handlePageExit);
+		window.addEventListener("beforeunload", handlePageExit);
+
+		return () => {
+			window.removeEventListener("pagehide", handlePageExit);
+			window.removeEventListener("beforeunload", handlePageExit);
+			leaveRoomOnce();
+		};
+	}, [rawRoom, roomName, playerName, leaveRoomOnce]);
+
+	// If the automatic auth check already resolved before this page listener ran,
+	// use the stored websocket state to join once it is valid for this URL user.
+	useEffect(() => {
+		if (rawRoom !== roomName) return;
+		const username = playerName.trim();
+		const result = session.lastUsernameAvailability;
+
+		if (!roomName || !username || !result) return;
+		if (!result.available || !result.isRegistered) return;
+		if (result.username !== username) return;
+
+		joinRoomOnce();
+	}, [rawRoom, roomName, playerName, session.lastUsernameAvailability, joinRoomOnce]);
 
 	// Room events
 	useEffect(() => {
@@ -326,7 +391,7 @@ export default function GamePage() {
 	}, [socket]);
 
 	function handleLeave() {
-		emitLeaveRoom();
+		leaveRoomOnce();
 		navigate("/");
 	}
 

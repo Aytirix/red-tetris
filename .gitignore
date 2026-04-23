@@ -16,3 +16,5 @@ server/*.tsbuildinfo
 
 # macOS
 .DS_Store
+graphify-out/
+.graphifyignore

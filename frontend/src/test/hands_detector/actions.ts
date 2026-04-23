@@ -30,9 +30,8 @@ export const COOLDOWN_MS: Cooldowns = {
 export function gesturesToActions(hands: HandGesture[]): GameAction[] {
 	if (hands.length === 0) return [];
 
-	// Both hands pinky+thumb simultaneously → hard drop.
-	const pinkyCount = hands.filter(h => h.thumbPinky).length;
-	if (pinkyCount >= 2) return ["DROP"];
+	const fistCount = hands.filter(h => h.fist).length;
+	if (fistCount >= 2) return ["DROP"];
 
 	const actions = new Set<GameAction>();
 
