@@ -10,6 +10,15 @@
 	to { transform: rotate(360deg); }
 }
 
+@keyframes loading-shimmer {
+	to { background-position: -200% 0; }
+}
+
+@keyframes loading-dot-pulse {
+	0%, 100% { opacity: 0.45; }
+	50% { opacity: 1; }
+}
+
 html,
 body,
 #root {
@@ -258,6 +267,15 @@ h3 {
 
 .button:hover {
 	transform: translateY(-1px);
+}
+
+.button:disabled {
+	cursor: default;
+	opacity: 0.58;
+}
+
+.button:disabled:hover {
+	transform: none;
 }
 
 .button-primary {
@@ -977,7 +995,22 @@ a:hover {
 	opacity: 1;
 }
 
+.game-lobby__status-badge--loading {
+	color: var(--color-secondary);
+	border-color: rgba(61, 231, 255, 0.28);
+	background: rgba(61, 231, 255, 0.08);
+}
+
+.game-lobby__status-badge--loading::before {
+	box-shadow: 0 0 5px var(--color-secondary);
+	animation: loading-dot-pulse 1.2s ease-in-out infinite;
+	opacity: 1;
+}
+
 .game-lobby__player-count-badge {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.35rem;
 	font-size: 0.72rem;
 	color: var(--color-text-muted-on-dark);
 }
@@ -1017,6 +1050,10 @@ a:hover {
 
 .game-lobby__player-item--me {
 	outline: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.game-lobby__player-item--loading {
+	pointer-events: none;
 }
 
 .game-lobby__player-avatar {
@@ -1133,6 +1170,36 @@ a:hover {
 	padding: 0.5rem 0.25rem;
 }
 
+.game-lobby__skeleton,
+.game-lobby__loading-line {
+	background:
+		linear-gradient(90deg, rgba(255, 255, 255, 0.06) 25%, rgba(61, 231, 255, 0.16) 50%, rgba(255, 255, 255, 0.06) 75%);
+	background-size: 200% 100%;
+	animation: loading-shimmer 1.2s linear infinite;
+}
+
+.game-lobby__loading-lines {
+	flex: 1;
+	display: flex;
+	flex-direction: column;
+	gap: 0.45rem;
+	min-width: 0;
+}
+
+.game-lobby__loading-line {
+	display: block;
+	height: 0.62rem;
+	border-radius: 999px;
+}
+
+.game-lobby__loading-line--name {
+	width: min(12rem, 70%);
+}
+
+.game-lobby__loading-line--meta {
+	width: min(7rem, 42%);
+}
+
 /* Settings */
 
 .game-lobby__settings {
@@ -1141,6 +1208,11 @@ a:hover {
 	gap: 0.75rem;
 	padding: 0.9rem 1.5rem;
 	border-top: 1px solid var(--color-glass-divider);
+}
+
+.game-lobby__settings--loading .game-lobby__mode-list,
+.game-lobby__settings--loading .game-lobby__privacy-btn {
+	opacity: 0.62;
 }
 
 .game-lobby__setting {
