@@ -39,7 +39,11 @@ export function registerUserSocket(socket: Socket): void {
 			return
 		}
 		try {
-			await postUsername(msg.username, msg.faction, msg.avatar);
+			await postUsername(socket, msg.faction, msg.avatar);
+			socket.emit("user:ResultRegister", {
+				"isRegister": true,
+				"message": null
+			})
 		} catch (error) {
 			console.error("Database error in Register:", error);
 			emitError(socket, "user:Register", "Registration failed")

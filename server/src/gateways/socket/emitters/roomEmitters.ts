@@ -11,5 +11,6 @@ export function emitRoomJoined(socket: Socket, room: Room) : void {
 			faction: player.getFaction(),
 		})),
 	}
+	console.log("emit")
 	socket.emit("room:joined", payload)
 }
