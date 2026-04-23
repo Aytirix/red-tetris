@@ -1,14 +1,15 @@
 import { useEffect, useRef, useState } from "react";
 import type { RefObject } from "react";
+import { flushSync } from "react-dom";
 import type { HandLandmarker, HandLandmarkerResult } from "@mediapipe/tasks-vision";
 
 import type { GameAction } from "./actions";
-import { applyCooldowns, gesturesToActions } from "./actions";
-import { updateStability } from "./stability";
-import type { StabilityState } from "./stability";
+import { applyCooldowns } from "./actions";
 import { analyzeHand } from "./gestures";
 import type { HandGesture, Handedness, HandLandmarks } from "./gestures";
 import { createHandLandmarker } from "./landmarker";
+import { createMotionState, detectMotionActions } from "./motion";
+import type { MotionState } from "./motion";
 import { startWebcam, stopWebcam } from "./webcam";
 
 export type HandsControllerStatus = "idle" | "loading" | "running" | "error";
@@ -66,7 +67,7 @@ export function useHandsController(
 		let rafId = 0;
 		let lastVideoTime = -1;
 		let lastFiredAt: Partial<Record<GameAction, number>> = {};
-		let stabilityState: StabilityState = {};
+		let motionState: MotionState = createMotionState();
 
 		setStatus("loading");
 		setError(null);
@@ -84,19 +85,25 @@ export function useHandsController(
 
 				setStatus("running");
 
-				const loop = () => {
+				const loop = (now: number) => {
 					if (cancelled || !landmarker || !video) return;
-					if (video.readyState >= 2 && video.currentTime !== lastVideoTime) {
+					if (video.readyState >= 2) {
+						if (video.currentTime === lastVideoTime) {
+							rafId = requestAnimationFrame(loop);
+							return;
+						}
 						lastVideoTime = video.currentTime;
-						const now = performance.now();
 						const result = landmarker.detectForVideo(video, now);
 						const detected = extractHands(result);
-						setHands(detected);
-						const raw = gesturesToActions(detected.map(d => d.gesture));
-						const { confirmed, next: nextStability } = updateStability(raw, stabilityState);
-						stabilityState = nextStability;
+						flushSync(() => setHands(detected));
+						const { actions, next: nextMotionState } = detectMotionActions(
+							detected,
+							motionState,
+							now,
+						);
+						motionState = nextMotionState;
 						const { fired, lastFiredAt: nextFired } = applyCooldowns(
-							confirmed,
+							actions,
 							lastFiredAt,
 							now,
 						);
@@ -105,6 +112,7 @@ export function useHandsController(
 					}
 					rafId = requestAnimationFrame(loop);
 				};
+
 				rafId = requestAnimationFrame(loop);
 			} catch (err) {
 				if (cancelled) return;
