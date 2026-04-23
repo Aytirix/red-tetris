@@ -5,7 +5,7 @@ import { isValidUsername } from "../../../utils/unsernameValidator.js";
 import { emitError } from "../emitters/systemEmitters.js";
 import { emitUsernameUnavailable } from "../emitters/userEmitters.js";
 import { isUsernameTaken, userSocketStore } from "../userSocketStore.js";
-import { validateSocketEvent } from "../validators/validateSocketEvent.js";
+import { checkAvatar, validateSocketEvent } from "../validators/validateSocketEvent.js";
 
 export function registerUserSocket(socket: Socket): void {
 	socket.on("user:CheckUsernameAvailable", async (msg) => {

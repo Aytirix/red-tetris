@@ -15,6 +15,9 @@ export function validateRegister(
 	&& Object.keys(payload).length === 2
 	&& "faction" in payload
 	&& "avatar" in payload
+	&& typeof payload.faction === "string"
+	&& typeof payload.avatar === "string"
+	&& checkAvatar(payload.faction, payload.avatar);
 	if (!isValid)
 		return false
 	return true
@@ -38,4 +41,23 @@ export function validateSocketEvent(socket: Socket, eventName: string, payload: 
 	if (!validator)
 		return false
 	return validator(payload)
+}
+
+export function checkAvatar(faction: string, avatar: string) : boolean {
+	if (faction === "marine") {
+		const isMarineValid = 
+			avatar === "garp" || avatar === "smoker" || avatar === "tashigi" ||
+			avatar === "koby" || avatar === "aokiji" || avatar === "kizaru" ||
+			avatar === "akainu" || avatar === "fujitora" || avatar === "sengoku" ||
+			avatar === "ryokugyu";
+		return isMarineValid;
+	} else if (faction === "pirate") {
+		const isPirateValid = 
+			avatar === "luffy" || avatar === "zoro" || avatar === "nami" ||
+			avatar === "usopp" || avatar === "sanji" || avatar === "chopper" ||
+			avatar === "robin" || avatar === "franky" || avatar === "brook" ||
+			avatar === "jinbei";
+		return isPirateValid;
+	}
+	return false;
 }
