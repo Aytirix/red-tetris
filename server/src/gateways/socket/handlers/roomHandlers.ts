@@ -19,9 +19,15 @@ export async function handlerRoomJoin(socket: Socket, payload: unknown): Promise
 	const room = roomSocketStore.get(payload.roomId)
 	if (!room) {
 		const newRoom = await createRoom(socket, payload.roomId)
-		console.log("Room created: ", newRoom)
+		if (!newRoom) {
+			emitError(socket, "room:join", "Failed to create room");
+			return;
+		}
+		console.log("Room created: ")
+		emitRoomJoined(socket, newRoom)
 	}
-	else
-		//join
-	emitRoomJoined(socket, room)
+	else {
+		// TODO: join existing room - add player to room
+		emitRoomJoined(socket, room)
+	}
 }

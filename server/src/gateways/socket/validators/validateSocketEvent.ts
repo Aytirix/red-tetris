@@ -12,8 +12,7 @@ export function validateRegister(
 	const isValid =
 	typeof payload === "object"
 	&& payload !== null
-	&& Object.keys(payload).length === 3
-	&& "username" in payload
+	&& Object.keys(payload).length === 2
 	&& "faction" in payload
 	&& "avatar" in payload
 	if (!isValid)
