@@ -25,6 +25,7 @@ export default function DashboardPage() {
 	const [hideUI, setHideUI] = useState(false);
 	const [view, setView] = useState<View>("home");
 	const [rooms, setRooms] = useState<RoomInfo[]>([]);
+	const [roomsLoading, setRoomsLoading] = useState(true);
 	const [roomName, setRoomName] = useState("");
 
 	const username = localStorage.getItem("username") ?? "";
@@ -32,17 +33,29 @@ export default function DashboardPage() {
 	useEffect(() => {
 		if (view !== "multiplayer") return;
 
+		setRoomsLoading(true);
+
 		function handleRoomList(data: unknown) {
-			if (Array.isArray(data)) setRooms(data as RoomInfo[]);
+			if (Array.isArray(data)) {
+				setRooms(data as RoomInfo[]);
+				setRoomsLoading(false);
+			}
 		}
 
 		socket.on("room:list", handleRoomList);
 		emitSubscribeRooms();
 
+		function handleUnload() {
+			emitUnsubscribeRooms();
+		}
+		window.addEventListener("beforeunload", handleUnload);
+
 		return () => {
+			window.removeEventListener("beforeunload", handleUnload);
 			socket.off("room:list", handleRoomList);
 			emitUnsubscribeRooms();
 			setRooms([]);
+			setRoomsLoading(true);
 		};
 	}, [view, socket]);
 
@@ -135,10 +148,14 @@ export default function DashboardPage() {
 						<div className={styles.roomListSection}>
 							<p className={styles.sectionLabel}>Salles disponibles</p>
 							<div className={styles.roomList}>
-								{rooms.length === 0 ? (
+								{roomsLoading ? (
 									<div className={styles.emptyRooms}>
 										<ClipLoader color="var(--color-secondary)" size={14} />
 										<span style={{ marginLeft: "0.5rem" }}>Recherche de salles…</span>
+									</div>
+								) : rooms.length === 0 ? (
+									<div className={styles.emptyRooms}>
+										<span>Aucune salle disponible</span>
 									</div>
 								) : (
 									rooms.map(room => (
@@ -147,14 +164,13 @@ export default function DashboardPage() {
 											<span className={styles.roomMeta}>
 												{room.playerCount}
 												{room.maxPlayers ? `/${room.maxPlayers}` : ""}
-												{" "}joueur{room.playerCount !== 1 ? "s" : ""}
 											</span>
 											{room.mode && (
 												<span className="badge">{room.mode}</span>
 											)}
 											<button
 												className="button button-outline"
-												style={{ padding: "0.35rem 0.75rem", fontSize: "0.82rem" }}
+												style={{ padding: "0.35rem 0.75rem", fontSize: "0.82rem", flexShrink: 0 }}
 												onClick={() => handleJoinRoom(room.roomId)}
 											>
 												Rejoindre

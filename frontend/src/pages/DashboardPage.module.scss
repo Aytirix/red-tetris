@@ -39,7 +39,7 @@
 	position: absolute;
 	bottom: 12vh;
 	left: max(3vw, 2rem);
-	width: min(380px, 92vw);
+	width: min(480px, 92vw);
 	padding: 1rem;
 	border: 1px solid var(--color-glass-border);
 	border-radius: var(--radius-card);
@@ -153,6 +153,7 @@
 }
 
 .roomMeta {
+	flex-shrink: 0;
 	font-size: 0.78rem;
 	color: var(--color-text-muted-on-dark);
 	white-space: nowrap;
