@@ -62,6 +62,7 @@ export class Room {
 		);
 		if (!playerToRemove)
 			return false;
+		
 		return this.removePlayer(playerToRemove);
 	}
 	reassignHost(player: Player) : void {
