@@ -23,7 +23,8 @@ export async function handlerRoomJoin(socket: Socket, payload: unknown): Promise
 			emitError(socket, "room:join", "Failed to create room");
 			return;
 		}
-		console.log("Room created: ")
+		console.log("Room created: ", newRoom.name)
+		roomSocketStore.set(payload.roomId, newRoom)
 		emitRoomJoined(socket, newRoom)
 	}
 	else {
