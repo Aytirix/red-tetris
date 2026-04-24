@@ -8,8 +8,8 @@ import type { GameAction } from "./hands_detector";
 const COLS = 10;
 const ROWS = 20;
 const CELL = 28;
-const CAMERA_WIDTH = 480;
-const CAMERA_HEIGHT = 360;
+const CAMERA_WIDTH = 640;
+const CAMERA_HEIGHT = 480;
 
 type PieceId = "I" | "O" | "T" | "S" | "Z" | "J" | "L";
 

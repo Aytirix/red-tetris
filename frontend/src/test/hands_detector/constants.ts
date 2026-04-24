@@ -8,13 +8,16 @@ export const HAND_LANDMARKER_MODEL_URL =
 
 export const WEBCAM_CONSTRAINTS: MediaStreamConstraints = {
 	video: {
-		width: { ideal: 320, max: 640 },
-		height: { ideal: 240, max: 480 },
-		frameRate: { ideal: 60, max: 60 },
+		width: { ideal: 320, max: 480 },
+		height: { ideal: 240, max: 360 },
+		frameRate: { ideal: 30, max: 30 },
 		facingMode: "user",
 	},
 	audio: false,
 };
+
+export const HAND_DETECTION_FPS = 24;
+export const HAND_DEBUG_RENDER_FPS = 12;
 
 // Fist detection: ratio of (tip→wrist) / (mcp→wrist). Below => curled.
 // Strict: 0.85 avoids counting half-curled fingers during transitions.
