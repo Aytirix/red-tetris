@@ -1,10 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import type { RefObject } from "react";
-import { flushSync } from "react-dom";
 import type { HandLandmarker, HandLandmarkerResult } from "@mediapipe/tasks-vision";
 
 import type { GameAction } from "./actions";
 import { applyCooldowns } from "./actions";
+import {
+	HAND_DEBUG_RENDER_FPS,
+	HAND_DETECTION_FPS,
+} from "./constants";
 import { analyzeHand } from "./gestures";
 import type { HandGesture, Handedness, HandLandmarks } from "./gestures";
 import { createHandLandmarker } from "./landmarker";
@@ -31,6 +34,9 @@ export type UseHandsControllerResult = {
 	error: string | null;
 	hands: DetectedHand[];
 };
+
+const HAND_DETECTION_INTERVAL_MS = 1000 / HAND_DETECTION_FPS;
+const HAND_DEBUG_RENDER_INTERVAL_MS = 1000 / HAND_DEBUG_RENDER_FPS;
 
 function extractHands(result: HandLandmarkerResult): DetectedHand[] {
 	const out: DetectedHand[] = [];
@@ -66,6 +72,8 @@ export function useHandsController(
 		let landmarker: HandLandmarker | null = null;
 		let rafId = 0;
 		let lastVideoTime = -1;
+		let lastDetectionAt = 0;
+		let lastDebugRenderAt = 0;
 		let lastFiredAt: Partial<Record<GameAction, number>> = {};
 		let motionState: MotionState = createMotionState();
 
@@ -88,14 +96,19 @@ export function useHandsController(
 				const loop = (now: number) => {
 					if (cancelled || !landmarker || !video) return;
 					if (video.readyState >= 2) {
-						if (video.currentTime === lastVideoTime) {
+						const shouldDetect =
+							now - lastDetectionAt >= HAND_DETECTION_INTERVAL_MS &&
+							video.currentTime !== lastVideoTime;
+
+						if (!shouldDetect) {
 							rafId = requestAnimationFrame(loop);
 							return;
 						}
+						lastDetectionAt = now;
 						lastVideoTime = video.currentTime;
+
 						const result = landmarker.detectForVideo(video, now);
 						const detected = extractHands(result);
-						flushSync(() => setHands(detected));
 						const { actions, next: nextMotionState } = detectMotionActions(
 							detected,
 							motionState,
@@ -109,6 +122,11 @@ export function useHandsController(
 						);
 						lastFiredAt = nextFired;
 						for (const a of fired) onActionRef.current(a);
+
+						if (now - lastDebugRenderAt >= HAND_DEBUG_RENDER_INTERVAL_MS) {
+							lastDebugRenderAt = now;
+							setHands(detected);
+						}
 					}
 					rafId = requestAnimationFrame(loop);
 				};
