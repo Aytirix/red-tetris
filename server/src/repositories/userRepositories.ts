@@ -12,14 +12,15 @@ export async function findUserByUsername(username: string) : Promise<User | null
 }
 
 export async function postUsername(socket: Socket, faction: Faction, avatar: string) : Promise<User> {
-	const username = userSocketStore.get(socket.id)
-	if (!username)
-		throw new Error("Username not found for this socket")
+	const session = userSocketStore.get(socket.id);
+	if (!session || !session.username) {
+		throw new Error("Username not found for this socket");
+	}
 	return await prisma.user.create({
-		data: {
-			username: username,
-			faction: faction,
-			avatar: avatar
-		}
-	})
+	data: {
+		username: session.username,
+		faction,
+		avatar,
+	},
+	});
 }

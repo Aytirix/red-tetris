@@ -26,3 +26,12 @@ export function removePlayer(socket: Socket): void {
 				return
 	}
 }
+
+export function getRoom(socket: Socket) : Room | null {
+	for (const room of roomSocketStore.values()) {
+		if (room.getPlayers().some((player) => player.getSocketId() === socket.id)) {
+			return room
+		}
+	}
+	return null
+}
