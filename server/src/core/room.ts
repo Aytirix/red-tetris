@@ -6,6 +6,7 @@ export class Room {
 	private players: Player[];
 	private hostPlayerId: string | null ;
 	private status: "waiting" | "playing" | "finished" ;
+	private mode: "Classique" | "Ultra" | "Sprint";
 	private game: Game | null;
 	constructor (name: string) {
 		this.name = name;
@@ -13,6 +14,7 @@ export class Room {
 		this.hostPlayerId = null;
 		this.status = "waiting";
 		this.game = null;
+		this.mode = "Classique"
 	}
 	canJoin() : boolean {
 		return this.status === "waiting"
@@ -36,6 +38,12 @@ export class Room {
 	}
 	getHostId() : string | null {
 		return this.hostPlayerId
+	}
+	getMode() : string {
+		return this.mode
+	}
+	countPlayer() : number {
+		return this.players.length
 	}
 	removePlayer(playerToRemove: Player): boolean {
 		const index = this.players.findIndex((currentPlayer) =>
