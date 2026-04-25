@@ -1,6 +1,6 @@
 import type { Socket } from "socket.io";
 
-export const userSocketStore = new Map<string, {username: string | null, subscribe: boolean}>();
+export const userSocketStore = new Map<string, {username: string | null, subscribe: boolean, socket: Socket}>();
 
 export function isUsernameTaken(
 	userSocketStore: Map<string, {username: string | null; subscribe: boolean}>,
