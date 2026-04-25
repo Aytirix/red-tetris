@@ -3,7 +3,7 @@ import { isValidRoomJoinPayload, isValidRoomName } from "../validators/validateR
 import { emitError } from "../emitters/systemEmitters.js";
 import { roomSocketStore } from "../roomSocketStore.js";
 import { createRoom, getRoom } from "../../../services/roomService.js";
-import { emitRoomJoined } from "../emitters/roomEmitters.js";
+import { emitRoomJoined, emitSubscrib } from "../emitters/roomEmitters.js";
 import { userSocketStore } from "../userSocketStore.js";
 
 export async function handlerRoomJoin(socket: Socket, payload: unknown): Promise<void> {
@@ -38,13 +38,14 @@ export function handlerRoomSubscribe(socket: Socket, payload: unknown) : void {
 		const session = userSocketStore.get(socket.id)
 		if (session)
 			session.subscribe = true;
-		socket.emit("room:list", Array.from(roomSocketStore.values()).map((room) => ({
-				roomId: room.name,
-				playerCount: room.countPlayer(),
-				maxPlayers: 4,
-				mode: room.getMode(),
-			})),
-		);
+		emitSubscrib();
 	}
+}
 
+export function handlerRoomUnsubscrib(socket: Socket, payload: unknown) : void {
+	if (!payload) {
+		const session = userSocketStore.get(socket.id)
+		if (session)
+			session.subscribe = false
+	}
 }
