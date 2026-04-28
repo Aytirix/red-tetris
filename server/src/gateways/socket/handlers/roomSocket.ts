@@ -1,5 +1,5 @@
 import type { Socket } from "socket.io";
-import { handlerRoomJoin, handlerRoomSubscribe } from "./roomHandlers.js";
+import { handleRoomKick, handleRoomMode, handleRoomSetPrivate, handlerRoomJoin, handlerRoomLeave, handlerRoomSubscribe, handlerRoomUnsubscribe} from "./roomHandlers.js";
 
 
 export function registerRoomSocket(socket: Socket) : void {
@@ -10,13 +10,20 @@ export function registerRoomSocket(socket: Socket) : void {
 		handlerRoomSubscribe(socket, msg)
 	})
 	socket.on("room:unsubscribeList", (msg) => {
-		handlerRoomUnsubscrib(socket, msg)
+		handlerRoomUnsubscribe(socket, msg)
 	})
-	// socket.on("room:leave")
-	// socket.on("room:kick")
-	// socket.on("room:setMode")
-	// socket.on("room:setPrivate")
+	socket.on("room:leave", (msg) => {
+		handlerRoomLeave(socket, msg)
+	})
+	socket.on("room:kick", (msg) => {
+		handleRoomKick(socket, msg)
+	})
+	socket.on("room:setMode", (msg) => {
+		handleRoomMode(socket, msg)
+	})
+	socket.on("room:setPrivate", (msg) => {
+		handleRoomSetPrivate(socket, msg)
+	})
 	// socket.on("room:start")
-	// socket.on("room:unsubscribeList")
 }
 
