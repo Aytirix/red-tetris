@@ -5,7 +5,11 @@ import { emitUsernameAvailable } from "../gateways/socket/emitters/userEmitters.
 
 export async function checkUsernameAvailability(socket: Socket, username: string): Promise<void> {
 	const user = await findUserByUsername(username);
-	userSocketStore.set(socket.id, username);
+	  userSocketStore.set(socket.id, {
+			username,
+			subscribe: false,
+			socket: socket,
+		});
 
 	if (!user) {
 		emitUsernameAvailable(socket, username, null)

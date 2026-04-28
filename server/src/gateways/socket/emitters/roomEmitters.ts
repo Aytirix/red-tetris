@@ -1,7 +1,10 @@
 import type { Socket } from "socket.io";
 import type { Room } from "../../../core/room.js";
 import type { RoomJoinedPayload } from "../../../types/socket/roomSocketTypes.js";
-import { Player } from "../../../core/Player.js";
+import { roomSocketStore } from "../roomSocketStore.js";
+import { userSocketStore } from "../userSocketStore.js";
+import type { Player } from "../../../core/Player.js";
+
 export function emitRoomJoined(socket: Socket, room: Room) : void {
 	const payload: RoomJoinedPayload = {
 		roomId: room.name,
@@ -11,6 +14,40 @@ export function emitRoomJoined(socket: Socket, room: Room) : void {
 			faction: player.getFaction(),
 		})),
 	}
-	console.log("emit")
 	socket.emit("room:joined", payload)
+	emitSubscrib()
+}
+
+export function emitSubscrib() : void {
+	for (const [socket, objet] of userSocketStore) {
+		if (objet.subscribe) {
+			const roomList = Array.from(roomSocketStore.values()).map((room) => ({
+					roomId: room.name,
+					playerCount: room.countPlayer(),
+					maxPlayers: 4,
+					mode: room.getMode(),
+				}))
+			objet.socket.emit("room:list", roomList);// checker dans room 
+		}
+	}
+}
+
+export function emitPlayersRoom(players: Player[]) : void {
+	const playerNames = players.map((player) => player.getName())
+	for (const player of players) {
+		const socket = player.getSocket()
+		socket.emit("room:players", playerNames)
+	}
+}
+
+export function emitRoomSettings(room: Room) : void {
+	const statRoom = room.getPrivate()
+	const mode = room.getMode()
+	const players = room.getPlayers()
+	for (const player of players) {
+		player.getSocket().emit("room:settings", {
+			"mode": mode,
+			"private": statRoom
+		})
+	}
 }
