@@ -8,6 +8,7 @@ export async function checkUsernameAvailability(socket: Socket, username: string
 	  userSocketStore.set(socket.id, {
 			username,
 			subscribe: false,
+			socket: socket,
 		});
 
 	if (!user) {
