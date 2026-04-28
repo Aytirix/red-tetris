@@ -18,11 +18,20 @@ export async function createRoom(socket: Socket, roomName: string): Promise <Roo
 
 export function removePlayer(socket: Socket): void {
 	const user = userSocketStore.get(socket.id);
+	console.log(user)
 	if (!user)
 		return;
+	for (const room of roomSocketStore.values()) {
+			if (room.removePlayerBySocketId(socket.id))
+				return
+	}
+}
 
-	const room = roomSocketStore.get(user);
-	if (!room)
-		return;
-	room.removePlayerBySocketId(socket.id);
+export function getRoom(socket: Socket) : Room | null {
+	for (const room of roomSocketStore.values()) {
+		if (room.getPlayers().some((player) => player.getSocketId() === socket.id)) {
+			return room
+		}
+	}
+	return null
 }

@@ -14,6 +14,6 @@ export async function createPlayer(socket: Socket) : Promise<Player | null> {
 	})
 	if (!user || !user.faction)
 		return null
-	const newPlayer = new Player(name, socket.id, user.avatar, user.faction);
+	const newPlayer = new Player(name, socket, user.avatar, user.faction);
 	return newPlayer
 }
