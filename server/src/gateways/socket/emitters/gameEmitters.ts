@@ -24,3 +24,9 @@ export function emitGameStart(state: Map<string, PlayerGameState>, game: Game) :
 	}
 }
 
+export function emitGameUpdate(playerState: PlayerGameState) : void {
+	const socket = playerState.player.getSocket()
+	socket.emit("game:update", {
+		
+	})
+}

@@ -7,7 +7,7 @@ export class Room {
 	private players: Player[];
 	private hostPlayerId: string | null ;
 	private status: "waiting" | "playing" | "finished" ;
-	private mode: "Classique" | "Ultra" | "Sprint";
+	private mode: "classique" | "ultra" | "sprint";
 	private visibility: boolean;
 	private game: Game | null;
 	constructor (name: string) {
@@ -17,7 +17,7 @@ export class Room {
 		this.status = "waiting";
 		this.visibility = false;
 		this.game = null;
-		this.mode = "Classique"
+		this.mode = "classique"
 	}
 	addPlayer(player: Player) : boolean {
 		if (!this.canJoin())
@@ -36,7 +36,7 @@ export class Room {
 	setMode(mode: string, socket: Socket) : boolean {
 		if (socket.id !== this.hostPlayerId)
 			return false
-		if (mode !== "Classique" && mode !== "Ultra" && mode !== "Sprint")
+		if (mode !== "classique" && mode !== "ultra" && mode !== "sprint")
 			return false
 		this.mode = mode
 		return true
@@ -63,7 +63,7 @@ export class Room {
 	getHostId() : string | null {
 		return this.hostPlayerId
 	}
-	getMode() : "Classique" | "Ultra" | "Sprint" {
+	getMode() : "classique" | "ultra" | "sprint" {
 		return this.mode
 	}
 	countPlayer() : number {

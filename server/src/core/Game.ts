@@ -5,11 +5,11 @@ import { emitGameStart } from "../gateways/socket/emitters/gameEmitters.js";
 import { Piece } from "./Piece.js";
 
 export class Game {
-	public mode: "Classique" | "Ultra" | "Sprint"
+	public mode: "classique" | "ultra" | "sprint"
 	public players: Player[];
 	private state: Map<string, PlayerGameState>;
 	private pieceQueue: PieceType[];
-	constructor (mode: "Classique" | "Ultra" | "Sprint", players: Player[]) {
+	constructor (mode: "classique" | "ultra" | "sprint", players: Player[]) {
 		this.mode = mode;
 		this.players = players;
 		this.state = new Map()
@@ -65,6 +65,11 @@ export class Game {
 		playerStat.nextPiece = new Piece(nextShape, nextType)
 	}
 	tick() : void {
-
+		for (const [, playerState] of this.state) {
+			if (!playerState.isAlive)
+				break
+			const currentPiece = playerState.currentPiece
+			currentPiece?.moveDown
+		}
 	}
 }
