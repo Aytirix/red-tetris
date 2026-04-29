@@ -30,6 +30,9 @@ export class Room {
 	canJoin() : boolean {
 		return this.status === "waiting"
 	}
+	setStatus(status: "waiting" | "playing" | "finished") : void {
+		this.status = status
+	}
 	setMode(mode: string, socket: Socket) : boolean {
 		if (socket.id !== this.hostPlayerId)
 			return false
@@ -60,7 +63,7 @@ export class Room {
 	getHostId() : string | null {
 		return this.hostPlayerId
 	}
-	getMode() : string {
+	getMode() : "Classique" | "Ultra" | "Sprint" {
 		return this.mode
 	}
 	countPlayer() : number {

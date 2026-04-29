@@ -5,6 +5,7 @@ import { roomSocketStore } from "../roomSocketStore.js";
 import { createRoom, getRoom } from "../../../services/roomService.js";
 import { emitPlayersRoom, emitRoomJoined, emitRoomSettings, emitSubscrib } from "../emitters/roomEmitters.js";
 import { userSocketStore } from "../userSocketStore.js";
+import { Game } from "../../../core/Game.js";
 
 export async function handlerRoomJoin(socket: Socket, payload: unknown): Promise<void> {
 	if (!isValidRoomJoinPayload(payload)) {
@@ -122,4 +123,19 @@ export function handleRoomSetPrivate(socket: Socket, payload: unknown) : void {
 		return;
 	}
 	emitRoomSettings(room)
+}
+
+export function handleRoomStart(socket: Socket, payload: unknown) : void {
+	if (!payload) {
+		const room = getRoom(socket)
+		if (!room)
+			return
+		const mode = room.getMode()
+		const players = room.getPlayers()
+		const game = new Game(mode, players)
+		if (socket.id === room.getHostId()) {
+			room.setStatus("playing")
+			game.start()
+		}
+	}
 }
