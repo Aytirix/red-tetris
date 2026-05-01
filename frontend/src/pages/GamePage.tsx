@@ -4,11 +4,23 @@ import { ClipLoader } from "react-spinners";
 import { useSocket } from "../contexts/SocketContext";
 import { useWsSession } from "../contexts/WsStateContext";
 import { normalizeUsernameAvailability } from "../socket/userState";
-import { emitJoinRoom, emitLeaveRoom, emitKickPlayer, emitStartGame, emitSetGameMode, emitSetPrivate } from "../socket/events/room";
+import {
+	emitJoinRoom,
+	emitLeaveRoom,
+	emitKickPlayer,
+	emitStartGame,
+	emitSetGameMode,
+	emitSetPrivate,
+} from "../socket/events/room";
+import { emitSubscribeSpectator, emitUnsubscribeSpectator } from "../socket/events/game";
+import { normalizeGameOver, normalizeGameState } from "../socket/gameState";
+import type { GameOverPayload, GameStatePayload } from "../types/game";
+import GameView from "../components/game/GameView";
+import GameOverView from "../components/game/GameOverView";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-type GameView = "lobby" | "game" | "gameover";
+type GameViewMode = "connecting" | "lobby" | "game" | "gameover";
 
 const GAME_MODES = [
 	{ id: "classic", label: "Classique" },
@@ -51,7 +63,6 @@ function LobbyView({
 	return (
 		<div className="game-lobby">
 			<div className="game-lobby__card" aria-busy={isRoomLoading}>
-				{/* ── Header ── */}
 				<header className="game-lobby__header">
 					<div className="game-lobby__header-left">
 						<span className="eyebrow">Salle</span>
@@ -72,7 +83,6 @@ function LobbyView({
 					</div>
 				</header>
 
-				{/* ── Player list ── */}
 				<ul className="game-lobby__player-list" aria-busy={isRoomLoading}>
 					{players.map((p, i) => {
 						const isMe = p.username === playerName;
@@ -143,7 +153,6 @@ function LobbyView({
 					)}
 				</ul>
 
-				{/* ── Settings ── */}
 				<div className={`game-lobby__settings${isRoomLoading ? " game-lobby__settings--loading" : ""}`}>
 					<div className="game-lobby__setting">
 						<span className="game-lobby__setting-label">Mode de jeu</span>
@@ -173,7 +182,6 @@ function LobbyView({
 					</div>
 				</div>
 
-				{/* ── Footer actions ── */}
 				<footer className="game-lobby__footer">
 					{isRoomLoading ? (
 						<div className="game-lobby__waiting-hint">
@@ -202,49 +210,6 @@ function LobbyView({
 	);
 }
 
-// ─── Game ────────────────────────────────────────────────────────────────────
-
-function GameView({ playerName }: { playerName: string }) {
-	return (
-		<div className="game-board">
-			<header className="game-board__header">
-				<span className="eyebrow">{playerName}</span>
-			</header>
-			<div className="game-board__area">
-				<div className="game-board__grid">
-					{/* Tetris grid — à implémenter */}
-					{Array.from({ length: 20 }).map((_, row) => (
-						<div key={row} className="game-board__row">
-							{Array.from({ length: 10 }).map((_, col) => (
-								<div key={col} className="game-board__cell" />
-							))}
-						</div>
-					))}
-				</div>
-			</div>
-		</div>
-	);
-}
-
-// ─── Game Over ────────────────────────────────────────────────────────────────
-
-function GameOverView({ onLeave }: { onLeave: () => void }) {
-	return (
-		<div className="game-over">
-			<h1 className="game-over__title">Game Over</h1>
-			<p className="game-over__subtitle">La partie est terminée.</p>
-			<div className="game-over__actions">
-				<button className="button button-primary">
-					Rejouer
-				</button>
-				<button className="button button-ghost" onClick={onLeave}>
-					Quitter
-				</button>
-			</div>
-		</div>
-	);
-}
-
 // ─── GamePage ─────────────────────────────────────────────────────────────────
 
 const MAX_NAME_LENGTH = 15;
@@ -254,27 +219,28 @@ export default function GamePage() {
 	const { socket } = useSocket();
 	const session = useWsSession();
 	const navigate = useNavigate();
-	const [view, setView] = useState<GameView>("lobby");
+	const [view, setView] = useState<GameViewMode>("connecting");
 	const [players, setPlayers] = useState<RoomPlayer[]>([]);
 	const [gameMode, setGameMode] = useState("classic");
 	const [isPrivate, setIsPrivate] = useState(false);
 	const [isRoomLoading, setIsRoomLoading] = useState(true);
+	const [gameState, setGameState] = useState<GameStatePayload | null>(null);
+	const [gameOver, setGameOver] = useState<GameOverPayload | null>(null);
 
 	const roomName = rawRoom.slice(0, MAX_NAME_LENGTH);
 
-	// Redirect to truncated URL if room name exceeded the limit
 	useEffect(() => {
 		if (rawRoom !== roomName) {
 			navigate(`/${roomName}/${playerName}`, { replace: true });
 		}
 	}, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-	// Keep stable refs for use in socket callbacks
 	const rawRoomRef = useRef(rawRoom);
 	const roomNameRef = useRef(roomName);
 	const playerNameRef = useRef(playerName);
 	const hasJoinedRoomRef = useRef(false);
 	const hasLeftRoomRef = useRef(false);
+	const isSpectatorRef = useRef(false);
 	useEffect(() => { rawRoomRef.current = rawRoom; }, [rawRoom]);
 	useEffect(() => { roomNameRef.current = roomName; }, [roomName]);
 	useEffect(() => { playerNameRef.current = playerName; }, [playerName]);
@@ -293,13 +259,14 @@ export default function GamePage() {
 		if (hasLeftRoomRef.current) return;
 
 		hasLeftRoomRef.current = true;
-		if (roomNameRef.current) {
+		if (isSpectatorRef.current) {
+			emitUnsubscribeSpectator();
+		} else if (roomNameRef.current) {
 			emitLeaveRoom();
 		}
 		hasJoinedRoomRef.current = false;
 	}, []);
 
-	// Auth result → join room if OK (redirect is handled by useAuthGuard on failure)
 	useEffect(() => {
 		function handleAuthResult(data: unknown) {
 			const result = normalizeUsernameAvailability(data);
@@ -313,7 +280,6 @@ export default function GamePage() {
 		return () => { socket.off("user:ResultUsernameAvailable", handleAuthResult); };
 	}, [socket, joinRoomOnce]);
 
-	// Room page lifecycle: join after the username session is confirmed, leave on any exit.
 	useEffect(() => {
 		if (rawRoom !== roomName) return;
 		const username = playerName.trim();
@@ -321,9 +287,12 @@ export default function GamePage() {
 
 		hasJoinedRoomRef.current = false;
 		hasLeftRoomRef.current = false;
-		setView("lobby");
+		isSpectatorRef.current = false;
+		setView("connecting");
 		setPlayers([]);
 		setIsRoomLoading(true);
+		setGameState(null);
+		setGameOver(null);
 
 		function handlePageExit() {
 			leaveRoomOnce();
@@ -339,8 +308,6 @@ export default function GamePage() {
 		};
 	}, [rawRoom, roomName, playerName, leaveRoomOnce]);
 
-	// The auth check is emitted elsewhere. Join once that check is valid for this
-	// URL user, including the freshly registered case confirmed by ResultRegister.
 	useEffect(() => {
 		if (rawRoom !== roomName) return;
 		const username = playerName.trim();
@@ -354,7 +321,7 @@ export default function GamePage() {
 		joinRoomOnce();
 	}, [rawRoom, roomName, playerName, session.faction, session.lastUsernameAvailability, joinRoomOnce]);
 
-	// Room events
+	// Room events — including spectator detection on room:joined { joined: false }
 	useEffect(() => {
 		type RawPlayer = { username: string; avatar?: string; faction?: string };
 
@@ -364,10 +331,19 @@ export default function GamePage() {
 		}
 
 		function handleRoomJoined(room: unknown) {
-			const r = room as { players?: RawPlayer[] } | null;
+			const r = room as { players?: RawPlayer[]; joined?: boolean } | null;
 			if (r?.players) setPlayers(r.players.map(parsePlayer));
 			setIsRoomLoading(false);
-			setView("lobby");
+
+			if (r && r.joined === false) {
+				// Game already running → become spectator on first available player
+				isSpectatorRef.current = true;
+				emitSubscribeSpectator(roomNameRef.current, null);
+				setView("game");
+			} else {
+				isSpectatorRef.current = false;
+				setView("lobby");
+			}
 		}
 		function handleRoomPlayers(data: unknown) {
 			const list = data as RawPlayer[] | null;
@@ -384,7 +360,6 @@ export default function GamePage() {
 		};
 	}, [socket]);
 
-	// Room settings
 	useEffect(() => {
 		function handleSettings(data: unknown) {
 			const s = data as { mode?: string; private?: boolean } | null;
@@ -396,15 +371,30 @@ export default function GamePage() {
 		return () => { socket.off("room:settings", handleSettings); };
 	}, [socket]);
 
-	// Game events
+	// Game state events
 	useEffect(() => {
-		function handleGameStart() { setView("game"); }
-		function handleGameOver() { setView("gameover"); }
-		socket.on("game:start", handleGameStart);
-		socket.on("game:over", handleGameOver);
+		function handleStateUpdate(raw: unknown) {
+			const next = normalizeGameState(raw);
+			if (!next) return;
+			isSpectatorRef.current = next.spectator !== false;
+			setGameState(next);
+			setGameOver(null);
+			setView("game");
+		}
+		function handleOver(raw: unknown) {
+			const payload = normalizeGameOver(raw);
+			setGameOver(payload);
+			setView("gameover");
+		}
+		socket.on("game:start", handleStateUpdate);
+		socket.on("game:update", handleStateUpdate);
+		socket.on("game:SpectatorGame", handleStateUpdate);
+		socket.on("game:over", handleOver);
 		return () => {
-			socket.off("game:start", handleGameStart);
-			socket.off("game:over", handleGameOver);
+			socket.off("game:start", handleStateUpdate);
+			socket.off("game:update", handleStateUpdate);
+			socket.off("game:SpectatorGame", handleStateUpdate);
+			socket.off("game:over", handleOver);
 		};
 	}, [socket]);
 
@@ -415,6 +405,14 @@ export default function GamePage() {
 
 	return (
 		<div className="game-page">
+			{view === "connecting" && (
+				<div className="tetris-stage tetris-stage--waiting">
+					<div className="tetris-stage__waiting">
+						<ClipLoader color="var(--color-secondary)" size={26} />
+						<span>Connexion à la room…</span>
+					</div>
+				</div>
+			)}
 			{view === "lobby" && (
 				<LobbyView
 					roomName={roomName}
@@ -426,11 +424,27 @@ export default function GamePage() {
 					onLeave={handleLeave}
 				/>
 			)}
-			{view === "game" && (
-				<GameView playerName={playerName} />
+			{view === "game" && gameState && (
+				<GameView
+					state={gameState}
+					roomName={roomName}
+					playerName={playerName}
+				/>
+			)}
+			{view === "game" && !gameState && (
+				<div className="tetris-stage tetris-stage--waiting">
+					<div className="tetris-stage__waiting">
+						<ClipLoader color="var(--color-secondary)" size={26} />
+						<span>Chargement de la partie…</span>
+					</div>
+				</div>
 			)}
 			{view === "gameover" && (
-				<GameOverView onLeave={handleLeave} />
+				<GameOverView
+					payload={gameOver}
+					playerName={playerName}
+					onLeave={handleLeave}
+				/>
 			)}
 		</div>
 	);

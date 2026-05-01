@@ -30,3 +30,11 @@ export function emitGameRotate() {
 export function emitGameDrop() {
 	socket.emit("game:drop");
 }
+
+export function emitSubscribeSpectator(roomId: string, user: string | null) {
+	socket.emit("game:subscribeSpectatorGame", { roomId, user });
+}
+
+export function emitUnsubscribeSpectator() {
+	socket.emit("game:unsubscribeSpectatorGame", {});
+}
