@@ -26,6 +26,13 @@ type RegisterResultPayload = {
 	message: string | null;
 };
 
+const USERNAME_ALLOWED_CHARS_REGEX = /[^a-zA-Z0-9_]/g;
+const USERNAME_MAX_LENGTH = 15;
+
+function sanitizeUsernameInput(value: string): string {
+	return value.replace(USERNAME_ALLOWED_CHARS_REGEX, "").slice(0, USERNAME_MAX_LENGTH);
+}
+
 const FACTIONS: Record<Faction, FactionData> = {
 	pirate: {
 		label: "Pirate",
@@ -389,9 +396,9 @@ function UsernameStep({ username, setUsername, checkState, isRegistered, onConfi
 					<input
 						type="text"
 						value={username}
-						onChange={(e) => setUsername(e.target.value)}
+						onChange={(e) => setUsername(sanitizeUsernameInput(e.target.value))}
 						placeholder="Votre pseudo…"
-						maxLength={15}
+						maxLength={USERNAME_MAX_LENGTH}
 						autoComplete="off"
 						spellCheck={false}
 						style={{
