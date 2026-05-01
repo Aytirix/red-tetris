@@ -139,7 +139,7 @@
     "description": "Déplace la pièce courante horizontalement ou vers le bas.",
     "payload": "{\n  \"direction\": \"left\"\n}",
     "payloadDescription": "direction : \"left\" | \"right\" | \"down\"",
-    "response": "{\n  \"board\": [\n    [\n      0,\n      0,\n      0,\n      0,\n      0,\n      0,\n      0,\n      0,\n      0,\n      0\n    ]\n  ],\n  \"opponents\": [\n    {\n      \"username\": \"zoro\",\n      \"board\": [\n        [\n          0,\n          0,\n          0,\n          0,\n          0,\n          0,\n          0,\n          0,\n          0,\n          0\n        ]\n      ]\n    }\n  ],\n  \"currentPiece\": {\n    \"type\": \"T\"\n  },\n  \"nextPiece\": {\n    \"type\": \"I\"\n  },\n  \"score\": 0,\n  \"level\": 1,\n  \"lines\": 0,\n  \"isSpectator\": true | false\n}",
+    "response": "{\n  \"board\": [\n    [\n      0,\n      0,\n      0,\n      0,\n      0,\n      0,\n      0,\n      0,\n      0,\n      0\n    ]\n  ],\n  \"opponents\": [\n    {\n      \"username\": \"zoro\",\n      \"board\": [\n        [\n          0,\n          0,\n          0,\n          0,\n          0,\n          0,\n          0,\n          0,\n          0,\n          0\n        ]\n      ]\n    }\n  ],\n  \"currentPiece\": {\n    \"type\": \"T\"\n  },\n  \"nextPiece\": {\n    \"type\": \"I\"\n  },\n  \"score\": 0,\n  \"level\": 1,\n  \"lines\": 0,\n  \"spectator\": false | string\n}",
     "responseName": "game:update",
     "responseDescription": "Envoyé au joueur avec l'état mis à jour de son plateau."
   },
@@ -151,7 +151,7 @@
     "description": "Fait pivoter la pièce courante dans le sens horaire.",
     "payload": "{}",
     "payloadDescription": "",
-    "response": "{\n  \"board\": [\n    [\n      0,\n      0,\n      0,\n      0,\n      0,\n      0,\n      0,\n      0,\n      0,\n      0\n    ]\n  ],\n  \"opponents\": [\n    {\n      \"username\": \"zoro\",\n      \"board\": [\n        [\n          0,\n          0,\n          0,\n          0,\n          0,\n          0,\n          0,\n          0,\n          0,\n          0\n        ]\n      ]\n    }\n  ],\n  \"currentPiece\": {\n    \"type\": \"T\"\n  },\n  \"nextPiece\": {\n    \"type\": \"I\"\n  },\n  \"score\": 0,\n  \"level\": 1,\n  \"lines\": 0,\n  \"isSpectator\": true | false\n}",
+    "response": "{\n  \"board\": [\n    [\n      0,\n      0,\n      0,\n      0,\n      0,\n      0,\n      0,\n      0,\n      0,\n      0\n    ]\n  ],\n  \"opponents\": [\n    {\n      \"username\": \"zoro\",\n      \"board\": [\n        [\n          0,\n          0,\n          0,\n          0,\n          0,\n          0,\n          0,\n          0,\n          0,\n          0\n        ]\n      ]\n    }\n  ],\n  \"currentPiece\": {\n    \"type\": \"T\"\n  },\n  \"nextPiece\": {\n    \"type\": \"I\"\n  },\n  \"score\": 0,\n  \"level\": 1,\n  \"lines\": 0,\n  \"spectator\": false | string\n}",
     "responseName": "game:update",
     "responseDescription": "Envoyé au joueur avec l'état mis à jour de son plateau."
   },
@@ -163,7 +163,7 @@
     "description": "Fait tomber instantanément la pièce courante jusqu'en bas (hard drop).",
     "payload": "{}",
     "payloadDescription": "",
-    "response": "{\n  \"board\": [\n    [\n      0,\n      0,\n      0,\n      0,\n      0,\n      0,\n      0,\n      0,\n      0,\n      0\n    ]\n  ],\n  \"opponents\": [\n    {\n      \"username\": \"zoro\",\n      \"board\": [\n        [\n          0,\n          0,\n          0,\n          0,\n          0,\n          0,\n          0,\n          0,\n          0,\n          0\n        ]\n      ]\n    }\n  ],\n  \"currentPiece\": {\n    \"type\": \"T\"\n  },\n  \"nextPiece\": {\n    \"type\": \"I\"\n  },\n  \"score\": 0,\n  \"level\": 1,\n  \"lines\": 0,\n  \"isSpectator\": true | false\n}",
+    "response": "{\n  \"board\": [\n    [\n      0,\n      0,\n      0,\n      0,\n      0,\n      0,\n      0,\n      0,\n      0,\n      0\n    ]\n  ],\n  \"opponents\": [\n    {\n      \"username\": \"zoro\",\n      \"board\": [\n        [\n          0,\n          0,\n          0,\n          0,\n          0,\n          0,\n          0,\n          0,\n          0,\n          0\n        ]\n      ]\n    }\n  ],\n  \"currentPiece\": {\n    \"type\": \"T\"\n  },\n  \"nextPiece\": {\n    \"type\": \"I\"\n  },\n  \"score\": 0,\n  \"level\": 1,\n  \"lines\": 0,\n  \"spectator\": false | string\n}",
     "responseName": "game:update",
     "responseDescription": "Envoyé au joueur avec l'état mis à jour de son plateau après le drop."
   },
@@ -173,7 +173,7 @@
     "direction": "back-to-front",
     "group": "game",
     "description": "Déclenché par l'admin via room:start. Signale à tous les joueurs que la partie commence.",
-    "payload": "{\n  \"board\": [\n    [\n      0,\n      0,\n      0,\n      0,\n      0,\n      0,\n      0,\n      0,\n      0,\n      0\n    ]\n  ],\n  \"opponents\": [\n    {\n      \"username\": \"zoro\",\n      \"board\": [\n        [\n          0,\n          0,\n          0,\n          0,\n          0,\n          0,\n          0,\n          0,\n          0,\n          0\n        ]\n      ]\n    }\n  ],\n  \"currentPiece\": {\n    \"type\": \"T\"\n  },\n  \"nextPiece\": {\n    \"type\": \"I\"\n  },\n  \"score\": 0,\n  \"level\": 1,\n  \"lines\": 0,\n  \"isSpectator\": true | false\n}",
+    "payload": "{\n  boardCols: 10,\n  boardRows: 20,\n  \"board\": [\n    [\n      0,\n      0,\n      0,\n      0,\n      0,\n      0,\n      0,\n      0,\n      0,\n      0\n    ]\n  ],\n  \"opponents\": [\n    {\n      \"username\": \"zoro\",\n      \"board\": [\n        [\n          0,\n          0,\n          0,\n          0,\n          0,\n          0,\n          0,\n          0,\n          0,\n          0\n        ]\n      ]\n    }\n  ],\n  \"currentPiece\": {\n    \"type\": \"T\"\n  },\n  \"nextPiece\": {\n    \"type\": \"I\"\n  },\n  \"score\": 0,\n  \"level\": 1,\n  \"lines\": 0,\n  \"spectator\": false | string\n}",
     "payloadDescription": "État initial du plateau pour chaque joueur.\nla clef \"lines\" est le nombre de ligne en pénalité du joueur (seulement pour certains mode mais autant tout le temps l'envoyer et le laissera 0, pour \"level\" c'est pareille mais en solo",
     "response": "",
     "responseName": "",
@@ -185,7 +185,7 @@
     "direction": "back-to-front",
     "group": "game",
     "description": "Mise à jour de l'état du plateau après chaque action du joueur.",
-    "payload": "{\n  \"board\": [\n    [\n      0,\n      0,\n      0,\n      0,\n      0,\n      0,\n      0,\n      0,\n      0,\n      0\n    ]\n  ],\n  \"opponents\": [\n    {\n      \"username\": \"zoro\",\n      \"board\": [\n        [\n          0,\n          0,\n          0,\n          0,\n          0,\n          0,\n          0,\n          0,\n          0,\n          0\n        ]\n      ]\n    }\n  ],\n  \"currentPiece\": {\n    \"type\": \"T\"\n  },\n  \"nextPiece\": {\n    \"type\": \"I\"\n  },\n  \"score\": 0,\n  \"level\": 1,\n  \"lines\": 0,\n  \"isSpectator\": true | false\n}",
+    "payload": "{\n  \"board\": [\n    [\n      0,\n      0,\n      0,\n      0,\n      0,\n      0,\n      0,\n      0,\n      0,\n      0\n    ]\n  ],\n  \"opponents\": [\n    {\n      \"username\": \"zoro\",\n      \"board\": [\n        [\n          0,\n          0,\n          0,\n          0,\n          0,\n          0,\n          0,\n          0,\n          0,\n          0\n        ]\n      ]\n    }\n  ],\n  \"currentPiece\": {\n    \"type\": \"T\"\n  },\n  \"nextPiece\": {\n    \"type\": \"I\"\n  },\n  \"score\": 0,\n  \"level\": 1,\n  \"lines\": 0,\n  \"spectator\": false | string\n}",
     "payloadDescription": "Envoyé uniquement au joueur concerné.",
     "response": "",
     "responseName": "",
@@ -235,9 +235,9 @@
     "description": "",
     "payload": "{\n  \"roomId\": \"ma-room\"\n  \"user\": None | string\n}",
     "payloadDescription": "user : par défaut sera à None donc il va être en spectateur sur la 1er personne de la game, et il pourra coté frontend cliquez sur les autres personnes, dans ce cas user contiendra le username de la personne a être en spectateur.",
-    "response": "{\n  \"board\": [\n    [\n      0,\n      0,\n      0,\n      0,\n      0,\n      0,\n      0,\n      0,\n      0,\n      0\n    ]\n  ],\n  \"opponents\": [\n    {\n      \"username\": \"zoro\",\n      \"board\": [\n        [\n          0,\n          0,\n          0,\n          0,\n          0,\n          0,\n          0,\n          0,\n          0,\n          0\n        ]\n      ]\n    }\n  ],\n  \"currentPiece\": {\n    \"type\": \"T\"\n  },\n  \"nextPiece\": {\n    \"type\": \"I\"\n  },\n  \"score\": 0,\n  \"level\": 1,\n  \"lines\": 0,\n  \"isSpectator\": true | false\n}",
+    "response": "{\n  \"board\": [\n    [\n      0,\n      0,\n      0,\n      0,\n      0,\n      0,\n      0,\n      0,\n      0,\n      0\n    ]\n  ],\n  \"opponents\": [\n    {\n      \"username\": \"zoro\",\n      \"board\": [\n        [\n          0,\n          0,\n          0,\n          0,\n          0,\n          0,\n          0,\n          0,\n          0,\n          0\n        ]\n      ]\n    }\n  ],\n  \"currentPiece\": {\n    \"type\": \"T\"\n  },\n  \"nextPiece\": {\n    \"type\": \"I\"\n  },\n  \"score\": 0,\n  \"level\": 1,\n  \"lines\": 0,\n  \"spectator\": false | string\n}",
     "responseName": "game:SpectatorGame",
-    "responseDescription": ""
+    "responseDescription": "spectator : false il n'est pas en spectateur, sinon marquez le peudo de la personne qu'il est entrain de regarder"
   },
   {
     "id": "8ea73948-449a-4b01-964b-977fd37cdc7a",
