@@ -9,14 +9,16 @@ export type PieceType = "I" | "J" | "L" | "O" | "S" | "T" | "Z";
 
 export type currentPiece = {
 	type: PieceType;
-	x: number;
-	y: number;
-	rotation: number
 };
 
 export type Cell = 0 | 1 | 2;
 
 export type Board = Cell [][];
+
+export type OpponentBoard = {
+	username: string;
+	board: Board;
+};
 
 export type PlayerGameState = {
 	board: Board;
