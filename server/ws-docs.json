@@ -43,9 +43,9 @@
     "description": "Rejoint une salle existante ou en crée une nouvelle si elle n'existe pas. Le pseudo du joueur est récupéré depuis la session socket.",
     "payload": "{\n  \"roomId\": \"ma-room\"\n}",
     "payloadDescription": "roomId : identifiant de la salle (correspond au premier segment de l'URL, ex: /ma-room/pseudo)\nmax 15 caractères pour le nom de la room",
-    "response": "{\n  \"roomId\": \"ma-room\",\n  \"players\": [\n    {\n      \"username\": \"luffy\",\n      \"avatar\": \"luffy\",\n      \"faction\": \"pirate\"\n    },\n    {\n      \"username\": \"garp\",\n      \"avatar\": \"garp\",\n      \"faction\": \"marine\"\n    }\n  ]\n}",
+    "response": "{\n  \"roomId\": \"ma-room\",\n  \"joined\": true | false\n  \"players\": [\n    {\n      \"username\": \"luffy\",\n      \"avatar\": \"luffy\",\n      \"faction\": \"pirate\"\n    },\n    {\n      \"username\": \"garp\",\n      \"avatar\": \"garp\",\n      \"faction\": \"marine\"\n    }\n  ]\n}",
     "responseName": "room:joined",
-    "responseDescription": "Envoyé uniquement au joueur qui vient de rejoindre. Contient la liste des joueurs déjà présents. Le premier joueur de la liste est l'admin de la salle."
+    "responseDescription": "Envoyé uniquement au joueur qui vient de rejoindre. Contient la liste des joueurs déjà présents. Le premier joueur de la liste est l'admin de la salle.\n\njoined : true si rejoint false si la game est déjà lancé"
   },
   {
     "id": "d3e5f7a9-2b3c-4d5e-6f7a-8b9c0d1e2f3a",
@@ -211,9 +211,9 @@
     "description": "S'abonner aux mises à jour de la liste des salles publiques disponibles. Le serveur envoie room:list à chaque changement tant que le client est abonné.",
     "payload": "{}",
     "payloadDescription": "",
-    "response": "[\n  { \"roomId\": \"maRoom\", \"playerCount\": 2, \"maxPlayers\": 8, \"mode\": \"classic\" }\n]",
+    "response": "[\n  {\n    \"roomId\": \"maRoom\",\n    \"playerCount\": 2,\n    \"maxPlayers\": 8,\n    \"mode\": \"classic\",\n    \"isStarted\": true | false\n  }\n]",
     "responseName": "room:list",
-    "responseDescription": "Tableau des salles publiques disponibles, envoyé en temps réel à chaque changement d'état."
+    "responseDescription": "Tableau des salles publiques disponibles, envoyé en temps réel à chaque changement d'état.\n\nisStarted: est-ce que la game est déjà lancé ou pas ?"
   },
   {
     "id": "d3e5f7a9-2c4d-5678-9abc-def012345602",
