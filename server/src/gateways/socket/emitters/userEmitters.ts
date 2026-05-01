@@ -1,6 +1,6 @@
 import type { Socket } from "socket.io";
 
-export function emitUsernameUnavailable(socket: Socket, username: string, reason: string): void {
+export function emitUsernameUnavailable(socket: Socket, username: string, reason: "invalid" | false): void {
 	socket.emit("user:ResultUsernameAvailable", {
 		available: reason, // ou invalid ne pas oublier
 		user_faction: null,

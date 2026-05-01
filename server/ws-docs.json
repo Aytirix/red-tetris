@@ -139,7 +139,7 @@
     "description": "Déplace la pièce courante horizontalement ou vers le bas.",
     "payload": "{\n  \"direction\": \"left\"\n}",
     "payloadDescription": "direction : \"left\" | \"right\" | \"down\"",
-    "response": "{\n  \"board\": [[0,0,0,0,0,0,0,0,0,0]],\n  \"currentPiece\": { \"type\": \"T\", \"x\": 3, \"y\": 2, \"rotation\": 0 },\n  \"score\": 0\n}",
+    "response": "{\n  \"board\": [\n    [\n      0,\n      0,\n      0,\n      0,\n      0,\n      0,\n      0,\n      0,\n      0,\n      0\n    ]\n  ],\n  \"currentPiece\": {\n    \"type\": \"T\",\n    \"x\": 4,\n    \"y\": 0,\n    \"rotation\": 0\n  },\n  \"nextPiece\": {\n    \"type\": \"I\",\n    \"rotation\": 0\n  },\n  \"score\": 0,\n  \"level\": 1,\n  \"lines\": 0\n}",
     "responseName": "game:update",
     "responseDescription": "Envoyé au joueur avec l'état mis à jour de son plateau."
   },
@@ -151,7 +151,7 @@
     "description": "Fait pivoter la pièce courante dans le sens horaire.",
     "payload": "{}",
     "payloadDescription": "",
-    "response": "{\n  \"board\": [[0,0,0,0,0,0,0,0,0,0]],\n  \"currentPiece\": { \"type\": \"T\", \"x\": 4, \"y\": 2, \"rotation\": 1 },\n  \"score\": 0\n}",
+    "response": "{\n  \"board\": [\n    [\n      0,\n      0,\n      0,\n      0,\n      0,\n      0,\n      0,\n      0,\n      0,\n      0\n    ]\n  ],\n  \"currentPiece\": {\n    \"type\": \"T\",\n    \"x\": 4,\n    \"y\": 0,\n    \"rotation\": 0\n  },\n  \"nextPiece\": {\n    \"type\": \"I\",\n    \"rotation\": 0\n  },\n  \"score\": 0,\n  \"level\": 1,\n  \"lines\": 0\n}",
     "responseName": "game:update",
     "responseDescription": "Envoyé au joueur avec l'état mis à jour de son plateau."
   },
@@ -163,7 +163,7 @@
     "description": "Fait tomber instantanément la pièce courante jusqu'en bas (hard drop).",
     "payload": "{}",
     "payloadDescription": "",
-    "response": "{\n  \"board\": [[0,0,0,0,0,0,0,0,0,0]],\n  \"currentPiece\": { \"type\": \"I\", \"x\": 4, \"y\": 0, \"rotation\": 0 },\n  \"score\": 2\n}",
+    "response": "{\n  \"board\": [\n    [\n      0,\n      0,\n      0,\n      0,\n      0,\n      0,\n      0,\n      0,\n      0,\n      0\n    ]\n  ],\n  \"currentPiece\": {\n    \"type\": \"T\",\n    \"x\": 4,\n    \"y\": 0,\n    \"rotation\": 0\n  },\n  \"nextPiece\": {\n    \"type\": \"I\",\n    \"rotation\": 0\n  },\n  \"score\": 0,\n  \"level\": 1,\n  \"lines\": 0\n}",
     "responseName": "game:update",
     "responseDescription": "Envoyé au joueur avec l'état mis à jour de son plateau après le drop."
   },
@@ -173,8 +173,8 @@
     "direction": "back-to-front",
     "group": "game",
     "description": "Déclenché par l'admin via room:start. Signale à tous les joueurs que la partie commence.",
-    "payload": "{\n  \"board\": [[0,0,0,0,0,0,0,0,0,0]],\n  \"currentPiece\": { \"type\": \"T\", \"x\": 4, \"y\": 0, \"rotation\": 0 },\n  \"nextPiece\": { \"type\": \"I\", \"rotation\": 0 }\n}",
-    "payloadDescription": "État initial du plateau pour chaque joueur.",
+    "payload": "{\n  \"board\": [\n    [\n      0,\n      0,\n      0,\n      0,\n      0,\n      0,\n      0,\n      0,\n      0,\n      0\n    ]\n  ],\n  \"currentPiece\": {\n    \"type\": \"T\",\n    \"x\": 4,\n    \"y\": 0,\n    \"rotation\": 0\n  },\n  \"nextPiece\": {\n    \"type\": \"I\",\n    \"rotation\": 0\n  },\n  \"score\": 0,\n  \"level\": 1,\n  \"lines\": 0\n}",
+    "payloadDescription": "État initial du plateau pour chaque joueur.\nla clef \"lines\" est le nombre de ligne en pénalité du joueur (seulement pour certains mode mais autant tout le temps l'envoyer et le laissera 0, pour \"level\" c'est pareille mais en solo",
     "response": "",
     "responseName": "",
     "responseDescription": ""
@@ -185,7 +185,7 @@
     "direction": "back-to-front",
     "group": "game",
     "description": "Mise à jour de l'état du plateau après chaque action du joueur.",
-    "payload": "{\n  \"board\": [[0,0,0,0,0,0,0,0,0,0]],\n  \"currentPiece\": { \"type\": \"T\", \"x\": 3, \"y\": 5, \"rotation\": 2 },\n  \"nextPiece\": { \"type\": \"S\", \"rotation\": 0 },\n  \"score\": 150,\n  \"level\": 2,\n  \"lines\": 3\n}",
+    "payload": "{\n  \"board\": [\n    [\n      0,\n      0,\n      0,\n      0,\n      0,\n      0,\n      0,\n      0,\n      0,\n      0\n    ]\n  ],\n  \"currentPiece\": {\n    \"type\": \"T\",\n    \"x\": 4,\n    \"y\": 0,\n    \"rotation\": 0\n  },\n  \"nextPiece\": {\n    \"type\": \"I\",\n    \"rotation\": 0\n  },\n  \"score\": 0,\n  \"level\": 1,\n  \"lines\": 0\n}",
     "payloadDescription": "Envoyé uniquement au joueur concerné.",
     "response": "",
     "responseName": "",
