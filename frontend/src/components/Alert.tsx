@@ -79,32 +79,44 @@ export function AlertProvider({ children }: { children: React.ReactNode }) {
 			{state && (
 				<div style={{
 					position: "fixed", inset: 0,
-					background: "var(--color-surface-strong)",
+					background: "rgba(5, 8, 14, 0.82)",
 					display: "flex", alignItems: "center", justifyContent: "center",
 					zIndex: 100, padding: "1rem",
 					backdropFilter: "blur(6px)",
 				}}>
 					<div
-						className="card"
 						style={{
-							width: "100%", maxWidth: "400px", padding: 0,
-							boxShadow: state.danger
-								? "var(--shadow-panel), var(--shadow-neon-red)"
-								: "var(--shadow-panel), var(--shadow-neon-cyan)",
+							width: "100%",
+							maxWidth: "400px",
+							padding: 0,
+							border: "1px solid var(--color-glass-border)",
+							borderRadius: "var(--radius-card)",
+							background: "var(--color-glass)",
+							boxShadow: "var(--shadow-panel)",
+							backdropFilter: "blur(20px)",
+							WebkitBackdropFilter: "blur(20px)",
+							overflow: "hidden",
 						}}
 					>
-						<div style={{ padding: "1.5rem 1.5rem 0" }}>
-							<p className="eyebrow" style={{
-								color: state.danger ? "var(--color-primary)" : "var(--color-secondary)",
-							}}>
+						<div style={{ padding: "1.5rem 1.5rem 0", textAlign: "center" }}>
+							<p className="eyebrow" style={{ color: "var(--color-text-muted-on-dark)" }}>
 								{state.danger ? "Attention" : "Info"}
 							</p>
-							<h3 style={{ marginTop: "0.5rem" }}>{state.title}</h3>
+							<h3 style={{
+								marginTop: "0.5rem",
+								color: state.danger ? "var(--color-primary)" : "var(--color-secondary)",
+								textShadow: state.danger ? "var(--shadow-neon-red)" : "var(--shadow-neon-cyan)",
+							}}>
+								{state.title}
+							</h3>
 							{state.message && (
 								<p style={{
-									marginTop: "0.75rem",
-									color: "var(--color-text-muted)",
-									fontSize: "0.9rem",
+									margin: 0,
+									padding: "1.5rem 0 0",
+									textAlign: "center",
+									color: "var(--color-text-muted-on-dark)",
+									fontSize: "0.85rem",
+									fontStyle: "italic",
 									lineHeight: 1.6,
 									whiteSpace: "pre-line",
 								}}>
@@ -116,7 +128,7 @@ export function AlertProvider({ children }: { children: React.ReactNode }) {
 						<div style={{
 							display: "flex", justifyContent: "flex-end", gap: "0.75rem",
 							padding: "1.25rem 1.5rem",
-							borderTop: "1px solid var(--color-border)",
+							borderTop: "1px solid var(--color-glass-border)",
 							marginTop: "1.25rem",
 						}}>
 							{state.showCancel && (
@@ -126,14 +138,11 @@ export function AlertProvider({ children }: { children: React.ReactNode }) {
 							)}
 							<button
 								className="button"
-								style={state.danger ? {
-									background: "linear-gradient(135deg, var(--color-primary-strong), var(--color-primary))",
-									boxShadow: "var(--shadow-neon-red)",
-								} : {
-									background: "var(--color-secondary-soft)",
-									border: "1px solid var(--color-secondary-soft)",
-									color: "var(--color-secondary)",
-									boxShadow: "var(--shadow-neon-cyan)",
+								style={{
+									background: "rgba(255, 255, 255, 0.07)",
+									border: "1px solid var(--color-glass-border)",
+									color: "var(--color-text-on-dark)",
+									boxShadow: "none",
 								}}
 								onClick={handleConfirm}
 							>
