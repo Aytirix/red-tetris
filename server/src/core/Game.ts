@@ -1,7 +1,7 @@
 import { BOARD_HEIGHT, BOARD_WIDTH, type Board, type Cell, type PieceType, type PlayerGameState } from "../types/game/gameTypes.js";
 import type { Player } from "./Player.js";
 import { pieces, PIECES_TYPES } from "../types/game/piecesGameTypes.js";
-import { emitGameStart } from "../gateways/socket/emitters/gameEmitters.js";
+import { emitGameStart, emitGameUpdate } from "../gateways/socket/emitters/gameEmitters.js";
 import { Piece } from "./Piece.js";
 
 export class Game {
@@ -69,7 +69,8 @@ export class Game {
 			if (!playerState.isAlive)
 				break
 			const currentPiece = playerState.currentPiece
-			currentPiece?.moveDown
+			currentPiece?.moveDown()
+			emitGameUpdate(playerState)
 		}
 	}
 }
