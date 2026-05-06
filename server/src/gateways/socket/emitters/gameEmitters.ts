@@ -45,13 +45,6 @@ export function emitGameUpdate(playerState: PlayerGameState, state: Map<string, 
 	if (!playerState.nextPiece)
 		throw new Error("Missing next piece before game update emit");
 	socket.emit("game:update", {
-		"board": playerState.board,
-		"opponents": getOpponentBoards(state, playerState.player.getSocketId()),
-		"currentPiece": {
-			"type": playerState.currentPiece.type
-		},
-		"nextPiece": {
-			"type": playerState.nextPiece.type
-		},
+		
 	})
 }
