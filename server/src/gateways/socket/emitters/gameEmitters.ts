@@ -26,7 +26,24 @@ export function emitGameStart(state: Map<string, PlayerGameState>, game: Game) :
 
 export function emitGameUpdate(playerState: PlayerGameState) : void {
 	const socket = playerState.player.getSocket()
+	if (!playerState.currentPiece)
+		throw new Error("Missing current piece before game update emit");
+	if (!playerState.nextPiece)
+		throw new Error("Missing next piece before game update emit");
 	socket.emit("game:update", {
-		
+		"board": playerState.board,
+		"currentPiece": {
+			"type": playerState.currentPiece.type,
+			"x": playerState.currentPiece.getX(),
+			"y": playerState.currentPiece.getY(),
+			"rotation": playerState.currentPiece.getRotate()
+		},
+		"nextPiece": {
+			"type": playerState.nextPiece.type,
+			"rotation": playerState.nextPiece.getRotate()
+		},
+		"score": playerState.score,
+		"level": 2,
+		"lines": 3,
 	})
 }
