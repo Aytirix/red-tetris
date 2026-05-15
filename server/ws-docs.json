@@ -250,5 +250,17 @@
     "response": "",
     "responseName": "",
     "responseDescription": ""
+  },
+  {
+    "id": "8161340a-7949-4b45-9ebc-745d293cedea",
+    "name": "room:kicked",
+    "direction": "back-to-front",
+    "group": "room",
+    "description": "envoi l information au joueur kicked",
+    "payload": "{}",
+    "payloadDescription": "",
+    "response": "",
+    "responseName": "",
+    "responseDescription": ""
   }
 ]
