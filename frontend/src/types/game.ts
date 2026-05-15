@@ -26,6 +26,7 @@ export type GameStatePayload = {
 export type GameOverScore = {
 	username: string;
 	score: number;
+	level?: number;
 };
 
 export type GameOverPayload = {

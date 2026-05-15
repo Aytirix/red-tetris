@@ -91,9 +91,14 @@ export function normalizeGameOver(raw: unknown): GameOverPayload | null {
 		if (!s || typeof s !== "object") continue;
 		const username = (s as { username?: unknown }).username;
 		const score = (s as { score?: unknown }).score;
+		const level = (s as { level?: unknown }).level;
 		if (typeof username !== "string" || !username) continue;
 		if (typeof score !== "number") continue;
-		scores.push({ username, score });
+		scores.push({
+			username,
+			score,
+			...(typeof level === "number" ? { level } : {}),
+		});
 	}
 	return { winner, scores };
 }

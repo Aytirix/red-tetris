@@ -10,8 +10,6 @@ type Props = {
 	payload: GameOverPayload | null;
 	playerName: string;
 	players: PlayerProfile[];
-	onLeave: () => void;
-	onReplay: () => void;
 };
 
 function getInitials(username: string) {
@@ -29,9 +27,14 @@ function podiumSlotClass(index: number) {
 	return "tetris-over__podium-slot tetris-over__podium-slot--third";
 }
 
-export default function GameOverView({ payload, playerName, players, onLeave, onReplay }: Props) {
+export default function GameOverView({ payload, playerName, players }: Props) {
+	if (!payload) return null;
+
 	const winner = payload?.winner ?? null;
 	const scores = payload?.scores ?? [];
+	const playerPlayed = scores.some((score) => score.username === playerName);
+	if (!playerPlayed) return null;
+
 	const profileByName = new Map(players.map((p) => [p.username, p]));
 	const rankedScores = scores.map((score, index) => ({
 		...score,
@@ -49,7 +52,7 @@ export default function GameOverView({ payload, playerName, players, onLeave, on
 	const titleClass = isWinner || isSolo ? "tetris-over__title tetris-over__title--win" : "tetris-over__title";
 
 	return (
-		<div className="tetris-over">
+		<aside className="game-lobby__summary" aria-label="Résumé de la dernière partie">
 			<div className="tetris-over__panel">
 				<header className="tetris-over__header">
 					<span className="tetris-over__eyebrow">{isSolo ? "Solo game" : "Classement final"}</span>
@@ -65,16 +68,13 @@ export default function GameOverView({ payload, playerName, players, onLeave, on
 
 				{isSolo && soloScore && (
 					<section className="tetris-over__solo-card">
-						<div className="tetris-over__solo-avatar">
-							{getPlayerAvatarSrc(soloScore.profile)
-								? <img src={getPlayerAvatarSrc(soloScore.profile) ?? ""} alt={soloScore.username} draggable={false} />
-								: <span>{getInitials(soloScore.username)}</span>
-							}
-						</div>
-						<div className="tetris-over__solo-copy">
-							<span>Score final</span>
+						<div className="tetris-over__solo-stat tetris-over__solo-stat--score">
+							<span>Points</span>
 							<strong>{soloScore.score.toLocaleString()}</strong>
-							<p>{soloScore.username}</p>
+						</div>
+						<div className="tetris-over__solo-stat">
+							<span>Level final</span>
+							<strong>{(soloScore.level ?? 1).toLocaleString()}</strong>
 						</div>
 					</section>
 				)}
@@ -136,15 +136,7 @@ export default function GameOverView({ payload, playerName, players, onLeave, on
 					</ol>
 				)}
 
-				<div className="tetris-over__actions">
-					<button className="button button-ghost" onClick={onLeave}>
-						Quitter
-					</button>
-					<button className="button button-primary" onClick={onReplay}>
-						Rejouer
-					</button>
-				</div>
 			</div>
-		</div>
+		</aside>
 	);
 }
