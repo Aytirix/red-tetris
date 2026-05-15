@@ -1,5 +1,5 @@
 import type { PieceType } from "../types/game/gameTypes.js";
-import type { PieceShape } from "../types/game/piecesGameTypes.js";
+import type { PieceCell, PieceShape } from "../types/game/piecesGameTypes.js";
 
 export class Piece {
 	public shape: PieceShape;
@@ -31,5 +31,29 @@ export class Piece {
 	}
 	getRotate() : number {
 		return this.rotation
+	}
+	getRotatedShape() : PieceCell[][] | null{
+		const oldHeight = this.shape.length
+		const oldWidth = this.shape[0]?.length
+		if (!oldWidth)
+			return null
+
+		const newHeight = oldWidth
+		const newWidth = oldHeight
+		const rotate: PieceCell[][] = Array.from({length: newHeight}, () => Array.from({length: newWidth}, () => 0))
+
+		for (let i = 0; i < this.shape.length; i++) {
+			const row = this.shape[i]
+			if (!row)
+				continue
+			for (let j = 0; j < row.length; j++) {
+				const rotateRow = rotate[j]
+				if (!rotateRow)
+					continue
+				rotateRow[oldHeight - 1 - i] = row[j] ?? 0
+			}
+		}
+		return rotate
+		// this.rotation = (this.rotation + 1) % 4
 	}
 }

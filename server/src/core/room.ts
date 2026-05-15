@@ -48,6 +48,12 @@ export class Room {
 		}
 		return false
 	}
+	setGame(game: Game) : void {
+		this.game = game
+	}
+	getGame() : Game | null {
+		return this.game
+	}
 	getPlayers() : Player[] {
 		return (this.players)
 	}
