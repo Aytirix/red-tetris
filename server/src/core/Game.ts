@@ -215,6 +215,7 @@ export class Game {
 	start() : void {
 		for (const [, playerStat] of this.state) {
 			this.spawnPiece(playerStat)
+			console.log("test")
 		}
 		emitGameStart(this.state, this)
 		this.restartTickInterval()
