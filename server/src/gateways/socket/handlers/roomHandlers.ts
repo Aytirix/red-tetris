@@ -26,10 +26,11 @@ export async function handlerRoomJoin(socket: Socket, payload: unknown): Promise
 			emitError(socket, "room:join", "Failed to create room");
 			return;
 		}
-		console.log("Room created: ", newRoom.name)
-		roomSocketStore.set(payload.roomId, newRoom)
-		emitRoomJoined(socket, newRoom)
-	}
+			console.log("Room created: ", newRoom.name)
+			roomSocketStore.set(payload.roomId, newRoom)
+			emitRoomJoined(socket, newRoom)
+			emitPlayersRoom(newRoom.getPlayers())
+		}
 	else {
 			const newPlayer = await createPlayer(socket)
 			if (!newPlayer)
@@ -37,10 +38,11 @@ export async function handlerRoomJoin(socket: Socket, payload: unknown): Promise
 			if (!room.addPlayer(newPlayer)) {
 				emitError(socket, "room:join", "Room is not joinable");
 				return
+				}
+				emitRoomJoined(socket, room)
+				emitPlayersRoom(room.getPlayers())
 			}
-			emitRoomJoined(socket, room)
 		}
-	}
 
 export function handlerRoomSubscribe(socket: Socket, payload: unknown) : void {
 	if (!payload) {
@@ -64,13 +66,15 @@ export function handlerRoomLeave(socket: Socket, payload: unknown) : void {
 		const room = getRoom(socket)
 		if (!room)
 			return
-		const removed = room.removePlayerBySocketId(socket.id)
-		if (!removed)
-			return
-		if (room.countPlayer() === 0)
-			roomSocketStore.delete(room.name)
-		socket.emit("room:left")
-		emitSubscrib()
+			const removed = room.removePlayerBySocketId(socket.id)
+			if (!removed)
+				return
+			if (room.countPlayer() === 0)
+				roomSocketStore.delete(room.name)
+			else
+				emitPlayersRoom(room.getPlayers())
+			socket.emit("room:left")
+			emitSubscrib()
 	}
 }
 
