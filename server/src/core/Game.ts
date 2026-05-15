@@ -18,9 +18,10 @@ export class Game {
 		this.intervalId = null
 		for (const player of players) {
 			this.state.set(player.getSocketId(), {
-				board: this.createBoard(),//fonction create board,
-				score: 0,
-				pieceIndex: 0,
+					board: this.createBoard(),//fonction create board,
+					score: 0,
+					level: 1,
+					pieceIndex: 0,
 				player: player,
 				isAlive: true,
 				spectator: false,
@@ -119,6 +120,32 @@ export class Game {
 		}
 		return true
 	}
+	isSolo() : boolean {
+		return this.players.length === 1
+	}
+	updateLevel(playerState: PlayerGameState) : void {
+		if (!this.isSolo())
+			return
+		const nextLevel = Math.floor(playerState.score / 500) + 1
+		if (nextLevel === playerState.level)
+			return
+		playerState.level = nextLevel
+		this.restartTickInterval()
+	}
+	getTickSpeed() : number {
+		if (!this.isSolo())
+			return 400
+		const playerState = [...this.state.values()][0]
+		const level = playerState?.level ?? 1
+		return Math.max(80, 400 - ((level - 1) * 40))
+	}
+	restartTickInterval() : void {
+		if (this.intervalId)
+			clearInterval(this.intervalId)
+		this.intervalId = setInterval(() => {
+			this.tick()
+		}, this.getTickSpeed())
+	}
 	clearLines(playerState: PlayerGameState) : void {
 		let clearedLines = 0
 
@@ -134,6 +161,7 @@ export class Game {
 		)
 		playerState.board = [...emptyRows, ...newBoard]
 		playerState.score += clearedLines * 100
+		this.updateLevel(playerState)
 	}
 	drop(socketId: string) : void {
 		const playerState = this.state.get(socketId)
@@ -189,10 +217,8 @@ export class Game {
 			this.spawnPiece(playerStat)
 		}
 		emitGameStart(this.state, this)
-			this.intervalId = setInterval(() => {
-				this.tick()
-			},300)
-		}
+		this.restartTickInterval()
+	}
 	spawnPiece(playerStat: PlayerGameState) : void {
 		const currentType = this.getPieceQueue(playerStat.pieceIndex)
 		const nextType = this.getPieceQueue((playerStat.pieceIndex + 1))
