@@ -55,3 +55,7 @@ export function emitRoomSettings(room: Room) : void {
 		})
 	}
 }
+
+export function emitKickedRoom(socket: Socket) : void {
+	socket.emit("room:kicked")
+}
