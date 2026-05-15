@@ -91,3 +91,19 @@ export function emitGameUpdate(playerState: PlayerGameState, state: Map<string, 
 		"spectator": playerState.spectator
 	})
 }
+
+export function emitGameOver(state: Map<string, PlayerGameState>, winner: string | null) : void {
+	const scores = [...state.values()]
+		.map((playerState) => ({
+			username: playerState.player.getName(),
+			score: playerState.score,
+		}))
+		.sort((a, b) => b.score - a.score)
+
+	for (const playerState of state.values()) {
+		playerState.player.getSocket().emit("game:over", {
+			winner,
+			scores,
+		})
+	}
+}
