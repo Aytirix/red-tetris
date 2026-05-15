@@ -403,6 +403,12 @@ export default function GamePage() {
 		navigate("/dashboard");
 	}
 
+	function handleReplay() {
+		setGameOver(null);
+		setGameState(null);
+		setView("lobby");
+	}
+
 	return (
 		<div className="game-page">
 			{view === "connecting" && (
@@ -443,7 +449,9 @@ export default function GamePage() {
 				<GameOverView
 					payload={gameOver}
 					playerName={playerName}
+					players={players}
 					onLeave={handleLeave}
+					onReplay={handleReplay}
 				/>
 			)}
 		</div>
