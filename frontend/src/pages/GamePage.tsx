@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { ClipLoader } from "react-spinners";
 import { useSocket } from "../contexts/SocketContext";
 import { useWsSession } from "../contexts/WsStateContext";
+import { useAlert } from "../components/Alert";
 import { normalizeUsernameAvailability } from "../socket/userState";
 import {
 	emitJoinRoom,
@@ -20,7 +21,7 @@ import GameOverView from "../components/game/GameOverView";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-type GameViewMode = "connecting" | "lobby" | "game" | "gameover";
+type GameViewMode = "connecting" | "lobby" | "game";
 
 const GAME_MODES = [
 	{ id: "classic", label: "Classique" },
@@ -43,6 +44,7 @@ function LobbyView({
 	gameMode,
 	isPrivate,
 	isRoomLoading,
+	gameSummary,
 	onLeave,
 }: {
 	roomName: string;
@@ -51,6 +53,7 @@ function LobbyView({
 	gameMode: string;
 	isPrivate: boolean;
 	isRoomLoading: boolean;
+	gameSummary: GameOverPayload | null;
 	onLeave: () => void;
 }) {
 	const isAdmin = !isRoomLoading && players[0]?.username === playerName;
@@ -59,157 +62,165 @@ function LobbyView({
 	const playerCountLabel = isRoomLoading
 		? "Chargement"
 		: `${players.length} joueur${players.length > 1 ? "s" : ""}`;
+	const hasGameSummary = !!gameSummary && gameSummary.scores.some((score) => score.username === playerName);
 
 	return (
 		<div className="game-lobby">
-			<div className="game-lobby__card" aria-busy={isRoomLoading}>
-				<header className="game-lobby__header">
-					<div className="game-lobby__header-left">
-						<span className="eyebrow">Salle</span>
-						<h1 className="game-lobby__room-name">{roomName}</h1>
-					</div>
-					<div className="game-lobby__header-right">
-						<span className={[
-							"game-lobby__status-badge",
-							isAdmin ? "game-lobby__status-badge--admin" : "",
-							isRoomLoading ? "game-lobby__status-badge--loading" : "",
-						].filter(Boolean).join(" ")}>
-							{statusLabel}
-						</span>
-						<span className="game-lobby__player-count-badge">
-							{isRoomLoading && <ClipLoader color="var(--color-secondary)" size={11} />}
-							{playerCountLabel}
-						</span>
-					</div>
-				</header>
+			<div className={`game-lobby__shell${hasGameSummary ? " game-lobby__shell--with-summary" : ""}`}>
+				<div className="game-lobby__card" aria-busy={isRoomLoading}>
+					<header className="game-lobby__header">
+						<div className="game-lobby__header-left">
+							<span className="eyebrow">Salle</span>
+							<h1 className="game-lobby__room-name">{roomName}</h1>
+						</div>
+						<div className="game-lobby__header-right">
+							<span className={[
+								"game-lobby__status-badge",
+								isAdmin ? "game-lobby__status-badge--admin" : "",
+								isRoomLoading ? "game-lobby__status-badge--loading" : "",
+							].filter(Boolean).join(" ")}>
+								{statusLabel}
+							</span>
+							<span className="game-lobby__player-count-badge">
+								{isRoomLoading && <ClipLoader color="var(--color-secondary)" size={11} />}
+								{playerCountLabel}
+							</span>
+						</div>
+					</header>
 
-				<ul className="game-lobby__player-list" aria-busy={isRoomLoading}>
-					{players.map((p, i) => {
-						const isMe = p.username === playerName;
-						const isPirate = p.faction === "pirate";
-						const isMarine = p.faction === "marine";
-						const factionDir = p.faction === "pirate" ? "pirate" : "marine";
-						const avatarSrc = p.faction && p.avatar
-							? `/img/avatar/${factionDir}/${p.avatar}.png`
-							: null;
+					<ul className="game-lobby__player-list" aria-busy={isRoomLoading}>
+						{players.map((p, i) => {
+							const isMe = p.username === playerName;
+							const isPirate = p.faction === "pirate";
+							const isMarine = p.faction === "marine";
+							const factionDir = p.faction === "pirate" ? "pirate" : "marine";
+							const avatarSrc = p.faction && p.avatar
+								? `/img/avatar/${factionDir}/${p.avatar}.png`
+								: null;
 
-						return (
-							<li
-								key={p.username}
-								className={[
-									"game-lobby__player-item",
-									isPirate ? "game-lobby__player-item--pirate" : "",
-									isMarine ? "game-lobby__player-item--marine" : "",
-									isMe ? "game-lobby__player-item--me" : "",
-								].filter(Boolean).join(" ")}
-							>
-								<div className="game-lobby__player-avatar">
-									{avatarSrc
-										? <img src={avatarSrc} alt={p.username} draggable={false} />
-										: <span>{p.username.slice(0, 2).toUpperCase()}</span>
-									}
-								</div>
-
-								<span className="game-lobby__player-name">
-									{p.username}
-								</span>
-
-								<div className="game-lobby__player-badges">
-									{isMe && <span className="game-lobby__player-tag game-lobby__player-tag--me">Vous</span>}
-									{i === 0 && <span className="game-lobby__player-tag game-lobby__player-tag--host">Admin</span>}
-									{isPirate && <span className="game-lobby__player-tag game-lobby__player-tag--pirate">☠ Pirate</span>}
-									{isMarine && <span className="game-lobby__player-tag game-lobby__player-tag--marine">⚓ Marine</span>}
-								</div>
-
-								{isAdmin && !isMe && (
-									<button
-										className="game-lobby__kick-btn"
-										onClick={() => emitKickPlayer(p.username)}
-										title={`Expulser ${p.username}`}
-									>
-										✕
-									</button>
-								)}
-							</li>
-						);
-					})}
-
-					{isRoomLoading && players.length === 0 && (
-						Array.from({ length: 2 }).map((_, i) => (
-							<li key={i} className="game-lobby__player-item game-lobby__player-item--loading" aria-hidden="true">
-								<div className="game-lobby__player-avatar game-lobby__skeleton" />
-								<div className="game-lobby__loading-lines">
-									<span className="game-lobby__loading-line game-lobby__loading-line--name" />
-									<span className="game-lobby__loading-line game-lobby__loading-line--meta" />
-								</div>
-							</li>
-						))
-					)}
-
-					{!isRoomLoading && players.length === 0 && (
-						<li className="game-lobby__player-empty">
-							<span>Aucun joueur connecté.</span>
-						</li>
-					)}
-				</ul>
-
-				<div className={`game-lobby__settings${isRoomLoading ? " game-lobby__settings--loading" : ""}`}>
-					<div className="game-lobby__setting">
-						<span className="game-lobby__setting-label">Mode de jeu</span>
-						<div className="game-lobby__mode-list">
-							{GAME_MODES.map((m) => (
-								<button
-									key={m.id}
-									className={`game-lobby__mode-btn${gameMode === m.id ? " game-lobby__mode-btn--active" : ""}`}
-									onClick={() => isAdmin && emitSetGameMode(m.id)}
-									disabled={controlsDisabled}
+							return (
+								<li
+									key={p.username}
+									className={[
+										"game-lobby__player-item",
+										isPirate ? "game-lobby__player-item--pirate" : "",
+										isMarine ? "game-lobby__player-item--marine" : "",
+										isMe ? "game-lobby__player-item--me" : "",
+									].filter(Boolean).join(" ")}
 								>
-									{m.label}
-								</button>
-							))}
+									<div className="game-lobby__player-avatar">
+										{avatarSrc
+											? <img src={avatarSrc} alt={p.username} draggable={false} />
+											: <span>{p.username.slice(0, 2).toUpperCase()}</span>
+										}
+									</div>
+
+									<span className="game-lobby__player-name">
+										{p.username}
+									</span>
+
+									<div className="game-lobby__player-badges">
+										{isMe && <span className="game-lobby__player-tag game-lobby__player-tag--me">Vous</span>}
+										{i === 0 && <span className="game-lobby__player-tag game-lobby__player-tag--host">Admin</span>}
+										{isPirate && <span className="game-lobby__player-tag game-lobby__player-tag--pirate">☠ Pirate</span>}
+										{isMarine && <span className="game-lobby__player-tag game-lobby__player-tag--marine">⚓ Marine</span>}
+									</div>
+
+									{isAdmin && !isMe && (
+										<button
+											className="game-lobby__kick-btn"
+											onClick={() => emitKickPlayer(p.username)}
+											title={`Expulser ${p.username}`}
+										>
+											✕
+										</button>
+									)}
+								</li>
+							);
+						})}
+
+						{isRoomLoading && players.length === 0 && (
+							Array.from({ length: 2 }).map((_, i) => (
+								<li key={i} className="game-lobby__player-item game-lobby__player-item--loading" aria-hidden="true">
+									<div className="game-lobby__player-avatar game-lobby__skeleton" />
+									<div className="game-lobby__loading-lines">
+										<span className="game-lobby__loading-line game-lobby__loading-line--name" />
+										<span className="game-lobby__loading-line game-lobby__loading-line--meta" />
+									</div>
+								</li>
+							))
+						)}
+
+						{!isRoomLoading && players.length === 0 && (
+							<li className="game-lobby__player-empty">
+								<span>Aucun joueur connecté.</span>
+							</li>
+						)}
+					</ul>
+
+					<div className={`game-lobby__settings${isRoomLoading ? " game-lobby__settings--loading" : ""}`}>
+						<div className="game-lobby__setting">
+							<span className="game-lobby__setting-label">Mode de jeu</span>
+							<div className="game-lobby__mode-list">
+								{GAME_MODES.map((m) => (
+									<button
+										key={m.id}
+										className={`game-lobby__mode-btn${gameMode === m.id ? " game-lobby__mode-btn--active" : ""}`}
+										onClick={() => isAdmin && emitSetGameMode(m.id)}
+										disabled={controlsDisabled}
+									>
+										{m.label}
+									</button>
+								))}
+							</div>
+						</div>
+
+						<div className="game-lobby__setting">
+							<span className="game-lobby__setting-label">Accès</span>
+							<button
+								className={`game-lobby__privacy-btn${isPrivate ? " game-lobby__privacy-btn--private" : ""}`}
+								onClick={() => isAdmin && emitSetPrivate(!isPrivate)}
+								disabled={controlsDisabled}
+							>
+								{isPrivate ? "🔒 Privée" : "🌐 Publique"}
+							</button>
 						</div>
 					</div>
 
-					<div className="game-lobby__setting">
-						<span className="game-lobby__setting-label">Accès</span>
-						<button
-							className={`game-lobby__privacy-btn${isPrivate ? " game-lobby__privacy-btn--private" : ""}`}
-							onClick={() => isAdmin && emitSetPrivate(!isPrivate)}
-							disabled={controlsDisabled}
-						>
-							{isPrivate ? "🔒 Privée" : "🌐 Publique"}
-						</button>
-					</div>
+					<footer className="game-lobby__footer">
+						{isRoomLoading ? (
+							<div className="game-lobby__waiting-hint">
+								<ClipLoader color="var(--color-secondary)" size={13} />
+								<span>Chargement de la room…</span>
+							</div>
+						) : !isAdmin && (
+							<div className="game-lobby__waiting-hint">
+								<ClipLoader color="var(--color-secondary)" size={13} />
+								<span>En attente de l'admin…</span>
+							</div>
+						)}
+						<div className="game-lobby__footer-actions">
+							<button className="button button-ghost" onClick={onLeave}>
+								Quitter
+							</button>
+							{(isRoomLoading || isAdmin) && (
+								<button className="button button-primary" onClick={emitStartGame} disabled={isRoomLoading}>
+									▶ Lancer
+								</button>
+							)}
+						</div>
+					</footer>
 				</div>
 
-				<footer className="game-lobby__footer">
-					{isRoomLoading ? (
-						<div className="game-lobby__waiting-hint">
-							<ClipLoader color="var(--color-secondary)" size={13} />
-							<span>Chargement de la room…</span>
-						</div>
-					) : !isAdmin && (
-						<div className="game-lobby__waiting-hint">
-							<ClipLoader color="var(--color-secondary)" size={13} />
-							<span>En attente de l'admin…</span>
-						</div>
-					)}
-					<div className="game-lobby__footer-actions">
-						<button className="button button-ghost" onClick={onLeave}>
-							Quitter
-						</button>
-						{(isRoomLoading || isAdmin) && (
-							<button className="button button-primary" onClick={emitStartGame} disabled={isRoomLoading}>
-								▶ Lancer
-							</button>
-						)}
-					</div>
-				</footer>
+				<GameOverView
+					payload={gameSummary}
+					playerName={playerName}
+					players={players}
+				/>
 			</div>
 		</div>
 	);
 }
-
 // ─── GamePage ─────────────────────────────────────────────────────────────────
 
 const MAX_NAME_LENGTH = 15;
@@ -218,6 +229,7 @@ export default function GamePage() {
 	const { roomName: rawRoom = "", playerName = "" } = useParams<{ roomName: string; playerName: string }>();
 	const { socket } = useSocket();
 	const session = useWsSession();
+	const { alert } = useAlert();
 	const navigate = useNavigate();
 	const [view, setView] = useState<GameViewMode>("connecting");
 	const [players, setPlayers] = useState<RoomPlayer[]>([]);
@@ -241,6 +253,7 @@ export default function GamePage() {
 	const hasJoinedRoomRef = useRef(false);
 	const hasLeftRoomRef = useRef(false);
 	const isSpectatorRef = useRef(false);
+	const lastPlayerLevelRef = useRef(1);
 	useEffect(() => { rawRoomRef.current = rawRoom; }, [rawRoom]);
 	useEffect(() => { roomNameRef.current = roomName; }, [roomName]);
 	useEffect(() => { playerNameRef.current = playerName; }, [playerName]);
@@ -293,6 +306,7 @@ export default function GamePage() {
 		setIsRoomLoading(true);
 		setGameState(null);
 		setGameOver(null);
+		lastPlayerLevelRef.current = 1;
 
 		function handlePageExit() {
 			leaveRoomOnce();
@@ -371,20 +385,54 @@ export default function GamePage() {
 		return () => { socket.off("room:settings", handleSettings); };
 	}, [socket]);
 
+	useEffect(() => {
+		function handleKicked() {
+			hasLeftRoomRef.current = true;
+			hasJoinedRoomRef.current = false;
+			isSpectatorRef.current = false;
+			setGameState(null);
+			setGameOver(null);
+			setPlayers([]);
+			navigate("/dashboard");
+			void alert({
+				title: "Expulsé de la salle",
+				message: "Vous avez été retiré de la room par l'admin.",
+				confirmLabel: "Compris",
+				danger: true,
+			});
+		}
+
+		socket.on("room:kicked", handleKicked);
+		return () => { socket.off("room:kicked", handleKicked); };
+	}, [socket, navigate, alert]);
+
 	// Game state events
 	useEffect(() => {
 		function handleStateUpdate(raw: unknown) {
 			const next = normalizeGameState(raw);
 			if (!next) return;
 			isSpectatorRef.current = next.spectator !== false;
+			if (next.spectator === false) {
+				lastPlayerLevelRef.current = next.level;
+			}
 			setGameState(next);
 			setGameOver(null);
 			setView("game");
 		}
 		function handleOver(raw: unknown) {
 			const payload = normalizeGameOver(raw);
-			setGameOver(payload);
-			setView("gameover");
+			const nextPayload = payload && payload.scores.length === 1
+				? {
+					...payload,
+					scores: [{
+						...payload.scores[0],
+						level: payload.scores[0].level ?? lastPlayerLevelRef.current,
+					}],
+				}
+				: payload;
+			setGameOver(nextPayload);
+			setGameState(null);
+			setView("lobby");
 		}
 		socket.on("game:start", handleStateUpdate);
 		socket.on("game:update", handleStateUpdate);
@@ -401,12 +449,6 @@ export default function GamePage() {
 	function handleLeave() {
 		leaveRoomOnce();
 		navigate("/dashboard");
-	}
-
-	function handleReplay() {
-		setGameOver(null);
-		setGameState(null);
-		setView("lobby");
 	}
 
 	return (
@@ -427,6 +469,7 @@ export default function GamePage() {
 					gameMode={gameMode}
 					isPrivate={isPrivate}
 					isRoomLoading={isRoomLoading}
+					gameSummary={gameOver}
 					onLeave={handleLeave}
 				/>
 			)}
@@ -444,15 +487,6 @@ export default function GamePage() {
 						<span>Chargement de la partie…</span>
 					</div>
 				</div>
-			)}
-			{view === "gameover" && (
-				<GameOverView
-					payload={gameOver}
-					playerName={playerName}
-					players={players}
-					onLeave={handleLeave}
-					onReplay={handleReplay}
-				/>
 			)}
 		</div>
 	);
