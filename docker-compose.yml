@@ -40,14 +40,16 @@ services:
       HOST: ${HOST:?HOST is required}
       PORT: ${PORT:?PORT is required}
       NODE_ENV: ${NODE_ENV:?NODE_ENV is required}
+      PORT_DEV_FRONTEND: ${PORT_DEV_FRONTEND:?PORT_DEV_FRONTEND is required}
       POSTGRES_HOST: ${POSTGRES_HOST:?POSTGRES_HOST is required}
       POSTGRES_PORT: ${POSTGRES_PORT:?POSTGRES_PORT is required}
       POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
       POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB is required}
-      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
+      DATABASE_URL: postgresql://${POSTGRES_USER:?POSTGRES_USER is required}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@db:5432/${POSTGRES_DB:?POSTGRES_DB is required}?schema=public
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     command: npm run dev
 
   db:
@@ -62,6 +64,11 @@ services:
       - "${POSTGRES_PORT:?POSTGRES_PORT is required}:5432"
     volumes:
       - db_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   pgadmin:
     image: dpage/pgadmin4
