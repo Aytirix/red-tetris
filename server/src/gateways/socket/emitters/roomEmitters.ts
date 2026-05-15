@@ -33,10 +33,14 @@ export function emitSubscrib() : void {
 }
 
 export function emitPlayersRoom(players: Player[]) : void {
-	const playerNames = players.map((player) => player.getName())
+	const payload = players.map((player) => ({
+		username: player.getName(),
+		avatar: player.getAvatar(),
+		faction: player.getFaction(),
+	}))
 	for (const player of players) {
 		const socket = player.getSocket()
-		socket.emit("room:players", playerNames)
+		socket.emit("room:players", payload)
 	}
 }
 

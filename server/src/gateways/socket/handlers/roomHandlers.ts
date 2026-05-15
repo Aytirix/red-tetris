@@ -6,6 +6,7 @@ import { createRoom, getRoom } from "../../../services/roomService.js";
 import { emitPlayersRoom, emitRoomJoined, emitRoomSettings, emitSubscrib } from "../emitters/roomEmitters.js";
 import { userSocketStore } from "../userSocketStore.js";
 import { Game } from "../../../core/Game.js";
+import { createPlayer } from "../../../services/playerService.js";
 
 export async function handlerRoomJoin(socket: Socket, payload: unknown): Promise<void> {
 	if (!isValidRoomJoinPayload(payload)) {
@@ -25,14 +26,23 @@ export async function handlerRoomJoin(socket: Socket, payload: unknown): Promise
 			emitError(socket, "room:join", "Failed to create room");
 			return;
 		}
-		console.log("Room created: ", newRoom.name)
-		roomSocketStore.set(payload.roomId, newRoom)
-		emitRoomJoined(socket, newRoom)
-	}
+			console.log("Room created: ", newRoom.name)
+			roomSocketStore.set(payload.roomId, newRoom)
+			emitRoomJoined(socket, newRoom)
+			emitPlayersRoom(newRoom.getPlayers())
+		}
 	else {
-		emitRoomJoined(socket, room)
-	}
-}
+			const newPlayer = await createPlayer(socket)
+			if (!newPlayer)
+				return
+			if (!room.addPlayer(newPlayer)) {
+				emitError(socket, "room:join", "Room is not joinable");
+				return
+				}
+				emitRoomJoined(socket, room)
+				emitPlayersRoom(room.getPlayers())
+			}
+		}
 
 export function handlerRoomSubscribe(socket: Socket, payload: unknown) : void {
 	if (!payload) {
@@ -56,13 +66,15 @@ export function handlerRoomLeave(socket: Socket, payload: unknown) : void {
 		const room = getRoom(socket)
 		if (!room)
 			return
-		const removed = room.removePlayerBySocketId(socket.id)
-		if (!removed)
-			return
-		if (room.countPlayer() === 0)
-			roomSocketStore.delete(room.name)
-		socket.emit("room:left")
-		emitSubscrib()
+			const removed = room.removePlayerBySocketId(socket.id)
+			if (!removed)
+				return
+			if (room.countPlayer() === 0)
+				roomSocketStore.delete(room.name)
+			else
+				emitPlayersRoom(room.getPlayers())
+			socket.emit("room:left")
+			emitSubscrib()
 	}
 }
 
