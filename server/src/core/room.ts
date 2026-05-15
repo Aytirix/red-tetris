@@ -121,5 +121,8 @@ export class Room {
 	searchName(username: string): boolean {
 		return this.getPlayers().some((player) => player.getName() === username)
 	}
+	findPlayerByName(username: string): Player | undefined {
+		return this.players.find((player) => player.getName() === username)
+	}
 	startGame() : void {}
-}
+	}
