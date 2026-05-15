@@ -135,7 +135,52 @@ export function handleRoomStart(socket: Socket, payload: unknown) : void {
 		const game = new Game(mode, players)
 		if (socket.id === room.getHostId()) {
 			room.setStatus("playing")
+			room.setGame(game)
 			game.start()
 		}
+	}
+}
+
+export function handleMove(socket: Socket, payload: unknown) : void {
+	if (
+		!payload ||
+		typeof payload !== "object" ||
+		!("direction" in payload) ||
+		(payload.direction !== "left" && payload.direction !== "right" && payload.direction !== "down")
+	) {
+		emitError(socket, "game:move", "Invalid payload");
+		return
+	}
+
+	const room = getRoom(socket)
+	if (!room)
+		return
+	const game = room.getGame()
+	if (!game)
+		return
+	game.move(socket.id, payload.direction)
+}
+
+export function handleRotate(socket: Socket, payload: unknown) : void {
+	if (!payload) {
+		const room = getRoom(socket)
+		if (!room)
+			return
+		const game = room.getGame()
+		if (!game)
+			return
+		game.rotate(socket.id)
+	}
+}
+
+export function handleDrop(socket: Socket, payload: unknown) : void {
+	if (!payload) {
+		const room = getRoom(socket)
+		if (!room)
+			return
+		const game = room.getGame()
+		if (!game)
+			return
+		game.drop(socket.id)
 	}
 }

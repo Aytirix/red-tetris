@@ -11,7 +11,7 @@ export type currentPiece = {
 	type: PieceType;
 };
 
-export type Cell = 0 | 1 | 2;
+export type Cell = 0 | PieceType | "penalty";
 
 export type Board = Cell [][];
 
@@ -26,6 +26,7 @@ export type PlayerGameState = {
 	pieceIndex: number
 	player: Player;
 	isAlive: boolean;
+	spectator: boolean | string;
 	currentPiece?: Piece;
 	nextPiece?: Piece;
 }
