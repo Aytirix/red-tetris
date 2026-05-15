@@ -93,12 +93,18 @@ export function handleRoomKick(socket: Socket, payload: unknown) : void {
 		console.log("Error: username invalid for kick");
 		return;
 	}
+	const playerToKick = room.findPlayerByName(username)
+	if (!playerToKick) {
+		emitError(socket, "room:kick", "Invalid username");
+		console.log("Error: player not found for kick");
+		return;
+	}
 	if (!room.removePlayerByName(socket.id, username)) {
 		emitError(socket, "room:kick", "Only host can kick players");
 		console.log("Error: Only host can kick players");
 		return;
 	}
-	emitKickedRoom(socket)
+	emitKickedRoom(playerToKick.getSocket())
 	emitPlayersRoom(room.getPlayers())
 }
 
