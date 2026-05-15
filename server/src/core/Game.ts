@@ -1,7 +1,7 @@
 import { BOARD_HEIGHT, BOARD_WIDTH, type Board, type Cell, type PieceType, type PlayerGameState } from "../types/game/gameTypes.js";
 import type { Player } from "./Player.js";
 import { pieces, PIECES_TYPES, type PieceCell, type PieceShape } from "../types/game/piecesGameTypes.js";
-import { emitGameStart, emitGameUpdate, getRenderedBoard } from "../gateways/socket/emitters/gameEmitters.js";
+import { emitGameOver, emitGameStart, emitGameUpdate, getRenderedBoard } from "../gateways/socket/emitters/gameEmitters.js";
 import { Piece } from "./Piece.js";
 
 export class Game {
@@ -9,11 +9,13 @@ export class Game {
 	public players: Player[];
 	private state: Map<string, PlayerGameState>;
 	private pieceQueue: PieceType[];
+	private intervalId: NodeJS.Timeout | null;
 	constructor (mode: "classique" | "ultra" | "sprint", players: Player[]) {
 		this.mode = mode;
 		this.players = players;
 		this.state = new Map()
 		this.pieceQueue = this.randomPiece()
+		this.intervalId = null
 		for (const player of players) {
 			this.state.set(player.getSocketId(), {
 				board: this.createBoard(),//fonction create board,
@@ -92,6 +94,31 @@ export class Game {
 		}
 		return true
 	}
+	canSpawn(playerStat: PlayerGameState) : boolean {
+		const piece = playerStat.currentPiece
+		if (!piece)
+			return false
+
+		for (let y = 0; y < piece.shape.length; y++) {
+			const pieceRow = piece.shape[y]
+			if (!pieceRow)
+				continue
+			for (let x = 0; x < pieceRow.length; x++) {
+				if (pieceRow[x] !== 1)
+					continue
+
+				const nextY = piece.getY() + y
+				const nextX = piece.getX() + x
+				if (nextX < 0 || nextX >= BOARD_WIDTH || nextY < 0 || nextY >= BOARD_HEIGHT)
+					return false
+
+				const boardRow = playerStat.board[nextY]
+				if (!boardRow || boardRow[nextX] !== 0)
+					return false
+			}
+		}
+		return true
+	}
 	clearLines(playerState: PlayerGameState) : void {
 		let clearedLines = 0
 
@@ -110,7 +137,7 @@ export class Game {
 	}
 	drop(socketId: string) : void {
 		const playerState = this.state.get(socketId)
-		if (!playerState || !playerState.currentPiece)
+		if (!playerState || !playerState.currentPiece || !playerState.isAlive)
 			return
 
 		while (this.canMove(playerState, 0, 1))
@@ -119,11 +146,12 @@ export class Game {
 		this.clearLines(playerState)
 		playerState.pieceIndex ++
 		this.spawnPiece(playerState)
+		this.checkGameOver()
 		emitGameUpdate(playerState, this.state)
 	}
 	move(socketId: string, direction: "left" | "right" | "down") : void {
 		const playerState = this.state.get(socketId)
-		if (!playerState || !playerState.currentPiece)
+		if (!playerState || !playerState.currentPiece || !playerState.isAlive)
 			return
 
 		if (direction === "left" && this.canMove(playerState, -1, 0))
@@ -150,7 +178,7 @@ export class Game {
 	}
 	rotate(socketId: string) : void {
 		const playerState = this.state.get(socketId)
-		if (!playerState || !playerState.currentPiece)
+		if (!playerState || !playerState.currentPiece || !playerState.isAlive)
 			return
 	const rotate = playerState.currentPiece.getRotatedShape()
 		if (!rotate)
@@ -164,10 +192,10 @@ export class Game {
 			this.spawnPiece(playerStat)
 		}
 		emitGameStart(this.state, this)
-		const intervalID = setInterval(() => {
-			this.tick()
-		},300)
-	}
+			this.intervalId = setInterval(() => {
+				this.tick()
+			},300)
+		}
 	spawnPiece(playerStat: PlayerGameState) : void {
 		const currentType = this.getPieceQueue(playerStat.pieceIndex)
 		const nextType = this.getPieceQueue((playerStat.pieceIndex + 1))
@@ -175,6 +203,22 @@ export class Game {
 		const nextShape = pieces[nextType]
 		playerStat.currentPiece = new Piece(currentShape, currentType)
 		playerStat.nextPiece = new Piece(nextShape, nextType)
+		if (!this.canSpawn(playerStat))
+			playerStat.isAlive = false
+	}
+	checkGameOver() : void {
+		const alivePlayers = [...this.state.values()].filter((playerState) => playerState.isAlive)
+		const isSolo = this.players.length <= 1
+		if ((isSolo && alivePlayers.length > 0) || (!isSolo && alivePlayers.length > 1))
+			return
+
+		if (this.intervalId) {
+			clearInterval(this.intervalId)
+			this.intervalId = null
+		}
+
+		const winner = !isSolo && alivePlayers[0] ? alivePlayers[0].player.getName() : null
+		emitGameOver(this.state, winner)
 	}
 	lockPiece(playerState: PlayerGameState) : void {
 		playerState.board = getRenderedBoard(playerState)
@@ -182,7 +226,7 @@ export class Game {
 	tick() : void {
 		for (const [, playerState] of this.state) {
 			if (!playerState.isAlive)
-				break
+				continue
 			const currentPiece = playerState.currentPiece
 				if (currentPiece && this.canMove(playerState, 0, 1))
 					currentPiece?.moveDown()
@@ -191,6 +235,7 @@ export class Game {
 					this.clearLines(playerState)
 					playerState.pieceIndex ++
 					this.spawnPiece(playerState)
+					this.checkGameOver()
 				}
 			emitGameUpdate(playerState, this.state)
 		}
