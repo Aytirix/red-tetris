@@ -1,6 +1,8 @@
+import { frontendOrigins } from "./frontendOrigin.js";
+
 export const socketConfig = {
 	cors: {
-		origin: "http://localhost:5173",
+		origin: frontendOrigins,
 		methods: ["GET", "POST"],
 	},
 };
