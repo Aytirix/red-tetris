@@ -33,10 +33,10 @@ export function emitGameStart(state: Map<string, PlayerGameState>, game: Game) :
 			},
 			"nextPiece": {
 				"type": playerState.nextPiece.type
-			},
-			"score": playerState.score,
-			"level": 1,
-			"spectator": playerState.spectator
+				},
+				"score": playerState.score,
+				"level": playerState.level,
+				"spectator": playerState.spectator
 		})
 	}
 }
@@ -85,10 +85,10 @@ export function emitGameUpdate(playerState: PlayerGameState, state: Map<string, 
 		},
 		"nextPiece": {
 			"type": playerState.nextPiece.type
-		},
-		"score": playerState.score,
-		"level": 1,
-		"spectator": playerState.spectator
+			},
+			"score": playerState.score,
+			"level": playerState.level,
+			"spectator": playerState.spectator
 	})
 }
 

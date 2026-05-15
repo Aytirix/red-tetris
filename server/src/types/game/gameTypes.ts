@@ -23,6 +23,7 @@ export type OpponentBoard = {
 export type PlayerGameState = {
 	board: Board;
 	score: number;
+	level: number;
 	pieceIndex: number
 	player: Player;
 	isAlive: boolean;
