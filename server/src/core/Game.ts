@@ -142,12 +142,9 @@ export class Game {
 
 		while (this.canMove(playerState, 0, 1))
 			playerState.currentPiece.moveDown()
-		this.lockPiece(playerState)
-		this.clearLines(playerState)
-		playerState.pieceIndex ++
-		this.spawnPiece(playerState)
-		this.checkGameOver()
-		emitGameUpdate(playerState, this.state)
+		const isGameOver = this.lockAndSpawnNext(playerState)
+		if (!isGameOver)
+			emitGameUpdate(playerState, this.state)
 	}
 	move(socketId: string, direction: "left" | "right" | "down") : void {
 		const playerState = this.state.get(socketId)
@@ -206,11 +203,11 @@ export class Game {
 		if (!this.canSpawn(playerStat))
 			playerStat.isAlive = false
 	}
-	checkGameOver() : void {
+	checkGameOver() : boolean {
 		const alivePlayers = [...this.state.values()].filter((playerState) => playerState.isAlive)
 		const isSolo = this.players.length <= 1
 		if ((isSolo && alivePlayers.length > 0) || (!isSolo && alivePlayers.length > 1))
-			return
+			return false
 
 		if (this.intervalId) {
 			clearInterval(this.intervalId)
@@ -219,25 +216,32 @@ export class Game {
 
 		const winner = !isSolo && alivePlayers[0] ? alivePlayers[0].player.getName() : null
 		emitGameOver(this.state, winner)
+		return true
 	}
 	lockPiece(playerState: PlayerGameState) : void {
 		playerState.board = getRenderedBoard(playerState)
 	}
+	lockAndSpawnNext(playerState: PlayerGameState) : boolean {
+		this.lockPiece(playerState)
+		this.clearLines(playerState)
+		playerState.pieceIndex ++
+		this.spawnPiece(playerState)
+		return this.checkGameOver()
+	}
 	tick() : void {
 		for (const [, playerState] of this.state) {
+			let isGameOver: boolean = false
 			if (!playerState.isAlive)
 				continue
-			const currentPiece = playerState.currentPiece
-				if (currentPiece && this.canMove(playerState, 0, 1))
-					currentPiece?.moveDown()
-				else {
-					this.lockPiece(playerState)
-					this.clearLines(playerState)
-					playerState.pieceIndex ++
-					this.spawnPiece(playerState)
-					this.checkGameOver()
-				}
-			emitGameUpdate(playerState, this.state)
-		}
+				const currentPiece = playerState.currentPiece
+					if (currentPiece && this.canMove(playerState, 0, 1))
+						currentPiece?.moveDown()
+					else
+						isGameOver = this.lockAndSpawnNext(playerState)
+				if (isGameOver)
+					break
+				if (!isGameOver)
+					emitGameUpdate(playerState, this.state)
+			}
 	}
 }
