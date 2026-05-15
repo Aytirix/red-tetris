@@ -92,6 +92,35 @@ export class Game {
 		}
 		return true
 	}
+	clearLines(playerState: PlayerGameState) : void {
+		let clearedLines = 0
+
+		const newBoard = playerState.board.filter(row => {
+			const isFull = row.every(cell => cell !== 0)
+			if (isFull)
+				clearedLines++
+			return !isFull
+		})
+		const emptyRows: Cell[][] = Array.from(
+			{ length: clearedLines },
+			() => Array.from({ length: BOARD_WIDTH }, () => 0)
+		)
+		playerState.board = [...emptyRows, ...newBoard]
+		playerState.score += clearedLines * 100
+	}
+	drop(socketId: string) : void {
+		const playerState = this.state.get(socketId)
+		if (!playerState || !playerState.currentPiece)
+			return
+
+		while (this.canMove(playerState, 0, 1))
+			playerState.currentPiece.moveDown()
+		this.lockPiece(playerState)
+		this.clearLines(playerState)
+		playerState.pieceIndex ++
+		this.spawnPiece(playerState)
+		emitGameUpdate(playerState, this.state)
+	}
 	move(socketId: string, direction: "left" | "right" | "down") : void {
 		const playerState = this.state.get(socketId)
 		if (!playerState || !playerState.currentPiece)
@@ -130,18 +159,6 @@ export class Game {
 			playerState.currentPiece.shape = rotate
 			emitGameUpdate(playerState, this.state)
 		} 
-	drop(socketId: string) : void {
-		const playerState = this.state.get(socketId)
-		if (!playerState || !playerState.currentPiece)
-			return
-
-		while (this.canMove(playerState, 0, 1))
-			playerState.currentPiece.moveDown()
-		this.lockPiece(playerState)
-		playerState.pieceIndex ++
-		this.spawnPiece(playerState)
-		emitGameUpdate(playerState, this.state)
-	}
 	start() : void {
 		for (const [, playerStat] of this.state) {
 			this.spawnPiece(playerStat)
@@ -171,6 +188,7 @@ export class Game {
 					currentPiece?.moveDown()
 				else {
 					this.lockPiece(playerState)
+					this.clearLines(playerState)
 					playerState.pieceIndex ++
 					this.spawnPiece(playerState)
 				}
