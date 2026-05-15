@@ -104,6 +104,7 @@ export function emitGameOver(state: Map<string, PlayerGameState>, winner: string
 		playerState.player.getSocket().emit("game:over", {
 			winner,
 			scores,
+			level: playerState.level,
 		})
 	}
 }

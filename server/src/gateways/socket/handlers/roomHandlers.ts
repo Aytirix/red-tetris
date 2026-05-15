@@ -3,7 +3,7 @@ import { isValidRoomJoinPayload, isValidRoomKickPayload, isValidRoomModePayload,
 import { emitError } from "../emitters/systemEmitters.js";
 import { roomSocketStore } from "../roomSocketStore.js";
 import { createRoom, getRoom } from "../../../services/roomService.js";
-import { emitPlayersRoom, emitRoomJoined, emitRoomSettings, emitSubscrib } from "../emitters/roomEmitters.js";
+import { emitKickedRoom, emitPlayersRoom, emitRoomJoined, emitRoomSettings, emitSubscrib } from "../emitters/roomEmitters.js";
 import { userSocketStore } from "../userSocketStore.js";
 import { Game } from "../../../core/Game.js";
 import { createPlayer } from "../../../services/playerService.js";
@@ -98,6 +98,7 @@ export function handleRoomKick(socket: Socket, payload: unknown) : void {
 		console.log("Error: Only host can kick players");
 		return;
 	}
+	emitKickedRoom(socket)
 	emitPlayersRoom(room.getPlayers())
 }
 
