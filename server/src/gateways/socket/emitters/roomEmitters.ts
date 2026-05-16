@@ -8,6 +8,7 @@ import type { Player } from "../../../core/Player.js";
 export function emitRoomJoined(socket: Socket, room: Room) : void {
 	const payload: RoomJoinedPayload = {
 		roomId: room.name,
+		joined: room.getStatus() !== "playing",
 		players: room.getPlayers().map((player) => ({
 			username: player.getName(),
 			avatar: player.getAvatar(),
