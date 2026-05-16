@@ -36,7 +36,7 @@ export async function handlerRoomJoin(socket: Socket, payload: unknown): Promise
 			if (!newPlayer)
 				return
 			if (!room.addPlayer(newPlayer)) {
-				emitError(socket, "room:join", "Room is not joinable");
+				emitRoomJoined(socket, room)
 				return
 				}
 				emitRoomJoined(socket, room)
@@ -151,7 +151,7 @@ export function handleRoomStart(socket: Socket, payload: unknown) : void {
 			return
 		const mode = room.getMode()
 		const players = room.getPlayers()
-		const game = new Game(mode, players)
+		const game = new Game(mode, players, room)
 		if (socket.id === room.getHostId()) {
 			room.setStatus("playing")
 			room.setGame(game)

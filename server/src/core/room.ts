@@ -72,6 +72,9 @@ export class Room {
 	getMode() : "classique" | "ultra" | "sprint" {
 		return this.mode
 	}
+	getStatus() : "waiting" | "playing" | "finished" {
+		return this.status
+	}
 	countPlayer() : number {
 		return this.players.length
 	}
