@@ -1,13 +1,18 @@
+import { lazy } from "react";
 import { createBrowserRouter } from "react-router-dom";
 import RootLayout from "./layouts/RootLayout";
 import HomePage from "./pages/HomePage";
 import NotFoundPage from "./pages/NotFoundPage";
 import ThemePage from "./pages/ThemePage";
 import RouteErrorPage from "./pages/RouteErrorPage";
-import DocsWsPage from "./pages/DocsWsPage";
 import DashboardPage from "./pages/DashboardPage";
 import GamePage from "./pages/GamePage";
-import TestPage from "./test/TestPage";
+
+// Chargées à la demande (chunks async séparés) :
+// - DocsWsPage : route DEV-only, ne doit pas peser sur le bundle de prod.
+// - TestPage : tire @mediapipe/tasks-vision (~137 KB) qui ne sert qu'ici.
+const DocsWsPage = lazy(() => import("./pages/DocsWsPage"));
+const TestPage = lazy(() => import("./test/TestPage"));
 
 const docsWsRoute = import.meta.env.DEV
 	? [{ path: "docs-ws", element: <DocsWsPage /> }]

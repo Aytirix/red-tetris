@@ -2,6 +2,7 @@ import { BOARD_HEIGHT, BOARD_WIDTH, type Board, type Cell, type PieceType, type 
 import type { Player } from "./Player.js";
 import { pieces, PIECES_TYPES, type PieceCell, type PieceShape } from "../types/game/piecesGameTypes.js";
 import { emitGameOver, emitGameStart, emitGameUpdate, getRenderedBoard } from "../gateways/socket/emitters/gameEmitters.js";
+import { settleGameRewards } from "../services/shopService.js";
 import { Piece } from "./Piece.js";
 
 export class Game {
@@ -242,6 +243,14 @@ export class Game {
 		}
 
 		const winner = !isSolo && alivePlayers[0] ? alivePlayers[0].player.getName() : null
+		// Crédit du butin: chaque joueur gagne son score final en berrys (persisté DB).
+		// Appelé une seule fois par partie (interval nettoyé + break dans tick()).
+		const rewardEntries = [...this.state.values()].map((playerState) => ({
+			username: playerState.player.getName(),
+			score: playerState.score,
+			socket: playerState.player.getSocket(),
+		}))
+		void settleGameRewards(rewardEntries)
 		emitGameOver(this.state, winner)
 		return true
 	}
