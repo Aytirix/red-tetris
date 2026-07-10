@@ -3,7 +3,9 @@ import { useNavigate } from "react-router-dom";
 import { ClipLoader } from "react-spinners";
 import { useWsSession } from "../contexts/WsStateContext";
 import { useSocket } from "../contexts/SocketContext";
+import { useShop } from "../contexts/ShopContext";
 import DashboardParallaxScene from "../components/DashboardParallaxScene";
+import ShopScreen from "../components/ShopScreen";
 import { emitSubscribeRooms, emitUnsubscribeRooms } from "../socket/events/room";
 import styles from "./DashboardPage.module.scss";
 
@@ -15,13 +17,18 @@ type RoomInfo = {
 };
 
 type View = "home" | "multiplayer";
+type Screen = "dashboard" | "shop";
 
 export default function DashboardPage() {
 	const { faction } = useWsSession();
 	const { socket } = useSocket();
+	const { berrys } = useShop();
 	const navigate = useNavigate();
 	const theme = faction ?? "pirate";
 
+	// screen = dashboard | shop → on switch les composants SANS quitter la page
+	// (le fond parallax reste monté). view = sous-vue du dashboard.
+	const [screen, setScreen] = useState<Screen>("dashboard");
 	const [hideUI, setHideUI] = useState(false);
 	const [view, setView] = useState<View>("home");
 	const [rooms, setRooms] = useState<RoomInfo[]>([]);
@@ -31,7 +38,7 @@ export default function DashboardPage() {
 	const username = localStorage.getItem("username") ?? "";
 
 	useEffect(() => {
-		if (view !== "multiplayer") return;
+		if (screen !== "dashboard" || view !== "multiplayer") return;
 
 		setRoomsLoading(true);
 
@@ -57,7 +64,7 @@ export default function DashboardPage() {
 			setRooms([]);
 			setRoomsLoading(true);
 		};
-	}, [view, socket]);
+	}, [screen, view, socket]);
 
 	function handleSolo() {
 		const suffix = Math.random().toString(36).substring(2, 8);
@@ -80,108 +87,131 @@ export default function DashboardPage() {
 		<DashboardParallaxScene theme={theme}>
 			<div className={styles.wrapper}>
 
-				{/* ── Hide toggle (always top-right) ── */}
-				<button
-					className={`button button-ghost ${styles.hideBtn}`}
-					onClick={() => setHideUI(h => !h)}
-				>
-					{hideUI ? "Afficher" : "Cacher"}
-				</button>
+				{/* ── Coin haut-gauche : Boutique (switch d'écran) + solde ── */}
+				<div className={styles.topLeft}>
+					<button
+						className="button button-outline"
+						onClick={() => setScreen((s) => (s === "shop" ? "dashboard" : "shop"))}
+					>
+						{screen === "shop" ? "← Jouer" : "🛒 Boutique"}
+					</button>
+					<span className={styles.balance} title="Cumul de tes scores de fin de partie">
+						{berrys.toLocaleString()} ฿
+					</span>
+				</div>
 
-				{/* ── Home panel ── */}
-				{!hideUI && view === "home" && (
-					<div className={`${styles.panel} ${theme === "marine" ? styles.panelMarine : ""}`}>
-						<p className="eyebrow">
-							{theme === "pirate" ? "Pirates" : "Marines"}
-						</p>
-						<h2 style={{ marginTop: "0.4rem", marginBottom: 0 }}>Jouer</h2>
-
-						<div className={styles.actions}>
-							<button className="button button-primary" onClick={handleSolo}>
-								Solo
-							</button>
-							<button
-								className="button button-outline"
-								onClick={() => setView("multiplayer")}
-							>
-								Multijoueur
-							</button>
-						</div>
-					</div>
+				{/* ── Cacher : haut-droite, uniquement sur le dashboard ── */}
+				{screen === "dashboard" && (
+					<button
+						className={`button button-ghost ${styles.hideBtn}`}
+						onClick={() => setHideUI((h) => !h)}
+					>
+						{hideUI ? "Afficher" : "Cacher"}
+					</button>
 				)}
 
-				{/* ── Multiplayer panel ── */}
-				{!hideUI && view === "multiplayer" && (
-					<div className={`${styles.panel} ${theme === "marine" ? styles.panelMarine : ""}`}>
+				{/* ── Écran BOUTIQUE ── */}
+				{screen === "shop" && <ShopScreen />}
 
-						<button
-							className={styles.backBtn}
-							onClick={() => setView("home")}
-							title="Retour"
-						>
-							&#8592;
-						</button>
+				{/* ── Écran DASHBOARD ── */}
+				{screen === "dashboard" && (
+					<>
+						{/* Home panel */}
+						{!hideUI && view === "home" && (
+							<div className={`${styles.panel} ${theme === "marine" ? styles.panelMarine : ""}`}>
+								<p className="eyebrow">
+									{theme === "pirate" ? "Pirates" : "Marines"}
+								</p>
+								<h2 style={{ marginTop: "0.4rem", marginBottom: 0 }}>Jouer</h2>
 
-						{/* Create room */}
-						<div>
-							<p className={styles.sectionLabel}>Créer une salle</p>
-							<div className={styles.createRow}>
-								<input
-									className={styles.input}
-									placeholder="Nom (1–15 caractères)"
-									value={roomName}
-									maxLength={15}
-									onChange={e => setRoomName(e.target.value)}
-									onKeyDown={e => e.key === "Enter" && handleCreateRoom()}
-								/>
+								<div className={styles.actions}>
+									<button className="button button-primary" onClick={handleSolo}>
+										Solo
+									</button>
+									<button
+										className="button button-outline"
+										onClick={() => setView("multiplayer")}
+									>
+										Multijoueur
+									</button>
+								</div>
+							</div>
+						)}
+
+						{/* Multiplayer panel */}
+						{!hideUI && view === "multiplayer" && (
+							<div className={`${styles.panel} ${theme === "marine" ? styles.panelMarine : ""}`}>
+
 								<button
-									className="button button-primary"
-									onClick={handleCreateRoom}
-									disabled={!roomNameValid}
+									className={styles.backBtn}
+									onClick={() => setView("home")}
+									title="Retour"
 								>
-									Créer
+									&#8592;
 								</button>
-							</div>
-						</div>
 
-						{/* Room list */}
-						<div className={styles.roomListSection}>
-							<p className={styles.sectionLabel}>Salles disponibles</p>
-							<div className={styles.roomList}>
-								{roomsLoading ? (
-									<div className={styles.emptyRooms}>
-										<ClipLoader color="var(--color-secondary)" size={14} />
-										<span style={{ marginLeft: "0.5rem" }}>Recherche de salles…</span>
+								{/* Create room */}
+								<div>
+									<p className={styles.sectionLabel}>Créer une salle</p>
+									<div className={styles.createRow}>
+										<input
+											className={styles.input}
+											placeholder="Nom (1–15 caractères)"
+											value={roomName}
+											maxLength={15}
+											onChange={e => setRoomName(e.target.value)}
+											onKeyDown={e => e.key === "Enter" && handleCreateRoom()}
+										/>
+										<button
+											className="button button-primary"
+											onClick={handleCreateRoom}
+											disabled={!roomNameValid}
+										>
+											Créer
+										</button>
 									</div>
-								) : rooms.length === 0 ? (
-									<div className={styles.emptyRooms}>
-										<span>Aucune salle disponible</span>
-									</div>
-								) : (
-									rooms.map(room => (
-										<div key={room.roomId} className={styles.roomItem}>
-											<span className={styles.roomName}>{room.roomId}</span>
-											<span className={styles.roomMeta}>
-												{room.playerCount}
-												{room.maxPlayers ? `/${room.maxPlayers}` : ""}
-											</span>
-											{room.mode && (
-												<span className="badge">{room.mode}</span>
-											)}
-											<button
-												className="button button-outline"
-												style={{ padding: "0.35rem 0.75rem", fontSize: "0.82rem", flexShrink: 0 }}
-												onClick={() => handleJoinRoom(room.roomId)}
-											>
-												Rejoindre
-											</button>
-										</div>
-									))
-								)}
-							</div>
-						</div>
+								</div>
 
-					</div>
+								{/* Room list */}
+								<div className={styles.roomListSection}>
+									<p className={styles.sectionLabel}>Salles disponibles</p>
+									<div className={styles.roomList}>
+										{roomsLoading ? (
+											<div className={styles.emptyRooms}>
+												<ClipLoader color="var(--color-secondary)" size={14} />
+												<span style={{ marginLeft: "0.5rem" }}>Recherche de salles…</span>
+											</div>
+										) : rooms.length === 0 ? (
+											<div className={styles.emptyRooms}>
+												<span>Aucune salle disponible</span>
+											</div>
+										) : (
+											rooms.map(room => (
+												<div key={room.roomId} className={styles.roomItem}>
+													<span className={styles.roomName}>{room.roomId}</span>
+													<span className={styles.roomMeta}>
+														{room.playerCount}
+														{room.maxPlayers ? `/${room.maxPlayers}` : ""}
+													</span>
+													{room.mode && (
+														<span className="badge">{room.mode}</span>
+													)}
+													<button
+														className="button button-outline"
+														style={{ padding: "0.35rem 0.75rem", fontSize: "0.82rem", flexShrink: 0 }}
+														onClick={() => handleJoinRoom(room.roomId)}
+													>
+														Rejoindre
+													</button>
+												</div>
+											))
+										)}
+									</div>
+								</div>
+
+							</div>
+						)}
+					</>
 				)}
 
 			</div>

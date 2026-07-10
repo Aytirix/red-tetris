@@ -5,15 +5,15 @@ import type { Socket } from "socket.io-client";
 
 export function registerGameListeners(sock: Socket) {
 	sock.on("game:start", (data) => {
-		console.log("game:start", data); // TODO: mettre à jour le store / state
+		if (import.meta.env.DEV) console.log("game:start", data); // TODO: mettre à jour le store / state
 	});
 
 	sock.on("game:update", (state) => {
-		console.log("game:update", state); // TODO: mettre à jour le store / state
+		if (import.meta.env.DEV) console.log("game:update", state); // TODO: mettre à jour le store / state
 	});
 
 	sock.on("game:over", (result) => {
-		console.log("game:over", result); // TODO: mettre à jour le store / state
+		if (import.meta.env.DEV) console.log("game:over", result); // TODO: mettre à jour le store / state
 	});
 }
 

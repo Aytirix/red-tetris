@@ -1,5 +1,54 @@
 import type { Game } from "../../../core/Game.js";
+import { BOARD_HEIGHT, BOARD_WIDTH } from "../../../types/game/gameTypes.js";
 import type { Board, OpponentBoard, PlayerGameState } from "../../../types/game/gameTypes.js";
+
+type GhostCell = { x: number; y: number };
+
+// Projection d'atterrissage (ghost piece): descend la pièce courante au plus bas
+// possible SANS la muter, et renvoie les cellules occupées à cet endroit.
+// Utilise playerState.board (verrouillé, sans la pièce) pour la collision.
+function getGhostCells(playerState: PlayerGameState): GhostCell[] {
+	const piece = playerState.currentPiece;
+	if (!piece)
+		return [];
+	const board = playerState.board;
+
+	const collides = (offY: number): boolean => {
+		for (let y = 0; y < piece.shape.length; y++) {
+			const row = piece.shape[y];
+			if (!row)
+				continue;
+			for (let x = 0; x < row.length; x++) {
+				if (row[x] !== 1)
+					continue;
+				const ny = piece.getY() + y + offY;
+				const nx = piece.getX() + x;
+				if (nx < 0 || nx >= BOARD_WIDTH || ny < 0 || ny >= BOARD_HEIGHT)
+					return true;
+				const boardRow = board[ny];
+				if (!boardRow || boardRow[nx] !== 0)
+					return true;
+			}
+		}
+		return false;
+	};
+
+	let drop = 0;
+	while (!collides(drop + 1))
+		drop++;
+
+	const cells: GhostCell[] = [];
+	for (let y = 0; y < piece.shape.length; y++) {
+		const row = piece.shape[y];
+		if (!row)
+			continue;
+		for (let x = 0; x < row.length; x++) {
+			if (row[x] === 1)
+				cells.push({ x: piece.getX() + x, y: piece.getY() + y + drop });
+		}
+	}
+	return cells;
+}
 
 function getOpponentBoards(
 	state: Map<string, PlayerGameState>,
@@ -36,7 +85,8 @@ export function emitGameStart(state: Map<string, PlayerGameState>, game: Game) :
 				},
 				"score": playerState.score,
 				"level": playerState.level,
-				"spectator": playerState.spectator
+				"spectator": playerState.spectator,
+				"ghost": getGhostCells(playerState)
 		})
 	}
 }
@@ -88,7 +138,8 @@ export function emitGameUpdate(playerState: PlayerGameState, state: Map<string, 
 			},
 			"score": playerState.score,
 			"level": playerState.level,
-			"spectator": playerState.spectator
+			"spectator": playerState.spectator,
+			"ghost": getGhostCells(playerState)
 	})
 }
 

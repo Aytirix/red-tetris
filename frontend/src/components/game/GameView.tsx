@@ -1,6 +1,8 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, type CSSProperties } from "react";
 import type { GameStatePayload } from "../../types/game";
 import { emitGameDrop, emitGameMove, emitGameRotate, emitSubscribeSpectator } from "../../socket/events/game";
+import { useShop } from "../../contexts/ShopContext";
+import { getPieceTheme, themeCssVars } from "../../config/pieceThemes";
 import GameBoard from "./GameBoard";
 import GameHud from "./GameHud";
 import NextPiecePreview from "./NextPiecePreview";
@@ -23,6 +25,9 @@ export default function GameView({ state, roomName, playerName }: Props) {
 	const spectatorOf = isSpectator ? (state.spectator as string) : null;
 	const isSolo = roomName.startsWith("sologame_");
 	const showLevel = isSolo;
+
+	const { equipped } = useShop();
+	const pieceTheme = getPieceTheme(equipped);
 
 	const boardRows = state.board.length;
 	const mainBoardHeightPx = boardRows * MAIN_CELL_SIZE;
@@ -82,7 +87,7 @@ export default function GameView({ state, roomName, playerName }: Props) {
 	}
 
 	return (
-		<div className="tetris-stage">
+		<div className="tetris-stage" data-recipe={pieceTheme.recipe} style={themeCssVars(pieceTheme) as CSSProperties}>
 			<div className="tetris-stage__inner">
 				{/* Left column — first opponents */}
 				<aside
@@ -106,7 +111,12 @@ export default function GameView({ state, roomName, playerName }: Props) {
 						spectatorOf={spectatorOf}
 					/>
 					<div className="tetris-stage__board-wrap">
-						<GameBoard board={state.board} cellSize={MAIN_CELL_SIZE} />
+						<GameBoard
+							board={state.board}
+							cellSize={MAIN_CELL_SIZE}
+							ghost={state.ghost}
+							ghostPiece={state.currentPiece?.type ?? null}
+						/>
 					</div>
 				</div>
 
