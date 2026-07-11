@@ -1,4 +1,4 @@
-import type { RoomJoinPayload, RoomKickPayload, RoomModePayload, RoomSetPrivatePayload } from "../../../types/socket/roomSocketTypes.js";
+import type { RoomJoinPayload, RoomKickPayload, RoomModePayload, RoomSetPrivatePayload, SubscribeSpectatorPayload } from "../../../types/socket/roomSocketTypes.js";
 
 const ROOM_ID_REGEX = /^[a-zA-Z0-9_]{1,15}$/;
 
@@ -43,5 +43,17 @@ export function isValidRoomSetPrivatePayload(payload: unknown) : payload is Room
 		Object.keys(payload).length === 1 &&
 		"private" in payload &&
 		typeof payload.private === "boolean"
+	)
+}
+
+export function isValidSubscribeSpectatorPayload(payload: unknown) : payload is SubscribeSpectatorPayload {
+	return (
+		typeof payload === "object" &&
+		payload !== null &&
+		Object.keys(payload).length === 2 &&
+		"roomId" in payload &&
+		"user" in payload &&
+		typeof payload.roomId === "string" &&
+		(payload.user === null || typeof payload.user === "string")
 	)
 }

@@ -1,6 +1,7 @@
 import { Socket } from "socket.io";
 import { emitPlayersRoom, emitSubscrib } from "../emitters/roomEmitters.js";
 import { roomSocketStore } from "../roomSocketStore.js";
+import { spectatorSocketStore } from "../spectatorSocketStore.js";
 import { userSocketStore } from "../userSocketStore.js";
 
 export function handlerDisconnect(socket: Socket): void {
@@ -16,6 +17,7 @@ export function handlerDisconnect(socket: Socket): void {
 					emitSubscrib()
 					break
 				}
+				spectatorSocketStore.delete(socket.id)
 				userSocketStore.delete(socket.id)
 			});
 	}

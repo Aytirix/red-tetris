@@ -1,12 +1,16 @@
 import type { Socket } from "socket.io";
-import { isValidRoomJoinPayload, isValidRoomKickPayload, isValidRoomModePayload, isValidRoomName, isValidRoomSetPrivatePayload } from "../validators/validateRoomEvent.js";
+import { isValidRoomJoinPayload, isValidRoomKickPayload, isValidRoomModePayload, isValidRoomName, isValidRoomSetPrivatePayload, isValidSubscribeSpectatorPayload } from "../validators/validateRoomEvent.js";
 import { emitError } from "../emitters/systemEmitters.js";
 import { roomSocketStore } from "../roomSocketStore.js";
 import { createRoom, getRoom } from "../../../services/roomService.js";
 import { emitKickedRoom, emitPlayersRoom, emitRoomJoined, emitRoomSettings, emitSubscrib } from "../emitters/roomEmitters.js";
+import { emitSpectatorGame } from "../emitters/gameEmitters.js";
 import { userSocketStore } from "../userSocketStore.js";
 import { Game } from "../../../core/Game.js";
 import { createPlayer } from "../../../services/playerService.js";
+import type { Room } from "../../../core/room.js";
+import type { Player } from "../../../core/Player.js";
+import { spectatorSocketStore } from "../spectatorSocketStore.js";
 
 export async function handlerRoomJoin(socket: Socket, payload: unknown): Promise<void> {
 	if (!isValidRoomJoinPayload(payload)) {
@@ -161,6 +165,8 @@ export function handleRoomStart(socket: Socket, payload: unknown) : void {
 }
 
 export function handleMove(socket: Socket, payload: unknown) : void {
+	if (spectatorSocketStore.has(socket.id))
+		return
 	if (
 		!payload ||
 		typeof payload !== "object" ||
@@ -181,6 +187,8 @@ export function handleMove(socket: Socket, payload: unknown) : void {
 }
 
 export function handleRotate(socket: Socket, payload: unknown) : void {
+	if (spectatorSocketStore.has(socket.id))
+		return
 	if (!payload) {
 		const room = getRoom(socket)
 		if (!room)
@@ -193,6 +201,8 @@ export function handleRotate(socket: Socket, payload: unknown) : void {
 }
 
 export function handleDrop(socket: Socket, payload: unknown) : void {
+	if (spectatorSocketStore.has(socket.id))
+		return
 	if (!payload) {
 		const room = getRoom(socket)
 		if (!room)
@@ -202,4 +212,73 @@ export function handleDrop(socket: Socket, payload: unknown) : void {
 			return
 		game.drop(socket.id)
 	}
+}
+
+function getRoomByName(roomName: string) : Room | null {
+	const room = roomSocketStore.get(roomName)
+	if (!room)
+		return null
+	return room
+}
+
+function getGameInRoom(room: Room) : Game | null {
+	if (room.getStatus() !== "playing")
+		return null
+	return room.getGame()
+}
+
+function getPlayerToSpectate(game: Game, username: null | string) : Player | null {
+	if (username === null) {
+		const firstPlayer = game.players[0]
+		if (!firstPlayer)
+			return null
+		return firstPlayer
+	}
+	if (username === "")
+		return null
+	for (const player of game.players) {
+		if (player.getName() === username)
+			return player
+	}
+	return null
+}
+
+function saveSpectatorSubscription(socket: Socket, game: Game, player: Player) : void {
+	spectatorSocketStore.set(socket.id, {
+		game: game,
+		player: player,
+	})
+}
+
+export function handleSubscribeSpectator(socket: Socket, payload: unknown) : void {
+	if (!isValidSubscribeSpectatorPayload(payload)) {
+		emitError(socket, "game:subscribeSpectatorGame", "Invalid payload");
+		return
+	}
+
+	const room = getRoomByName(payload.roomId)
+	if (!room) {
+		emitError(socket, "game:subscribeSpectatorGame", "Room not found");
+		return
+	}
+
+	const game = getGameInRoom(room)
+	if (!game) {
+		emitError(socket, "game:subscribeSpectatorGame", "Game not found");
+		return
+	}
+
+	const playerSpectated = getPlayerToSpectate(game, payload.user)
+	if (!playerSpectated) {
+		emitError(socket, "game:subscribeSpectatorGame", "Player not found");
+		return
+	}
+
+	saveSpectatorSubscription(socket, game, playerSpectated)
+	emitSpectatorGame(socket, game, playerSpectated)
+}
+
+export function handleUnsubscribeSpectator(socket: Socket, payload: unknown) : void {
+	if (!payload)
+		spectatorSocketStore.delete(socket.id)
 }

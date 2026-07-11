@@ -1,5 +1,9 @@
 import type { Game } from "../../../core/Game.js";
+import type { Player } from "../../../core/Player.js";
+import type { Socket } from "socket.io";
 import type { Board, OpponentBoard, PlayerGameState } from "../../../types/game/gameTypes.js";
+import { spectatorSocketStore } from "../spectatorSocketStore.js";
+import { userSocketStore } from "../userSocketStore.js";
 
 function getOpponentBoards(
 	state: Map<string, PlayerGameState>,
@@ -90,6 +94,42 @@ export function emitGameUpdate(playerState: PlayerGameState, state: Map<string, 
 			"level": playerState.level,
 			"spectator": playerState.spectator
 	})
+}
+
+export function emitSpectatorGame(socket: Socket, game: Game, player: Player) : void {
+	const playerState = game.getPlayerStateBySocketId(player.getSocketId())
+	if (!playerState)
+		return
+	if (!playerState.currentPiece)
+		throw new Error("Missing current piece before spectator game emit");
+	if (!playerState.nextPiece)
+		throw new Error("Missing next piece before spectator game emit");
+	socket.emit("game:SpectatorGame", {
+		"board": getRenderedBoard(playerState),
+		"opponents": getOpponentBoards(game.getState(), player.getSocketId()),
+		"currentPiece": {
+			"type": playerState.currentPiece.type
+		},
+		"nextPiece": {
+			"type": playerState.nextPiece.type
+			},
+			"score": playerState.score,
+			"level": playerState.level,
+			"spectator": player.getName()
+	})
+}
+
+export function emitSpectatorForPlayer(playerState: PlayerGameState, state: Map<string, PlayerGameState>) : void {
+	for (const [spectatorSocketId, subscription] of spectatorSocketStore) {
+		if (subscription.game.getState() !== state)
+			continue
+		if (subscription.player.getSocketId() !== playerState.player.getSocketId())
+			continue
+		const spectatorSession = userSocketStore.get(spectatorSocketId)
+		if (!spectatorSession)
+			continue
+		emitSpectatorGame(spectatorSession.socket, subscription.game, subscription.player)
+	}
 }
 
 export function emitGameOver(state: Map<string, PlayerGameState>, winner: string | null) : void {
