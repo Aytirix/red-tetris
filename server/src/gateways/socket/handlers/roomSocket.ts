@@ -1,5 +1,5 @@
 import type { Socket } from "socket.io";
-import { handleDrop, handleMove, handleRoomKick, handleRoomMode, handleRoomSetPrivate, handleRoomStart, handleRotate, handlerRoomJoin, handlerRoomLeave, handlerRoomSubscribe, handlerRoomUnsubscribe} from "./roomHandlers.js";
+import { handleDrop, handleMove, handleRoomKick, handleRoomMode, handleRoomSetPrivate, handleRoomStart, handleRotate, handleSubscribeSpectator, handleUnsubscribeSpectator, handlerRoomJoin, handlerRoomLeave, handlerRoomSubscribe, handlerRoomUnsubscribe} from "./roomHandlers.js";
 
 
 export function registerRoomSocket(socket: Socket) : void {
@@ -35,5 +35,11 @@ export function registerRoomSocket(socket: Socket) : void {
 	})
 	socket.on("game:drop", (msg) => {
 		handleDrop(socket, msg)
+	})
+	socket.on("game:subscribeSpectatorGame", (msg) => {
+		handleSubscribeSpectator(socket, msg)
+	})
+	socket.on("game:unsubscribeSpectatorGame", (msg) => {
+		handleUnsubscribeSpectator(socket, msg)
 	})
 }
