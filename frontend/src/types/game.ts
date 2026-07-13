@@ -13,6 +13,8 @@ export type GamePiece = {
 	type: PieceType;
 };
 
+export type GhostCell = { x: number; y: number };
+
 export type GameStatePayload = {
 	board: GameBoard;
 	opponents: OpponentBoard[];
@@ -21,6 +23,7 @@ export type GameStatePayload = {
 	score: number;
 	level: number;
 	spectator: false | string;
+	ghost: GhostCell[];
 };
 
 export type GameOverScore = {

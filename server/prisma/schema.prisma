@@ -18,12 +18,15 @@ enum Faction {
 }
 
 model User {
-  id        Int      @id @default(autoincrement())
-  username  String   @unique
-  faction   Faction?
+  id            Int      @id @default(autoincrement())
+  username      String   @unique
+  faction       Faction?
   avatar	String
-  wins      Int      @default(0)
-  losses    Int      @default(0)
+  wins          Int      @default(0)
+  losses        Int      @default(0)
+  berrys        Int      @default(0)
+  ownedThemes   String[] @default([])
+  equippedTheme String   @default("neon-gem")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }

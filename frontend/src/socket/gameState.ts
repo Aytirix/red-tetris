@@ -5,6 +5,7 @@ import type {
 	GameOverScore,
 	GamePiece,
 	GameStatePayload,
+	GhostCell,
 	OpponentBoard,
 	PieceType,
 } from "../types/game";
@@ -63,6 +64,18 @@ function normalizeSpectator(raw: unknown): false | string {
 	return false;
 }
 
+function normalizeGhost(raw: unknown): GhostCell[] {
+	if (!Array.isArray(raw)) return [];
+	const out: GhostCell[] = [];
+	for (const c of raw) {
+		if (!c || typeof c !== "object") continue;
+		const x = (c as { x?: unknown }).x;
+		const y = (c as { y?: unknown }).y;
+		if (typeof x === "number" && typeof y === "number") out.push({ x, y });
+	}
+	return out;
+}
+
 export function normalizeGameState(raw: unknown): GameStatePayload | null {
 	if (!raw || typeof raw !== "object") return null;
 	const r = raw as Record<string, unknown>;
@@ -78,6 +91,7 @@ export function normalizeGameState(raw: unknown): GameStatePayload | null {
 		score,
 		level,
 		spectator: normalizeSpectator(r.spectator),
+		ghost: normalizeGhost(r.ghost),
 	};
 }
 

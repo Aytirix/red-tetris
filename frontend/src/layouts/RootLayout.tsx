@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 import DevToolsMenu from "../components/DevToolsMenu";
 import { useAuthGuard } from "../hooks/useAuthGuard";
@@ -13,7 +14,9 @@ export default function RootLayout() {
 	if (isHomePage || isDashboard || isGamePage) {
 		return (
 			<>
-				<Outlet />
+				<Suspense fallback={null}>
+					<Outlet />
+				</Suspense>
 				<DevToolsMenu />
 			</>
 		);
@@ -22,7 +25,9 @@ export default function RootLayout() {
 	return (
 		<>
 			<main className={`page${isDocsWsPage ? " page-wide" : ""}`}>
-				<Outlet />
+				<Suspense fallback={null}>
+					<Outlet />
+				</Suspense>
 			</main>
 			<DevToolsMenu />
 		</>

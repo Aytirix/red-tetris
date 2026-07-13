@@ -70,11 +70,11 @@ export default function DashboardParallaxScene({ theme, children }: Props) {
 	}, []);
 
 	return (
-		<div ref={sceneRef} className={styles.scene} aria-hidden="true">
+		<div ref={sceneRef} className={styles.scene}>
 			{theme === "pirate" ? <PirateLayers /> : <MarineLayers />}
-			<div className={styles.scrim} />
+			<div className={styles.scrim} aria-hidden="true" />
 			{children !== undefined && (
-				<div className={styles.content} aria-hidden="false">
+				<div className={styles.content}>
 					{children}
 				</div>
 			)}
