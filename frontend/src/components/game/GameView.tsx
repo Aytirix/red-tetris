@@ -18,9 +18,12 @@ type Props = {
 	state: GameStatePayload;
 	roomName: string;
 	playerName: string;
+	eliminated?: boolean;
+	onEliminationDone?: () => void;
+	onLeave?: () => void;
 };
 
-export default function GameView({ state, roomName, playerName }: Props) {
+export default function GameView({ state, roomName, playerName, eliminated = false, onEliminationDone, onLeave }: Props) {
 	const isSpectator = state.spectator !== false;
 	const spectatorOf = isSpectator ? (state.spectator as string) : null;
 	const isSolo = roomName.startsWith("sologame_");
@@ -88,6 +91,11 @@ export default function GameView({ state, roomName, playerName }: Props) {
 
 	return (
 		<div className="tetris-stage" data-recipe={pieceTheme.recipe} style={themeCssVars(pieceTheme) as CSSProperties}>
+			{onLeave && (
+				<button type="button" className="button button-ghost tetris-stage__leave" onClick={onLeave}>
+					Quitter la partie
+				</button>
+			)}
 			<div className="tetris-stage__inner">
 				{/* Left column — first opponents */}
 				<aside
@@ -138,6 +146,17 @@ export default function GameView({ state, roomName, playerName }: Props) {
 			</div>
 			{/* avoid unused warning for player name in this component scope */}
 			<span hidden>{playerName}</span>
+
+			{eliminated && (
+				<div className="tetris-gameover-overlay">
+					<span
+						className="tetris-gameover-overlay__text"
+						onAnimationEnd={onEliminationDone}
+					>
+						GAME OVER
+					</span>
+				</div>
+			)}
 		</div>
 	);
 }

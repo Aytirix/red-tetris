@@ -7,6 +7,7 @@ export type GameBoard = GameBoardCell[][];
 export type OpponentBoard = {
 	username: string;
 	board: GameBoard;
+	alive: boolean;
 };
 
 export type GamePiece = {

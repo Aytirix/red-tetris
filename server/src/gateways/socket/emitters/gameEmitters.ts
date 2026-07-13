@@ -57,15 +57,20 @@ import { userSocketStore } from "../userSocketStore.js";
 function getOpponentBoards(
 	state: Map<string, PlayerGameState>,
 	currentSocketId: string,
+	spectatorSocketId?: string,
 ): OpponentBoard[] {
 	const opponents: OpponentBoard[] = [];
 
 	for (const [socketId, playerState] of state) {
 		if (socketId === currentSocketId)
 			continue;
+		// Un spectateur (ex: joueur mort) ne doit pas se voir lui-même sur le côté.
+		if (spectatorSocketId && socketId === spectatorSocketId)
+			continue;
 		opponents.push({
 			username: playerState.player.getName(),
 			board: playerState.board,
+			alive: playerState.isAlive,
 		});
 	}
 	return opponents;
@@ -157,7 +162,7 @@ export function emitSpectatorGame(socket: Socket, game: Game, player: Player) : 
 		throw new Error("Missing next piece before spectator game emit");
 	socket.emit("game:SpectatorGame", {
 		"board": getRenderedBoard(playerState),
-		"opponents": getOpponentBoards(game.getState(), player.getSocketId()),
+		"opponents": getOpponentBoards(game.getState(), player.getSocketId(), socket.id),
 		"currentPiece": {
 			"type": playerState.currentPiece.type
 		},
@@ -181,6 +186,24 @@ export function emitSpectatorForPlayer(playerState: PlayerGameState, state: Map<
 			continue
 		emitSpectatorGame(spectatorSession.socket, subscription.game, subscription.player)
 	}
+}
+
+// Élimination individuelle: un joueur a topped-out alors que la partie continue
+// (d'autres joueurs sont encore vivants). On le notifie SEULEMENT lui, et on lui
+// indique un joueur vivant à spectater par défaut (≠ lui-même).
+export function emitPlayerEliminated(playerState: PlayerGameState, state: Map<string, PlayerGameState>) : void {
+	let spectate: string | null = null
+	for (const other of state.values()) {
+		if (other.isAlive && other.player.getSocketId() !== playerState.player.getSocketId()) {
+			spectate = other.player.getName()
+			break
+		}
+	}
+	playerState.player.getSocket().emit("game:eliminated", {
+		"score": playerState.score,
+		"level": playerState.level,
+		"spectate": spectate,
+	})
 }
 
 export function emitGameOver(state: Map<string, PlayerGameState>, winner: string | null) : void {
