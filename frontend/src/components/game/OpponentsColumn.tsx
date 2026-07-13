@@ -35,6 +35,7 @@ export default function OpponentsColumn({
 					board={o.board}
 					clickable={clickable}
 					active={currentSpectatorTarget === o.username}
+					alive={o.alive}
 					onClick={clickable && onSelect ? () => onSelect(o.username) : undefined}
 				/>
 			))}

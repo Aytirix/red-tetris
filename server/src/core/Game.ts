@@ -1,7 +1,7 @@
 import { BOARD_HEIGHT, BOARD_WIDTH, type Board, type Cell, type PieceType, type PlayerGameState } from "../types/game/gameTypes.js";
 import type { Player } from "./Player.js";
 import { pieces, PIECES_TYPES, type PieceCell, type PieceShape } from "../types/game/piecesGameTypes.js";
-import { emitGameOver, emitGameStart, emitGameUpdate, getRenderedBoard } from "../gateways/socket/emitters/gameEmitters.js";
+import { emitGameOver, emitGameStart, emitGameUpdate, emitPlayerEliminated, emitSpectatorForPlayer, getRenderedBoard } from "../gateways/socket/emitters/gameEmitters.js";
 import { settleGameRewards } from "../services/shopService.js";
 import { Piece } from "./Piece.js";
 import type { Room } from "./room.js";
@@ -181,7 +181,7 @@ export class Game {
 		while (this.canMove(playerState, 0, 1))
 			playerState.currentPiece.moveDown()
 		const isGameOver = this.lockAndSpawnNext(playerState)
-		if (!isGameOver) {
+		if (!isGameOver && playerState.isAlive) {
 			emitGameUpdate(playerState, this.state)
 			emitSpectatorForPlayer(playerState, this.state)
 		}
@@ -256,6 +256,12 @@ export class Game {
 			this.intervalId = null
 		}
 
+		// Fin de partie: rouvrir la room (retour salon) et détacher la game terminée.
+		// Sinon un joueur qui ACTUALISE pendant le game over reviendrait dans le visuel
+		// de partie (room encore "playing" → joined=false → spectateur) au lieu du lobby.
+		this.room.setStatus("waiting")
+		this.room.setGame(null)
+
 		const winner = !isSolo && alivePlayers[0] ? alivePlayers[0].player.getName() : null
 		// Crédit du butin: chaque joueur gagne son score final en berrys (persisté DB).
 		// Appelé une seule fois par partie (interval nettoyé + break dans tick()).
@@ -276,7 +282,14 @@ export class Game {
 		this.clearLines(playerState)
 		playerState.pieceIndex ++
 		this.spawnPiece(playerState)
-		return this.checkGameOver()
+		const justEliminated = !playerState.isAlive
+		const isGameOver = this.checkGameOver()
+		// Mort individuelle mais partie non terminée: notifier ce joueur (game over
+		// perso + passage spectateur côté client). Si la partie est finie, emitGameOver
+		// (déjà émis par checkGameOver) s'en charge pour tout le monde.
+		if (justEliminated && !isGameOver)
+			emitPlayerEliminated(playerState, this.state)
+		return isGameOver
 	}
 	tick() : void {
 		for (const [, playerState] of this.state) {
@@ -290,7 +303,7 @@ export class Game {
 						isGameOver = this.lockAndSpawnNext(playerState)
 				if (isGameOver)
 					break
-				if (!isGameOver) {
+				if (!isGameOver && playerState.isAlive) {
 					emitGameUpdate(playerState, this.state)
 					emitSpectatorForPlayer(playerState, this.state)
 				}

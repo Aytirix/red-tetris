@@ -54,7 +54,9 @@ function normalizeOpponents(raw: unknown): OpponentBoard[] {
 		const board = normalizeBoard((o as { board?: unknown }).board);
 		if (typeof username !== "string" || !username) continue;
 		if (!board) continue;
-		out.push({ username, board });
+		// alive absent → considéré vivant (rétro-compat / robustesse).
+		const alive = (o as { alive?: unknown }).alive !== false;
+		out.push({ username, board, alive });
 	}
 	return out;
 }

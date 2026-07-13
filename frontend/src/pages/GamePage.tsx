@@ -238,6 +238,9 @@ export default function GamePage() {
 	const [isRoomLoading, setIsRoomLoading] = useState(true);
 	const [gameState, setGameState] = useState<GameStatePayload | null>(null);
 	const [gameOver, setGameOver] = useState<GameOverPayload | null>(null);
+	// Élimination individuelle en multi (partie qui continue): déclenche l'overlay
+	// "GAME OVER" zoom, puis bascule en spectateur à la fin de l'animation.
+	const [eliminated, setEliminated] = useState(false);
 
 	const roomName = rawRoom.slice(0, MAX_NAME_LENGTH);
 
@@ -253,6 +256,10 @@ export default function GamePage() {
 	const hasJoinedRoomRef = useRef(false);
 	const hasLeftRoomRef = useRef(false);
 	const isSpectatorRef = useRef(false);
+	const eliminateSpectateRef = useRef<string | null>(null);
+	// True dès qu'on a rejoint la room en tant que JOUEUR (≠ spectateur pur): permet
+	// de distinguer un mort-devenu-spectateur d'un simple spectateur au moment de partir.
+	const wasPlayerRef = useRef(false);
 	const lastPlayerLevelRef = useRef(1);
 	useEffect(() => { rawRoomRef.current = rawRoom; }, [rawRoom]);
 	useEffect(() => { roomNameRef.current = roomName; }, [roomName]);
@@ -274,7 +281,10 @@ export default function GamePage() {
 		hasLeftRoomRef.current = true;
 		if (isSpectatorRef.current) {
 			emitUnsubscribeSpectator();
-		} else if (roomNameRef.current) {
+		}
+		// Un joueur (même éliminé et devenu spectateur) doit quitter la room, pas
+		// seulement se désabonner — sinon il resterait "fantôme" jusqu'à déconnexion.
+		if (wasPlayerRef.current && roomNameRef.current) {
 			emitLeaveRoom();
 		}
 		hasJoinedRoomRef.current = false;
@@ -301,11 +311,14 @@ export default function GamePage() {
 		hasJoinedRoomRef.current = false;
 		hasLeftRoomRef.current = false;
 		isSpectatorRef.current = false;
+		eliminateSpectateRef.current = null;
+		wasPlayerRef.current = false;
 		setView("connecting");
 		setPlayers([]);
 		setIsRoomLoading(true);
 		setGameState(null);
 		setGameOver(null);
+		setEliminated(false);
 		lastPlayerLevelRef.current = 1;
 
 		function handlePageExit() {
@@ -356,6 +369,7 @@ export default function GamePage() {
 				setView("game");
 			} else {
 				isSpectatorRef.current = false;
+				wasPlayerRef.current = true;
 				setView("lobby");
 			}
 		}
@@ -432,23 +446,44 @@ export default function GamePage() {
 				: payload;
 			setGameOver(nextPayload);
 			setGameState(null);
+			setEliminated(false);
 			setView("lobby");
+		}
+		function handleEliminated(raw: unknown) {
+			// Le backend n'envoie ce signal qu'au joueur qui vient de topper alors
+			// que la partie continue. On garde l'écran de jeu (dernière frame) et on
+			// laisse l'overlay "GAME OVER" jouer; la bascule spectateur se fait à la
+			// fin de l'animation (handleEliminationDone).
+			const p = (raw ?? {}) as { spectate?: unknown };
+			eliminateSpectateRef.current = typeof p.spectate === "string" ? p.spectate : null;
+			isSpectatorRef.current = true;
+			setEliminated(true);
+			setView("game");
 		}
 		socket.on("game:start", handleStateUpdate);
 		socket.on("game:update", handleStateUpdate);
 		socket.on("game:SpectatorGame", handleStateUpdate);
 		socket.on("game:over", handleOver);
+		socket.on("game:eliminated", handleEliminated);
 		return () => {
 			socket.off("game:start", handleStateUpdate);
 			socket.off("game:update", handleStateUpdate);
 			socket.off("game:SpectatorGame", handleStateUpdate);
 			socket.off("game:over", handleOver);
+			socket.off("game:eliminated", handleEliminated);
 		};
 	}, [socket]);
 
 	function handleLeave() {
 		leaveRoomOnce();
 		navigate("/dashboard");
+	}
+
+	// Fin de l'animation "GAME OVER": on s'abonne comme spectateur d'un joueur
+	// encore vivant (nom fourni par le backend) et on retire l'overlay.
+	function handleEliminationDone() {
+		emitSubscribeSpectator(roomNameRef.current, eliminateSpectateRef.current);
+		setEliminated(false);
 	}
 
 	return (
@@ -478,6 +513,9 @@ export default function GamePage() {
 					state={gameState}
 					roomName={roomName}
 					playerName={playerName}
+					eliminated={eliminated}
+					onEliminationDone={handleEliminationDone}
+					onLeave={handleLeave}
 				/>
 			)}
 			{view === "game" && !gameState && (

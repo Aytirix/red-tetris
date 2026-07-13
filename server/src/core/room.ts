@@ -48,7 +48,7 @@ export class Room {
 		}
 		return false
 	}
-	setGame(game: Game) : void {
+	setGame(game: Game | null) : void {
 		this.game = game
 	}
 	getGame() : Game | null {

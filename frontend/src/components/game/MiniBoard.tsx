@@ -7,6 +7,7 @@ type Props = {
 	cellSize?: number;
 	clickable?: boolean;
 	active?: boolean;
+	alive?: boolean;
 	onClick?: () => void;
 };
 
@@ -16,6 +17,7 @@ export default function MiniBoard({
 	cellSize = 10,
 	clickable = false,
 	active = false,
+	alive = true,
 	onClick,
 }: Props) {
 	const rows = board.length;
@@ -25,6 +27,7 @@ export default function MiniBoard({
 		"tetris-mini",
 		clickable ? "tetris-mini--clickable" : "",
 		active ? "tetris-mini--active" : "",
+		!alive ? "tetris-mini--dead" : "",
 	].filter(Boolean).join(" ");
 
 	const Wrapper = clickable ? "button" : "div";

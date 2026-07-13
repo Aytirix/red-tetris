@@ -18,6 +18,7 @@ export type Board = Cell [][];
 export type OpponentBoard = {
 	username: string;
 	board: Board;
+	alive: boolean;
 };
 
 export type PlayerGameState = {

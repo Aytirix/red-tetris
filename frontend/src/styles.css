@@ -1814,6 +1814,54 @@ a:hover {
 
 /* Game over */
 
+/* Overlay "GAME OVER" — élimination individuelle en multi (la partie continue).
+   Le texte apparaît minuscule, grossit vite jusqu'à une taille lisible, s'y
+   attarde ~2,5 s, puis continue de zoomer jusqu'à disparaître. Timing "linear":
+   c'est l'espacement des keyframes qui donne la sensation d'accélération. */
+@keyframes tetris-gameover-zoom {
+	0%   { transform: scale(0.06); opacity: 0; }
+	6%   { opacity: 1; }
+	16%  { transform: scale(1); }
+	18%  { transform: scale(1.04); }
+	62%  { transform: scale(1.9); opacity: 1; }
+	100% { transform: scale(16); opacity: 0; }
+}
+
+.tetris-gameover-overlay {
+	position: absolute;
+	inset: 0;
+	z-index: 30;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	overflow: hidden;
+	background: var(--color-scrim);
+	pointer-events: none;
+}
+
+.tetris-gameover-overlay__text {
+	margin: 0;
+	font-family: var(--font-display);
+	font-weight: 700;
+	font-size: clamp(1.6rem, 5vw, 3.4rem);
+	letter-spacing: 0.14em;
+	white-space: nowrap;
+	color: var(--color-primary);
+	text-shadow: var(--shadow-neon-red);
+	transform: scale(0.06);
+	transform-origin: center;
+	will-change: transform, opacity;
+	animation: tetris-gameover-zoom 5s linear forwards;
+}
+
+/* Motion réduit: on garde une animation (sinon l'événement animationend, qui
+   déclenche la bascule spectateur, ne se déclencherait jamais) mais raccourcie. */
+@media (prefers-reduced-motion: reduce) {
+	.tetris-gameover-overlay__text {
+		animation-duration: 1.6s;
+	}
+}
+
 .tetris-over {
 	flex: 1;
 	display: flex;
@@ -2628,4 +2676,27 @@ a:hover {
 .glass-panel h3,
 .glass-panel h4 {
 	color: var(--color-text-on-dark);
+}
+
+/* ── Adversaire éliminé: mini-board grisé ──────────────────────────────────
+   Placé APRÈS les recipes de thème et scopé sous [data-recipe] (spécificité
+   0,3,0, même niveau que les recipes) → l'emporte quel que soit le thème
+   équipé. Neutralise la teinte des pièces d'un joueur mort. */
+[data-recipe] .tetris-mini--dead .tetris-cell--filled {
+	--c: #6b7280;
+	background: linear-gradient(160deg, #838b99, #363b47);
+	box-shadow: inset 0 0 calc(var(--cs, 20px) * 0.28) rgba(0, 0, 0, 0.5);
+}
+
+.tetris-mini--dead .tetris-mini__name {
+	opacity: 0.55;
+}
+
+/* Bouton "quitter la partie" — même rendu joueur ET spectateur, coin haut-droit
+   de la scène (sous l'overlay GAME OVER z-index:30). */
+.tetris-stage__leave {
+	position: absolute;
+	top: 1rem;
+	right: 1rem;
+	z-index: 20;
 }
