@@ -4,6 +4,7 @@ export type RoomJoinPayload = {
 
 export type RoomJoinedPayload = {
 	roomId: string;
+	joined: boolean;
 	players: {
 		username: string;
 		avatar: string;
@@ -21,4 +22,9 @@ export type RoomModePayload = {
 
 export type RoomSetPrivatePayload = {
 	private: boolean
+}
+
+export type SubscribeSpectatorPayload = {
+	roomId: string;
+	user: null | string;
 }

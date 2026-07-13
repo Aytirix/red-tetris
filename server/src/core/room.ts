@@ -72,6 +72,9 @@ export class Room {
 	getMode() : "classique" | "ultra" | "sprint" {
 		return this.mode
 	}
+	getStatus() : "waiting" | "playing" | "finished" {
+		return this.status
+	}
 	countPlayer() : number {
 		return this.players.length
 	}
@@ -121,5 +124,8 @@ export class Room {
 	searchName(username: string): boolean {
 		return this.getPlayers().some((player) => player.getName() === username)
 	}
+	findPlayerByName(username: string): Player | undefined {
+		return this.players.find((player) => player.getName() === username)
+	}
 	startGame() : void {}
-}
+	}
