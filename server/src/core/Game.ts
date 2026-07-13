@@ -4,16 +4,19 @@ import { pieces, PIECES_TYPES, type PieceCell, type PieceShape } from "../types/
 import { emitGameOver, emitGameStart, emitGameUpdate, getRenderedBoard } from "../gateways/socket/emitters/gameEmitters.js";
 import { settleGameRewards } from "../services/shopService.js";
 import { Piece } from "./Piece.js";
+import type { Room } from "./room.js";
 
 export class Game {
 	public mode: "classique" | "ultra" | "sprint"
 	public players: Player[];
+	private room: Room;
 	private state: Map<string, PlayerGameState>;
 	private pieceQueue: PieceType[];
 	private intervalId: NodeJS.Timeout | null;
-	constructor (mode: "classique" | "ultra" | "sprint", players: Player[]) {
+	constructor (mode: "classique" | "ultra" | "sprint", players: Player[], room: Room) {
 		this.mode = mode;
 		this.players = players;
+		this.room = room;
 		this.state = new Map()
 		this.pieceQueue = this.randomPiece()
 		this.intervalId = null
@@ -140,6 +143,12 @@ export class Game {
 		const level = playerState?.level ?? 1
 		return Math.max(80, 400 - ((level - 1) * 40))
 	}
+	getPlayerStateBySocketId(socketId: string) : PlayerGameState | undefined {
+		return this.state.get(socketId)
+	}
+	getState() : Map<string, PlayerGameState> {
+		return this.state
+	}
 	restartTickInterval() : void {
 		if (this.intervalId)
 			clearInterval(this.intervalId)
@@ -172,8 +181,10 @@ export class Game {
 		while (this.canMove(playerState, 0, 1))
 			playerState.currentPiece.moveDown()
 		const isGameOver = this.lockAndSpawnNext(playerState)
-		if (!isGameOver)
+		if (!isGameOver) {
 			emitGameUpdate(playerState, this.state)
+			emitSpectatorForPlayer(playerState, this.state)
+		}
 	}
 	move(socketId: string, direction: "left" | "right" | "down") : void {
 		const playerState = this.state.get(socketId)
@@ -188,6 +199,7 @@ export class Game {
 			playerState.currentPiece.moveDown()
 
 		emitGameUpdate(playerState, this.state)
+		emitSpectatorForPlayer(playerState, this.state)
 	}
 	randomPiece() : PieceType[] {
 		const pieces: PieceType[] = ["I", "J", "L", "O", "S", "T", "Z"]
@@ -206,12 +218,14 @@ export class Game {
 		const playerState = this.state.get(socketId)
 		if (!playerState || !playerState.currentPiece || !playerState.isAlive)
 			return
-	const rotate = playerState.currentPiece.getRotatedShape()
+		const rotate = playerState.currentPiece.getRotatedShape()
 		if (!rotate)
 			return
-		if (this.canRotate(rotate, playerState))
+		if (this.canRotate(rotate, playerState)) {
 			playerState.currentPiece.shape = rotate
 			emitGameUpdate(playerState, this.state)
+			emitSpectatorForPlayer(playerState, this.state)
+		}
 		} 
 	start() : void {
 		for (const [, playerStat] of this.state) {
@@ -276,8 +290,10 @@ export class Game {
 						isGameOver = this.lockAndSpawnNext(playerState)
 				if (isGameOver)
 					break
-				if (!isGameOver)
+				if (!isGameOver) {
 					emitGameUpdate(playerState, this.state)
+					emitSpectatorForPlayer(playerState, this.state)
+				}
 			}
 	}
 }
