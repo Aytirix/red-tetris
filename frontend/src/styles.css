@@ -248,6 +248,7 @@ h3 {
 	align-items: center;
 }
 
+/* ── Boutons : liquid glass + teinte de couleur par fonction ──────────────── */
 .button {
 	display: inline-flex;
 	align-items: center;
@@ -258,6 +259,15 @@ h3 {
 	font-size: 0.95rem;
 	font-weight: 700;
 	letter-spacing: 0.02em;
+	/* base verre dépoli */
+	color: var(--color-text-on-dark);
+	border: 1px solid rgba(255, 255, 255, 0.22);
+	background: rgba(255, 255, 255, 0.10);
+	backdrop-filter: blur(14px) saturate(180%);
+	-webkit-backdrop-filter: blur(14px) saturate(180%);
+	box-shadow:
+		inset 0 1px 0 rgba(255, 255, 255, 0.45),
+		inset 0 -2px 6px rgba(0, 0, 0, 0.20);
 	transition:
 		transform var(--transition-soft),
 		box-shadow var(--transition-soft),
@@ -267,41 +277,62 @@ h3 {
 
 .button:hover {
 	transform: translateY(-1px);
+	border-color: rgba(255, 255, 255, 0.4);
 }
 
 .button:disabled {
 	cursor: default;
-	opacity: 0.58;
+	opacity: 0.5;
 }
 
 .button:disabled:hover {
 	transform: none;
 }
 
+/* Action principale / confirmer / lancer — ROUGE */
 .button-primary {
-	background: linear-gradient(135deg, var(--color-primary), var(--color-primary-strong));
-	color: #fffdf9;
-	box-shadow: var(--shadow-neon-red);
+	background:
+		linear-gradient(135deg, rgba(255, 60, 95, 0.55), rgba(209, 43, 69, 0.34)),
+		rgba(255, 255, 255, 0.04);
+	border-color: rgba(255, 120, 145, 0.5);
+	color: #fff;
+	box-shadow:
+		inset 0 1px 0 rgba(255, 255, 255, 0.5),
+		inset 0 -2px 6px rgba(0, 0, 0, 0.22);
 }
 
+/* Info / secondaire — CYAN */
 .button-secondary {
-	border: 1px solid rgba(28, 120, 192, 0.18);
-	background: linear-gradient(180deg, rgba(255, 255, 255, 0.88), rgba(233, 244, 255, 0.92));
-	color: var(--color-secondary);
-	box-shadow: var(--shadow-neon-cyan);
+	background:
+		linear-gradient(135deg, rgba(61, 231, 255, 0.42), rgba(28, 120, 192, 0.28)),
+		rgba(255, 255, 255, 0.04);
+	border-color: rgba(61, 231, 255, 0.5);
+	color: #eafcff;
+	box-shadow:
+		inset 0 1px 0 rgba(255, 255, 255, 0.5),
+		inset 0 -2px 6px rgba(0, 0, 0, 0.22);
 }
 
+/* Quitter / cacher / fermer — AMBRE */
 .button-ghost {
-	border: 1px solid rgba(214, 166, 59, 0.2);
-	background: rgba(255, 250, 239, 0.95);
-	color: #8d6720;
-	box-shadow: 0 14px 32px rgba(214, 166, 59, 0.08);
+	background:
+		linear-gradient(135deg, rgba(255, 205, 100, 0.30), rgba(214, 166, 59, 0.18)),
+		rgba(255, 255, 255, 0.05);
+	border-color: rgba(255, 210, 120, 0.45);
+	color: #ffe9c2;
+	box-shadow:
+		inset 0 1px 0 rgba(255, 255, 255, 0.42),
+		inset 0 -2px 6px rgba(0, 0, 0, 0.20);
 }
 
+/* Annuler / navigation / neutre — SLATE clair */
 .button-outline {
-	border: 1px solid var(--color-border);
-	background: rgba(255, 255, 255, 0.72);
-	color: var(--color-text);
+	background: rgba(220, 228, 250, 0.12);
+	border-color: rgba(255, 255, 255, 0.28);
+	color: var(--color-text-on-dark);
+	box-shadow:
+		inset 0 1px 0 rgba(255, 255, 255, 0.4),
+		inset 0 -2px 6px rgba(0, 0, 0, 0.18);
 }
 
 .hero-preview {
@@ -2585,4 +2616,16 @@ a:hover {
 	width: 100%;
 	max-width: 1000px;
 	margin: 0 auto;
+}
+
+/* Contenu des panneaux en verre liquide (liquid-glass-react) : texte clair */
+.glass-panel {
+	color: var(--color-text-on-dark);
+}
+
+.glass-panel h1,
+.glass-panel h2,
+.glass-panel h3,
+.glass-panel h4 {
+	color: var(--color-text-on-dark);
 }

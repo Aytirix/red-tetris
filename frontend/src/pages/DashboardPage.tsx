@@ -19,6 +19,92 @@ type RoomInfo = {
 type View = "home" | "multiplayer";
 type Screen = "dashboard" | "shop";
 
+// Noms d'équipages de pirates One Piece pour nommer les salles automatiquement.
+// (≤ 10 car. pour laisser la place au suffixe _N sans dépasser 15.)
+const CREW_NAMES = [
+	// Yonko
+	"Mugiwara",
+	"Straw Hat",
+	"Red Hair",
+	"Whitebeard",
+	"Big Mom",
+	"Beasts",
+	"Blackbeard",
+
+	// Légendes
+	"Roger",
+	"Rocks",
+	"Gold Lion",
+	"Spade",
+	"Rumbar",
+
+	// Supernovas
+	"Heart",
+	"Kid",
+	"Hawkins",
+	"On Air",
+	"Monk",
+	"Bonney",
+	"Fire Tank",
+	"Drake",
+
+	// East Blue
+	"Alvida",
+	"Buggy",
+	"Black Cat",
+	"Krieg",
+	"Arlong",
+
+	// Grand Line
+	"Bliking",
+	"Baroque",
+	"Foxy",
+	"Saruyama",
+	"Bellamy",
+	"Giants",
+	"Moria",
+
+	// Water Seven / CP
+	"Franky",
+	"CP9",
+	"CP0",
+
+	// Nouveau Monde / Fishman
+	"Kuja",
+	"Sun",
+	"Fishman",
+	"Flying",
+	"Caribou",
+	"Macro",
+	"Fake Hat",
+
+	// Dressrosa / Grand Fleet
+	"Doflamingo",
+	"Barto Club",
+	"Beautiful",
+	"Happo Navy",
+	"Tontatta",
+	"Ideo",
+	"Yonta",
+	"New Giants",
+	"SH Fleet",
+
+	// Wano
+	"Scabbards",
+	"Kozuki",
+	"Kurozumi",
+	"Mimawari",
+
+	// Organisations
+	"Germa 66",
+	"Revo Army",
+	"CrossGuild",
+	"Knights",
+	"SWORD",
+];
+
+const SOLO_PREFIX = "sologame_";
+
 export default function DashboardPage() {
 	const { faction } = useWsSession();
 	const { socket } = useSocket();
@@ -33,7 +119,6 @@ export default function DashboardPage() {
 	const [view, setView] = useState<View>("home");
 	const [rooms, setRooms] = useState<RoomInfo[]>([]);
 	const [roomsLoading, setRoomsLoading] = useState(true);
-	const [roomName, setRoomName] = useState("");
 
 	const username = localStorage.getItem("username") ?? "";
 
@@ -71,17 +156,28 @@ export default function DashboardPage() {
 		navigate(`/sologame_${suffix}/${username}`);
 	}
 
+	// Choisit un nom d'équipage libre (aléatoire); si tous pris, ajoute _1, _2, …
+	function pickRoomName(): string {
+		const taken = new Set(rooms.map((r) => r.roomId));
+		const free = CREW_NAMES.filter((n) => !taken.has(n));
+		if (free.length > 0) return free[Math.floor(Math.random() * free.length)];
+		for (let i = 1; i < 1000; i++) {
+			const freeSuffixed = CREW_NAMES.map((n) => `${n}_${i}`).filter((c) => !taken.has(c));
+			if (freeSuffixed.length > 0) return freeSuffixed[Math.floor(Math.random() * freeSuffixed.length)];
+		}
+		return `Crew_${Math.random().toString(36).slice(2, 7)}`;
+	}
+
 	function handleCreateRoom() {
-		const name = roomName.trim();
-		if (!name || name.length > 15) return;
-		navigate(`/${name}/${username}`);
+		navigate(`/${pickRoomName()}/${username}`);
 	}
 
 	function handleJoinRoom(roomId: string) {
 		navigate(`/${roomId}/${username}`);
 	}
 
-	const roomNameValid = roomName.trim().length >= 1 && roomName.trim().length <= 15;
+	// Les parties solo ne doivent pas apparaître dans les salles disponibles.
+	const visibleRooms = rooms.filter((r) => !r.roomId.startsWith(SOLO_PREFIX));
 
 	return (
 		<DashboardParallaxScene theme={theme}>
@@ -150,27 +246,14 @@ export default function DashboardPage() {
 									&#8592;
 								</button>
 
-								{/* Create room */}
-								<div>
-									<p className={styles.sectionLabel}>Créer une salle</p>
-									<div className={styles.createRow}>
-										<input
-											className={styles.input}
-											placeholder="Nom (1–15 caractères)"
-											value={roomName}
-											maxLength={15}
-											onChange={e => setRoomName(e.target.value)}
-											onKeyDown={e => e.key === "Enter" && handleCreateRoom()}
-										/>
-										<button
-											className="button button-primary"
-											onClick={handleCreateRoom}
-											disabled={!roomNameValid}
-										>
-											Créer
-										</button>
-									</div>
-								</div>
+								{/* Créer une salle — nom d'équipage One Piece attribué automatiquement */}
+								<button
+									className="button button-primary"
+									style={{ width: "100%" }}
+									onClick={handleCreateRoom}
+								>
+									+ Créer une salle
+								</button>
 
 								{/* Room list */}
 								<div className={styles.roomListSection}>
@@ -181,12 +264,12 @@ export default function DashboardPage() {
 												<ClipLoader color="var(--color-secondary)" size={14} />
 												<span style={{ marginLeft: "0.5rem" }}>Recherche de salles…</span>
 											</div>
-										) : rooms.length === 0 ? (
+										) : visibleRooms.length === 0 ? (
 											<div className={styles.emptyRooms}>
 												<span>Aucune salle disponible</span>
 											</div>
 										) : (
-											rooms.map(room => (
+											visibleRooms.map(room => (
 												<div key={room.roomId} className={styles.roomItem}>
 													<span className={styles.roomName}>{room.roomId}</span>
 													<span className={styles.roomMeta}>
