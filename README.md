@@ -20,13 +20,28 @@ Le frontend Vite est ensuite accessible sur `http://localhost:5180`.
 make prod
 ```
 
-Le build de production est servi par Nginx sur `http://localhost:8080`.
+Comme l'impose le sujet, c'est le **serveur Node lui-même** qui sert la SPA : le
+profil `prod` construit le bundle avec Vite dans un volume, puis Express sert
+`index.html`, le bundle et les assets statiques sur `http://localhost:${PORT}` —
+le même port que Socket.IO. Une URL de partie s'écrit donc
+`http://<host>:<port>/<room>/<player_name>`.
+
+Le conteneur applique les migrations Prisma au démarrage, la base peut être vierge.
+
+### Tests
+
+```bash
+make test
+```
+
+Lance les deux suites avec la couverture et les seuils imposés par le sujet
+(70 % statements/functions/lines, 50 % branches).
 
 ### Structure ajoutée
 
 - `frontend/` contient l'application React + TypeScript + Vite
 - `frontend/Dockerfile` gère le mode dev et le build de prod
-- `frontend/nginx.conf` sert la SPA en production
+- `server/src/app.ts` sert la SPA et les assets en production
 - `docker-compose.yml` expose un profil `dev` et un profil `prod`
 - `Makefile` ajoute des commandes simples pour piloter les deux modes
 

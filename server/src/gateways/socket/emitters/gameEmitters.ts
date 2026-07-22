@@ -2,7 +2,7 @@ import type { Game } from "../../../core/Game.js";
 import { BOARD_HEIGHT, BOARD_WIDTH } from "../../../types/game/gameTypes.js";
 import type { Player } from "../../../core/Player.js";
 import type { Socket } from "socket.io";
-import type { Board, OpponentBoard, PlayerGameState } from "../../../types/game/gameTypes.js";
+import type { Board, Cell, OpponentBoard, PlayerGameState } from "../../../types/game/gameTypes.js";
 
 type GhostCell = { x: number; y: number };
 
@@ -54,10 +54,41 @@ function getGhostCells(playerState: PlayerGameState): GhostCell[] {
 import { spectatorSocketStore } from "../spectatorSocketStore.js";
 import { userSocketStore } from "../userSocketStore.js";
 
+/**
+ * Spectre d'un plateau, tel que l'impose le sujet: pour chaque colonne on ne garde que
+ * la hauteur du bloc le plus haut, remplie jusqu'en bas avec un marqueur neutre.
+ * Un joueur ne doit voir ni les couleurs de ses adversaires, ni les trous sous leur pile.
+ */
+export function getSpectrumBoard(board: Board): Board {
+	const spectrum: Board = Array.from(
+		{ length: BOARD_HEIGHT },
+		() => Array.from({ length: BOARD_WIDTH }, () => 0 as Cell),
+	);
+
+	for (let x = 0; x < BOARD_WIDTH; x++) {
+		let top = -1;
+		for (let y = 0; y < BOARD_HEIGHT; y++) {
+			const row = board[y];
+			if (row && row[x] !== 0) {
+				top = y;
+				break;
+			}
+		}
+		if (top < 0)
+			continue;
+		for (let y = top; y < BOARD_HEIGHT; y++) {
+			const row = spectrum[y];
+			if (row)
+				row[x] = "spectrum";
+		}
+	}
+	return spectrum;
+}
+
 function getOpponentBoards(
 	state: Map<string, PlayerGameState>,
 	currentSocketId: string,
-	spectatorSocketId?: string,
+	options: { spectatorSocketId?: string; fullBoards?: boolean } = {},
 ): OpponentBoard[] {
 	const opponents: OpponentBoard[] = [];
 
@@ -65,11 +96,12 @@ function getOpponentBoards(
 		if (socketId === currentSocketId)
 			continue;
 		// Un spectateur (ex: joueur mort) ne doit pas se voir lui-même sur le côté.
-		if (spectatorSocketId && socketId === spectatorSocketId)
+		if (options.spectatorSocketId && socketId === options.spectatorSocketId)
 			continue;
 		opponents.push({
 			username: playerState.player.getName(),
-			board: playerState.board,
+			// Un joueur en jeu ne recoit que le spectre; un spectateur voit les vrais plateaux.
+			board: options.fullBoards ? playerState.board : getSpectrumBoard(playerState.board),
 			alive: playerState.isAlive,
 		});
 	}
@@ -162,7 +194,10 @@ export function emitSpectatorGame(socket: Socket, game: Game, player: Player) : 
 		throw new Error("Missing next piece before spectator game emit");
 	socket.emit("game:SpectatorGame", {
 		"board": getRenderedBoard(playerState),
-		"opponents": getOpponentBoards(game.getState(), player.getSocketId(), socket.id),
+		"opponents": getOpponentBoards(game.getState(), player.getSocketId(), {
+			spectatorSocketId: socket.id,
+			fullBoards: true,
+		}),
 		"currentPiece": {
 			"type": playerState.currentPiece.type
 		},

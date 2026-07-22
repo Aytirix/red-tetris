@@ -22,6 +22,11 @@ export class Room {
 	addPlayer(player: Player) : boolean {
 		if (!this.canJoin())
 			return (false);
+		// Un meme socket ne doit jamais figurer deux fois: la Game indexe son state par
+		// socketId, donc un doublon desynchronise players (N) et state (1) et fait finir
+		// la partie des le premier verrouillage.
+		if (this.players.some((current) => current.getSocketId() === player.getSocketId()))
+			return (false);
 		if (!this.hostPlayerId)
 			this.hostPlayerId = player.getSocketId()
 		this.players.push(player)

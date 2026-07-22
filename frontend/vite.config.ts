@@ -17,6 +17,13 @@ export default defineConfig(({ mode }) => {
 		...loadEnv(mode, process.cwd(), ""),
 		...process.env,
 	};
+	// Le .env de la racine (partage avec Docker Compose) contient NODE_ENV=development,
+	// necessaire au service backend-dev. loadEnv le recopie dans VITE_USER_NODE_ENV, et
+	// Vite bascule alors TOUT le build en mode developpement: React en jsxDEV,
+	// `import.meta.env.DEV === true`, donc les routes DEV-only — dont /test et son
+	// <canvas> @mediapipe interdit par le sujet — atterrissaient dans dist/.
+	// Le front ne consomme jamais NODE_ENV: on coupe donc cet effet de bord.
+	delete process.env.VITE_USER_NODE_ENV;
 	const frontendPort = parsePort(env.PORT_DEV_FRONTEND, 5173);
 	const previewPort = parsePort(env.PORT_PREVIEW_FRONTEND, 4173);
 

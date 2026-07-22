@@ -23,6 +23,21 @@ export async function handlerRoomJoin(socket: Socket, payload: unknown): Promise
 		console.log("Error: roomId invalid");
 		return;
 	}
+	// Un socket ne doit jamais etre assis dans deux rooms a la fois: sinon le meme
+	// socketId peut etre injecte deux fois dans une partie et desynchroniser
+	// Room.players de Game.state.
+	const currentRoom = getRoom(socket)
+	if (currentRoom) {
+		// Meme room: join idempotent, on se contente de renvoyer l'etat courant.
+		if (currentRoom.name === payload.roomId) {
+			emitRoomJoined(socket, currentRoom)
+			return;
+		}
+		// Room differente: on quitte proprement l'ancienne (comme un room:leave) au
+		// lieu de refuser, sinon un changement de room plus rapide que l'aller-retour
+		// room:join/room:joined laisserait le client bloque sur l'ecran de connexion.
+		leaveRoom(socket, currentRoom)
+	}
 	const room = roomSocketStore.get(payload.roomId)
 	if (!room) {
 		const newRoom = await createRoom(socket, payload.roomId)
@@ -65,20 +80,31 @@ export function handlerRoomUnsubscribe(socket: Socket, payload: unknown) : void 
 	}
 }
 
+/**
+ * Sortie propre d'un socket de sa room. Quitter en pleine partie sort d'abord le
+ * joueur de la Game (mort + reevaluation de la fin de partie): sinon l'interval de
+ * gravite survivrait a la suppression de la room.
+ */
+function leaveRoom(socket: Socket, room: Room) : boolean {
+	room.getGame()?.abandon(socket.id)
+	if (!room.removePlayerBySocketId(socket.id))
+		return false
+	if (room.countPlayer() === 0)
+		roomSocketStore.delete(room.name)
+	else
+		emitPlayersRoom(room.getPlayers())
+	return true
+}
+
 export function handlerRoomLeave(socket: Socket, payload: unknown) : void {
 	if (!payload) {
 		const room = getRoom(socket)
 		if (!room)
 			return
-			const removed = room.removePlayerBySocketId(socket.id)
-			if (!removed)
-				return
-			if (room.countPlayer() === 0)
-				roomSocketStore.delete(room.name)
-			else
-				emitPlayersRoom(room.getPlayers())
-			socket.emit("room:left")
-			emitSubscrib()
+		if (!leaveRoom(socket, room))
+			return
+		socket.emit("room:left")
+		emitSubscrib()
 	}
 }
 
@@ -92,6 +118,13 @@ export function handleRoomKick(socket: Socket, payload: unknown) : void {
 	const room = getRoom(socket)
 	if (!room)
 		return
+	// Kicker en pleine partie retirerait le joueur de la Room sans le retirer de la
+	// Game: il ne pourrait plus jouer (getRoom -> null) alors que la gravite continue
+	// de faire tomber ses pieces = elimination a la demande par l'hote.
+	if (room.getStatus() !== "waiting") {
+		emitError(socket, "room:kick", "Cannot kick during a running game");
+		return
+	}
 	if (!room.searchName(username)) {
 		emitError(socket, "room:kick", "Invalid username");
 		console.log("Error: username invalid for kick");
@@ -122,6 +155,11 @@ export function handleRoomMode(socket: Socket, payload: unknown) : void {
 	const room = getRoom(socket)
 	if (!room)
 		return
+	// Changer le mode en pleine partie ferait diverger room.mode de game.mode.
+	if (room.getStatus() !== "waiting") {
+		emitError(socket, "room:setMode", "Cannot change mode during a running game");
+		return
+	}
 	if (!room.setMode(mode, socket)) {
 		emitError(socket, "room:setMode", "Invalid Mode or Not Host");
 		console.log("Error: Invalid Mode or Not Host");
@@ -140,6 +178,10 @@ export function handleRoomSetPrivate(socket: Socket, payload: unknown) : void {
 	const visibility = payload.private
 	if (!room)
 		return
+	if (room.getStatus() !== "waiting") {
+		emitError(socket, "room:setPrivate", "Cannot change visibility during a running game");
+		return
+	}
 	if (!room.setPrivate(visibility, socket)) {
 		emitError(socket, "room:setPrivate", "only host can change visibility");
 		console.log("Error: Invalid Mode or only host can change visibility");
@@ -153,14 +195,22 @@ export function handleRoomStart(socket: Socket, payload: unknown) : void {
 		const room = getRoom(socket)
 		if (!room)
 			return
-		const mode = room.getMode()
-		const players = room.getPlayers()
-		const game = new Game(mode, players, room)
-		if (socket.id === room.getHostId()) {
-			room.setStatus("playing")
-			room.setGame(game)
-			game.start()
-		}
+		// Les controles passent AVANT la construction de la Game: son constructeur
+		// rattache tous les joueurs a la partie (setGame/setInGame). Le construire en
+		// premier laissait n'importe quel non-hote reattacher tout le monde a une partie
+		// morte, et un second room:start creait un deuxieme setInterval sans nettoyer le
+		// premier - deux boucles de gravite sur les memes joueurs.
+		if (socket.id !== room.getHostId())
+			return
+		if (room.getStatus() !== "waiting")
+			return
+		// Copie du tableau: getPlayers() renvoie la liste vivante de la Room, un depart
+		// en cours de partie muterait sinon retroactivement Game.players (dont dependent
+		// isSolo, getTickSpeed et updateLevel).
+		const game = new Game(room.getMode(), [...room.getPlayers()], room)
+		room.setStatus("playing")
+		room.setGame(game)
+		game.start()
 	}
 }
 
@@ -265,6 +315,16 @@ export function handleSubscribeSpectator(socket: Socket, payload: unknown) : voi
 	const game = getGameInRoom(room)
 	if (!game) {
 		emitError(socket, "game:subscribeSpectatorGame", "Game not found");
+		return
+	}
+
+	// Un joueur VIVANT de cette partie ne doit jamais pouvoir se mettre en spectateur:
+	// les frames spectateur contiennent les plateaux REELS des adversaires, ce qui
+	// annulerait completement le spectre impose par le sujet. Seuls un joueur elimine
+	// ou un socket exterieur a la partie peuvent spectater.
+	const requesterState = game.getPlayerStateBySocketId(socket.id)
+	if (requesterState && requesterState.isAlive) {
+		emitError(socket, "game:subscribeSpectatorGame", "Alive players cannot spectate");
 		return
 	}
 

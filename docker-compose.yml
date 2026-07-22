@@ -22,9 +22,39 @@ services:
     build:
       context: ./frontend
       target: build
+      args:
+        VITE_PORT: ${PORT:?PORT is required}
     volumes:
       - frontend_dist:/dist
-    command: sh -c "cp -r /app/dist/. /dist/"
+    command: sh -c "rm -rf /dist/* && cp -r /app/dist/. /dist/"
+
+  backend-prod:
+    profiles: [ "prod" ]
+    restart: unless-stopped
+    build:
+      context: ./server
+      target: prod
+    ports:
+      - "0.0.0.0:${PORT:?PORT is required}:${PORT:?PORT is required}"
+    environment:
+      HOST: ${HOST:?HOST is required}
+      PORT: ${PORT:?PORT is required}
+      NODE_ENV: production
+      STATIC_DIR: /frontend/dist
+      FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:-http://localhost:${PORT}}
+      POSTGRES_HOST: ${POSTGRES_HOST:?POSTGRES_HOST is required}
+      POSTGRES_PORT: ${POSTGRES_PORT:?POSTGRES_PORT is required}
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB is required}
+      DATABASE_URL: postgresql://${POSTGRES_USER:?POSTGRES_USER is required}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@db:5432/${POSTGRES_DB:?POSTGRES_DB is required}?schema=public
+    volumes:
+      - frontend_dist:/frontend/dist:ro
+    depends_on:
+      db:
+        condition: service_healthy
+      frontend-builder:
+        condition: service_completed_successfully
 
   backend-dev:
     profiles: [ "dev" ]
@@ -61,7 +91,9 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
       POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB is required}
     ports:
-      - "${POSTGRES_PORT:?POSTGRES_PORT is required}:5432"
+      # Publie uniquement en local: la base n'a pas a etre joignable depuis le LAN,
+      # backend-prod l'atteint par le reseau interne de Compose.
+      - "127.0.0.1:${POSTGRES_PORT:?POSTGRES_PORT is required}:5432"
     volumes:
       - db_data:/var/lib/postgresql
     healthcheck:
@@ -71,6 +103,9 @@ services:
       retries: 10
 
   pgadmin:
+    # Console d'administration de la base: outil de developpement uniquement, elle ne
+    # doit jamais etre publiee par le profil prod.
+    profiles: [ "dev" ]
     image: dpage/pgadmin4
     restart: always
     depends_on:
