@@ -17,9 +17,11 @@ export function handlerDisconnect(socket: Socket): void {
 						game?.abandon(socket.id)
 					if (!room.removePlayerBySocketId(socket.id))
 						continue
-					if (room.countPlayer() === 0)
+					if (room.countPlayer() === 0) {
+						// Annule un eventuel decompte en cours avant de supprimer la room.
+						room.clearCountdown()
 						roomSocketStore.delete(room.name)
-					else
+					} else
 						emitPlayersRoom(room.getPlayers())
 					emitSubscrib()
 					break

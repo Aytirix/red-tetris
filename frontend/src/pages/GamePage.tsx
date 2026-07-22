@@ -238,6 +238,8 @@ export default function GamePage() {
 	const [isRoomLoading, setIsRoomLoading] = useState(true);
 	const [gameState, setGameState] = useState<GameStatePayload | null>(null);
 	const [gameOver, setGameOver] = useState<GameOverPayload | null>(null);
+	// Décompte 3-2-1 diffusé par le serveur entre room:start et le vrai démarrage.
+	const [countdown, setCountdown] = useState<number | null>(null);
 	// Élimination individuelle en multi (partie qui continue): déclenche l'overlay
 	// "GAME OVER" zoom, puis bascule en spectateur à la fin de l'animation.
 	const [eliminated, setEliminated] = useState(false);
@@ -429,9 +431,17 @@ export default function GamePage() {
 			if (next.spectator === false) {
 				lastPlayerLevelRef.current = next.level;
 			}
+			setCountdown(null);
 			setGameState(next);
 			setGameOver(null);
 			setView("game");
+		}
+		function handleCountdown(raw: unknown) {
+			const value = (raw as { value?: unknown } | null)?.value;
+			if (typeof value !== "number") return;
+			// Overlay 3-2-1 par-dessus le lobby, jusqu'à l'arrivée de game:start.
+			setGameOver(null);
+			setCountdown(value);
 		}
 		function handleOver(raw: unknown) {
 			const payload = normalizeGameOver(raw);
@@ -460,12 +470,14 @@ export default function GamePage() {
 			setEliminated(true);
 			setView("game");
 		}
+		socket.on("game:countdown", handleCountdown);
 		socket.on("game:start", handleStateUpdate);
 		socket.on("game:update", handleStateUpdate);
 		socket.on("game:SpectatorGame", handleStateUpdate);
 		socket.on("game:over", handleOver);
 		socket.on("game:eliminated", handleEliminated);
 		return () => {
+			socket.off("game:countdown", handleCountdown);
 			socket.off("game:start", handleStateUpdate);
 			socket.off("game:update", handleStateUpdate);
 			socket.off("game:SpectatorGame", handleStateUpdate);
@@ -475,6 +487,7 @@ export default function GamePage() {
 	}, [socket]);
 
 	function handleLeave() {
+		setCountdown(null);
 		leaveRoomOnce();
 		navigate("/dashboard");
 	}
@@ -524,6 +537,12 @@ export default function GamePage() {
 						<ClipLoader color="var(--color-secondary)" size={26} />
 						<span>Chargement de la partie…</span>
 					</div>
+				</div>
+			)}
+			{countdown !== null && (
+				<div className="game-countdown" role="status" aria-live="assertive">
+					<span key={countdown} className="game-countdown__value">{countdown}</span>
+					<span className="game-countdown__label">La partie commence…</span>
 				</div>
 			)}
 		</div>

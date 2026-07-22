@@ -357,12 +357,25 @@ describe("roomHandlers", () => {
 	});
 
 	describe("handleRoomStart", () => {
-		it("starts the game when the host asks for it", () => {
+		it("diffuse un decompte 3-2-1 puis demarre la partie", () => {
 			const { room, sockets } = seedRoom("salle1", ["luffy", "zoro"]);
 
 			handleRoomStart(sockets.get("luffy")!, undefined);
 
+			// Verrou immediat, mais la Game n'existe pas encore: on affiche d'abord "3".
 			expect(room.getStatus()).toBe("playing");
+			expect(room.getGame()).toBeNull();
+			expect(lastEmit(sockets.get("luffy")!, "game:countdown")).toEqual(["game:countdown", { value: 3 }]);
+			expect(lastEmit(sockets.get("zoro")!, "game:countdown")).toEqual(["game:countdown", { value: 3 }]);
+			expect(lastEmit(sockets.get("luffy")!, "game:start")).toBeUndefined();
+
+			vi.advanceTimersByTime(1000);
+			expect(lastEmit(sockets.get("luffy")!, "game:countdown")).toEqual(["game:countdown", { value: 2 }]);
+			vi.advanceTimersByTime(1000);
+			expect(lastEmit(sockets.get("luffy")!, "game:countdown")).toEqual(["game:countdown", { value: 1 }]);
+
+			// A 3s, la partie demarre reellement.
+			vi.advanceTimersByTime(1000);
 			expect(room.getGame()).toBeInstanceOf(Game);
 			expect(lastEmit(sockets.get("luffy")!, "game:start")).toBeDefined();
 			expect(lastEmit(sockets.get("zoro")!, "game:start")).toBeDefined();
@@ -372,10 +385,26 @@ describe("roomHandlers", () => {
 			const { room, sockets } = seedRoom("salle1", ["luffy", "zoro"]);
 
 			handleRoomStart(sockets.get("zoro")!, undefined);
+			vi.advanceTimersByTime(3000);
 
 			expect(room.getStatus()).toBe("waiting");
 			expect(room.getGame()).toBeNull();
+			expect(lastEmit(sockets.get("zoro")!, "game:countdown")).toBeUndefined();
 			expect(lastEmit(sockets.get("zoro")!, "game:start")).toBeUndefined();
+		});
+
+		it("annule le decompte si la room se vide avant le demarrage", () => {
+			const { room, sockets } = seedRoom("salle1", ["luffy", "zoro"]);
+
+			handleRoomStart(sockets.get("luffy")!, undefined);
+			vi.advanceTimersByTime(1000);
+			handlerRoomLeave(sockets.get("luffy")!, undefined);
+			handlerRoomLeave(sockets.get("zoro")!, undefined);
+
+			// Aucune Game ne doit apparaitre apres coup, la room est supprimee.
+			vi.advanceTimersByTime(5000);
+			expect(roomSocketStore.has("salle1")).toBe(false);
+			expect(room.getGame()).toBeNull();
 		});
 
 		it("does nothing when the socket is in no room", () => {
@@ -401,11 +430,29 @@ describe("roomHandlers", () => {
 			const { room, sockets } = seedRoom("salle1", ["luffy", "zoro"]);
 
 			handleRoomStart(sockets.get("luffy")!, undefined);
+			vi.advanceTimersByTime(3000);
 			const firstGame = room.getGame();
+			expect(firstGame).toBeInstanceOf(Game);
 			handleRoomStart(sockets.get("luffy")!, undefined);
+			vi.advanceTimersByTime(3000);
 
 			expect(room.getGame()).toBe(firstGame);
 			expect(room.getStatus()).toBe("playing");
+		});
+
+		it("ignores a second start pendant le decompte (avant le demarrage)", () => {
+			const { room, sockets } = seedRoom("salle1", ["luffy", "zoro"]);
+
+			handleRoomStart(sockets.get("luffy")!, undefined);
+			// Pendant le decompte le status est deja "playing": un second start est ignore
+			// et ne lance pas un deuxieme decompte.
+			handleRoomStart(sockets.get("luffy")!, undefined);
+			sockets.get("luffy")!.emit.mockClear();
+			vi.advanceTimersByTime(3000);
+
+			expect(room.getGame()).toBeInstanceOf(Game);
+			const startCalls = sockets.get("luffy")!.emit.mock.calls.filter((c) => c[0] === "game:start");
+			expect(startCalls).toHaveLength(1);
 		});
 
 		it("ignores the call when a payload is given", () => {
@@ -419,6 +466,7 @@ describe("roomHandlers", () => {
 		function startedRoom() {
 			const seeded = seedRoom("salle1", ["luffy", "zoro"]);
 			handleRoomStart(seeded.sockets.get("luffy")!, undefined);
+			vi.advanceTimersByTime(3000);
 			for (const socket of seeded.sockets.values()) socket.emit.mockClear();
 			return seeded;
 		}
@@ -530,6 +578,7 @@ describe("roomHandlers", () => {
 		function startedRoom() {
 			const seeded = seedRoom("salle1", ["luffy", "zoro"]);
 			handleRoomStart(seeded.sockets.get("luffy")!, undefined);
+			vi.advanceTimersByTime(3000);
 			return seeded;
 		}
 

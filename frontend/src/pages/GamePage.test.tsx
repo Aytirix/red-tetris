@@ -298,6 +298,42 @@ describe("GamePage — partie en cours", () => {
 	});
 });
 
+describe("GamePage — decompte de lancement", () => {
+	it("affiche l'overlay 3-2-1 et le met a jour a chaque valeur", () => {
+		const { container } = renderGamePage();
+		joinLobby([{ username: "luffy", faction: "pirate" }]);
+
+		receive("game:countdown", { value: 3 });
+		expect(container.querySelector(".game-countdown__value")?.textContent).toBe("3");
+
+		receive("game:countdown", { value: 2 });
+		expect(container.querySelector(".game-countdown__value")?.textContent).toBe("2");
+
+		receive("game:countdown", { value: 1 });
+		expect(container.querySelector(".game-countdown__value")?.textContent).toBe("1");
+	});
+
+	it("retire l'overlay quand la partie demarre vraiment", () => {
+		const { container } = renderGamePage();
+		joinLobby([{ username: "luffy", faction: "pirate" }]);
+
+		receive("game:countdown", { value: 1 });
+		expect(container.querySelector(".game-countdown")).not.toBeNull();
+
+		receive("game:start", { board: emptyBoard(), score: 0, level: 1, spectator: false });
+		expect(container.querySelector(".game-countdown")).toBeNull();
+		expect(container.querySelector(".tetris-board")).not.toBeNull();
+	});
+
+	it("ignore un decompte sans valeur numerique", () => {
+		const { container } = renderGamePage();
+		joinLobby([{ username: "luffy", faction: "pirate" }]);
+
+		receive("game:countdown", { value: "trois" });
+		expect(container.querySelector(".game-countdown")).toBeNull();
+	});
+});
+
 describe("GamePage — spectateur", () => {
 	it("s'abonne automatiquement quand la partie a deja demarre (joined: false)", () => {
 		renderGamePage();

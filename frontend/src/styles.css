@@ -886,6 +886,48 @@ a:hover {
 	flex-direction: column;
 }
 
+/* Décompte 3-2-1 avant le lancement, en overlay plein écran par-dessus le lobby. */
+.game-countdown {
+	position: fixed;
+	inset: 0;
+	z-index: 50;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: 0.5rem;
+	background: rgba(5, 8, 22, 0.82);
+	backdrop-filter: blur(6px);
+	-webkit-backdrop-filter: blur(6px);
+}
+
+.game-countdown__value {
+	font-family: var(--font-display, sans-serif);
+	font-size: clamp(6rem, 26vw, 16rem);
+	font-weight: 800;
+	line-height: 1;
+	color: rgba(255, 250, 244, 0.98);
+	text-shadow: 0 0 40px var(--color-secondary-glow, rgba(80, 200, 255, 0.6));
+	animation: game-countdown-pop 1s ease-out;
+}
+
+.game-countdown__label {
+	font-size: clamp(0.9rem, 2.5vw, 1.3rem);
+	letter-spacing: 0.35em;
+	text-transform: uppercase;
+	color: rgba(255, 250, 244, 0.7);
+}
+
+@keyframes game-countdown-pop {
+	0% { transform: scale(2.2); opacity: 0; }
+	25% { transform: scale(1); opacity: 1; }
+	100% { transform: scale(1); opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.game-countdown__value { animation: none; }
+}
+
 /* Connecting */
 
 .game-connecting {
