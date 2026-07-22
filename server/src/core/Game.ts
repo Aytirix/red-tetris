@@ -3,16 +3,29 @@ import type { Player } from "./Player.js";
 import { pieces, PIECES_TYPES, type PieceCell, type PieceShape } from "../types/game/piecesGameTypes.js";
 import { emitGameOver, emitGameStart, emitGameUpdate, emitPlayerEliminated, emitSpectatorForPlayer, getRenderedBoard } from "../gateways/socket/emitters/gameEmitters.js";
 import { settleGameRewards } from "../services/shopService.js";
+import { spectatorSocketStore } from "../gateways/socket/spectatorSocketStore.js";
 import { Piece } from "./Piece.js";
 import type { Room } from "./room.js";
 
 export class Game {
+	// Wall kicks a la rotation: decalages HORIZONTAUX uniquement, du plus petit au plus
+	// grand. (0,0) = rotation en place; ±1/±2/±3 en x pour decoller la piece d'un mur ou
+	// d'une pile. Seul le I (large de 4) atteint ±3; les pieces 3-larges trouvent toujours
+	// a ±2 au plus. Aucun decalage vertical: une piece ne doit jamais "sauter" vers le
+	// haut en tournant.
+	private static readonly ROTATION_KICKS: ReadonlyArray<readonly [number, number]> = [
+		[0, 0], [-1, 0], [1, 0], [-2, 0], [2, 0], [-3, 0], [3, 0],
+	]
 	public mode: "classique" | "ultra" | "sprint"
 	public players: Player[];
 	private room: Room;
 	private state: Map<string, PlayerGameState>;
 	private pieceQueue: PieceType[];
 	private intervalId: NodeJS.Timeout | null;
+	// checkGameOver() est appelable depuis plusieurs chemins (verrouillage de piece,
+	// depart d'un joueur): ce drapeau garantit qu'une partie ne se termine qu'une fois,
+	// donc pas de double game:over ni de double credit de berrys.
+	private isOver: boolean;
 	constructor (mode: "classique" | "ultra" | "sprint", players: Player[], room: Room) {
 		this.mode = mode;
 		this.players = players;
@@ -20,6 +33,7 @@ export class Game {
 		this.state = new Map()
 		this.pieceQueue = this.randomPiece()
 		this.intervalId = null
+		this.isOver = false
 		for (const player of players) {
 			this.state.set(player.getSocketId(), {
 					board: this.createBoard(),//fonction create board,
@@ -74,21 +88,23 @@ export class Game {
 		}
 		return true
 	}
-	canRotate(rotatedShape: PieceCell[][], playerStat: PlayerGameState) : boolean {
+	// Verifie qu'une forme tient sur le plateau a la position de la piece decalee de
+	// (offsetX, offsetY). Base commune de canRotate et des wall kicks.
+	canPlaceShape(shape: PieceCell[][], playerStat: PlayerGameState, offsetX: number, offsetY: number) : boolean {
 		const piece = playerStat.currentPiece
 		if (!piece)
 			return false
 
-		for (let y = 0; y < rotatedShape.length; y++) {
-			const pieceRow = rotatedShape[y]
+		for (let y = 0; y < shape.length; y++) {
+			const pieceRow = shape[y]
 			if (!pieceRow)
 				continue
 			for (let x = 0; x < pieceRow.length; x++) {
 				if (pieceRow[x] !== 1)
 					continue
 
-				const nextY = piece.getY() + y
-				const nextX = piece.getX() + x
+				const nextY = piece.getY() + y + offsetY
+				const nextX = piece.getX() + x + offsetX
 				if (nextX < 0 || nextX >= BOARD_WIDTH || nextY < 0 || nextY >= BOARD_HEIGHT)
 					return false
 
@@ -98,6 +114,9 @@ export class Game {
 			}
 		}
 		return true
+	}
+	canRotate(rotatedShape: PieceCell[][], playerStat: PlayerGameState) : boolean {
+		return this.canPlaceShape(rotatedShape, playerStat, 0, 0)
 	}
 	canSpawn(playerStat: PlayerGameState) : boolean {
 		const piece = playerStat.currentPiece
@@ -221,12 +240,20 @@ export class Game {
 		const rotate = playerState.currentPiece.getRotatedShape()
 		if (!rotate)
 			return
-		if (this.canRotate(rotate, playerState)) {
+		// Wall kicks: si la forme pivotee deborde a la position actuelle (piece collee a
+		// un mur, au sol ou a une pile), on essaie de la decaler avant d'abandonner la
+		// rotation. Ordre = deplacement croissant, horizontal d'abord (le plus courant),
+		// puis un cran vers le haut. Le premier decalage qui tient est applique.
+		for (const [dx, dy] of Game.ROTATION_KICKS) {
+			if (!this.canPlaceShape(rotate, playerState, dx, dy))
+				continue
+			playerState.currentPiece.translate(dx, dy)
 			playerState.currentPiece.shape = rotate
 			emitGameUpdate(playerState, this.state)
 			emitSpectatorForPlayer(playerState, this.state)
+			return
 		}
-		} 
+	} 
 	start() : void {
 		for (const [, playerStat] of this.state) {
 			this.spawnPiece(playerStat)
@@ -245,11 +272,24 @@ export class Game {
 		if (!this.canSpawn(playerStat))
 			playerStat.isAlive = false
 	}
+	// Depart d'un joueur pendant la partie (room:leave / disconnect). Sans ca la Room est
+	// supprimee du store alors que l'interval de gravite tourne toujours, et les sockets
+	// partis continuent de recevoir des game:update.
+	abandon(socketId: string) : void {
+		const playerState = this.state.get(socketId)
+		if (!playerState || !playerState.isAlive)
+			return
+		playerState.isAlive = false
+		this.checkGameOver()
+	}
 	checkGameOver() : boolean {
+		if (this.isOver)
+			return true
 		const alivePlayers = [...this.state.values()].filter((playerState) => playerState.isAlive)
 		const isSolo = this.players.length <= 1
 		if ((isSolo && alivePlayers.length > 0) || (!isSolo && alivePlayers.length > 1))
 			return false
+		this.isOver = true
 
 		if (this.intervalId) {
 			clearInterval(this.intervalId)
@@ -261,6 +301,13 @@ export class Game {
 		// de partie (room encore "playing" → joined=false → spectateur) au lieu du lobby.
 		this.room.setStatus("waiting")
 		this.room.setGame(null)
+
+		// Les abonnements spectateur pointent sur une partie terminee: sans purge ils
+		// bloquent encore game:move/rotate/drop du socket concerne a la partie suivante.
+		for (const [spectatorSocketId, subscription] of spectatorSocketStore) {
+			if (subscription.game === this)
+				spectatorSocketStore.delete(spectatorSocketId)
+		}
 
 		const winner = !isSolo && alivePlayers[0] ? alivePlayers[0].player.getName() : null
 		// Crédit du butin: chaque joueur gagne son score final en berrys (persisté DB).

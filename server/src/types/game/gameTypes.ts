@@ -11,7 +11,8 @@ export type currentPiece = {
 	type: PieceType;
 };
 
-export type Cell = 0 | PieceType | "penalty";
+// "spectrum": cellule du spectre envoye aux adversaires (hauteur de pile, sans couleur).
+export type Cell = 0 | PieceType | "penalty" | "spectrum";
 
 export type Board = Cell [][];
 

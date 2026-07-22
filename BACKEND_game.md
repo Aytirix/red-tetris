@@ -164,6 +164,20 @@ Même schéma que `game:start`, **mais** :
 | `0`             | Cellule vide                         |
 | `"I"` … `"Z"`   | Bloc de pièce (couleur dédiée front) |
 | `"penalty"`     | Cellule de pénalité grise            |
+| `"spectrum"`    | Cellule de spectre adverse (monochrome) |
+
+### Plateaux adverses : spectre ou plateau réel
+
+Le sujet impose qu'un joueur ne voie de ses adversaires que **la hauteur du bloc le plus haut
+de chaque colonne**. Le contenu de `opponents[].board` dépend donc du destinataire :
+
+| Destinataire | Événement | Contenu de `opponents[].board` |
+|---|---|---|
+| Un **joueur** en partie | `game:start`, `game:update` | **Spectre** : chaque colonne est remplie de `"spectrum"` depuis son bloc le plus haut jusqu'en bas. Ni couleurs, ni trous visibles. |
+| Un **spectateur** | `game:SpectatorGame` | **Plateau réel**, couleurs et trous compris — un spectateur a le droit de tout voir. |
+
+Le format reste le même (une grille 20×10) dans les deux cas : seul le contenu change, le front
+n'a donc rien à faire de particulier, il rend `"spectrum"` en monochrome.
 
 ---
 
@@ -190,6 +204,12 @@ Deux entrées possibles :
    - Back change la cible et émet `game:SpectatorGame` avec `spectator: "zoro"`.
 
 Le spectateur ne peut jamais émettre `game:move`/`rotate`/`drop` (le front l'empêche). Si jamais ça arrive, le back doit ignorer.
+
+> **Garde-fou serveur** : un joueur **encore vivant** de la partie ne peut pas s'abonner
+> comme spectateur — le back répond `system:Error { message: "Alive players cannot spectate" }`.
+> Sans ce contrôle, n'importe quel joueur pourrait demander `game:SpectatorGame` (qui contient
+> les plateaux réels) et contourner totalement le spectre imposé par le sujet.
+> Seuls un joueur éliminé ou un socket extérieur à la partie peuvent spectater.
 
 À la déconnexion / `game:unsubscribeSpectatorGame`, libérer les ressources et arrêter d'émettre.
 

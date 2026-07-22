@@ -6,6 +6,14 @@ import { useRememberCurrentUserFaction } from "../contexts/WsStateContext";
 import { useAlert } from "../components/Alert";
 import { emitCheckUsernameAvailable } from "../socket/events/user";
 import { APP_NAME } from "../config";
+import avatarCrops from "../config/avatarCrops.json";
+import {
+	CHEVRON_END_Y,
+	CHEVRON_GEOMETRY,
+	CHEVRON_LAYERS,
+	CHEVRON_MID_Y,
+	getChevronArm,
+} from "../config/chevronGeometry";
 import {
 	normalizeUsernameAvailability,
 	type AppFaction as Faction,
@@ -100,7 +108,12 @@ type AvatarCrop = {
 	zoom: number;
 };
 
-const avatarCropCache = new Map<string, AvatarCrop>();
+// Recadrage des avatars: les valeurs sont pre-calculees hors ligne par
+// `npm run generate:avatar-crops` (analyse des pixels alpha des PNG). Le sujet
+// interdit Canvas cote client, ce calcul ne peut donc pas tourner dans le navigateur.
+const avatarCropCache = new Map<string, AvatarCrop>(
+	Object.entries(avatarCrops as Record<string, AvatarCrop>),
+);
 const REGISTER_SCENE_IMAGE_SRCS = [
 	"/img/choix-faction/affrontement.jpg",
 	"/img/choix-faction/pirate.jpg",
@@ -142,66 +155,10 @@ function getCharacterAvatarSrc(faction: Faction, characterId: string): string {
 	return `/img/avatar/${dir}/${characterId}.png`;
 }
 
-function computeAvatarCrop(src: string): Promise<AvatarCrop> {
-	const cached = avatarCropCache.get(src);
-	if (cached) return Promise.resolve(cached);
-
-	return new Promise((resolve, reject) => {
-		const image = new Image();
-		image.onload = () => {
-			try {
-				const canvas = document.createElement("canvas");
-				canvas.width = image.naturalWidth;
-				canvas.height = image.naturalHeight;
-
-				const context = canvas.getContext("2d", { willReadFrequently: true });
-				if (!context) {
-					reject(new Error("Canvas context unavailable"));
-					return;
-				}
-
-				context.drawImage(image, 0, 0);
-				const { data, width, height } = context.getImageData(0, 0, canvas.width, canvas.height);
-
-				let minX = width;
-				let minY = height;
-				let maxX = -1;
-				let maxY = -1;
-
-				for (let y = 0; y < height; y += 1) {
-					for (let x = 0; x < width; x += 1) {
-						const alpha = data[(y * width + x) * 4 + 3];
-						if (alpha < 8) continue;
-						if (x < minX) minX = x;
-						if (y < minY) minY = y;
-						if (x > maxX) maxX = x;
-						if (y > maxY) maxY = y;
-					}
-				}
-
-				const hasVisiblePixels = maxX >= minX && maxY >= minY;
-				const contentWidth = hasVisiblePixels ? maxX - minX + 1 : width;
-				const contentHeight = hasVisiblePixels ? maxY - minY + 1 : height;
-				const contentCenterX = hasVisiblePixels ? minX + contentWidth / 2 : width / 2;
-				const contentCenterY = hasVisiblePixels ? minY + contentHeight / 2 : height / 2;
-				const overscan = 1.04;
-				const scale = overscan / Math.max(1, Math.min(contentWidth, contentHeight));
-
-				const crop: AvatarCrop = {
-					positionX: (contentCenterX / width) * 100,
-					positionY: (contentCenterY / height) * 100,
-					zoom: Math.min(3, Math.max(1.04, scale * Math.min(width, height))),
-				};
-
-				avatarCropCache.set(src, crop);
-				resolve(crop);
-			} catch (error) {
-				reject(error);
-			}
-		};
-		image.onerror = () => reject(new Error(`Failed to load avatar: ${src}`));
-		image.src = src;
-	});
+// Retourne null si l'avatar n'a pas de crop pre-calcule: le composant retombe alors
+// sur son cadrage par defaut, et une image introuvable reste geree par <img onError>.
+function computeAvatarCrop(src: string): Promise<AvatarCrop | null> {
+	return Promise.resolve(avatarCropCache.get(src) ?? null);
 }
 
 function AvatarPreview({ faction, characterId, characterName, selected, color, selectedGlow }: {
@@ -696,37 +653,21 @@ function RegisterStep({ username, onSubmit, sceneEnterActive = false }: {
 					height: "72vh",
 					opacity: 0.92,
 				}}>
-					<svg
-						viewBox="0 0 100 100"
-						preserveAspectRatio="none"
+					{/* Eclair pre-rasterise (scripts/generate-decor-assets.py): le sujet interdit SVG.
+					    Le PNG inclut la marge des extremites arrondies, d'ou top/height decales. */}
+					<img
+						src="/img/decor/bolt-hero.png"
+						alt=""
 						aria-hidden="true"
-						style={{ width: "100%", height: "100%", overflow: "visible" }}
-					>
-						<path
-							d="M58 0 L68 12 L49 27 L61 42 L43 56 L55 72 L39 86 L47 100"
-							fill="none"
-							stroke="rgba(167, 223, 255, 0.34)"
-							strokeWidth="18"
-							strokeLinecap="round"
-							strokeLinejoin="round"
-						/>
-						<path
-							d="M58 0 L68 12 L49 27 L61 42 L43 56 L55 72 L39 86 L47 100"
-							fill="none"
-							stroke="rgba(255, 243, 205, 0.78)"
-							strokeWidth="9"
-							strokeLinecap="round"
-							strokeLinejoin="round"
-						/>
-						<path
-							d="M58 0 L68 12 L49 27 L61 42 L43 56 L55 72 L39 86 L47 100"
-							fill="none"
-							stroke="rgba(255, 252, 242, 0.98)"
-							strokeWidth="3.2"
-							strokeLinecap="round"
-							strokeLinejoin="round"
-						/>
-					</svg>
+						style={{
+							position: "absolute",
+							left: 0,
+							top: "-9%",
+							width: "100%",
+							height: "118%",
+							display: "block",
+						}}
+					/>
 				</div>
 
 				{(Object.entries(FACTIONS) as [Faction, typeof FACTIONS.pirate][]).map(([key, fc]) => {
@@ -895,35 +836,23 @@ function RegisterStep({ username, onSubmit, sceneEnterActive = false }: {
 									filter: `drop-shadow(0 10px 24px rgba(0, 0, 0, 0.14)) drop-shadow(0 0 14px ${layerData.glow})`,
 								}}
 							>
-								<svg
-									viewBox="0 0 88 100"
-									preserveAspectRatio="none"
+								{/* Poignee de bord: le degrade est identique au <linearGradient> d'origine,
+								    la forme bombee est rendue par un border-radius elliptique. */}
+								<span
 									aria-hidden="true"
 									style={{
 										position: "absolute",
 										inset: 0,
-										width: "100%",
-										height: "100%",
-										overflow: "visible",
+										background: `linear-gradient(to ${layerisPirate ? "right" : "left"}, rgba(7, 12, 22, 0) 0%, rgba(7, 12, 22, 0.04) 18%, rgba(7, 12, 22, 0.14) 52%, rgba(7, 12, 22, 0.46) 100%)`,
+										borderRadius: layerisPirate
+											? "34% 0 0 34% / 50% 0 0 50%"
+											: "0 34% 34% 0 / 0 50% 50% 0",
 									}}
-								>
-									<defs>
-										<linearGradient id={`edge-handle-fill-${layerFaction}`} x1={layerisPirate ? "0%" : "100%"} y1="0%" x2={layerisPirate ? "100%" : "0%"} y2="0%">
-											<stop offset="0%" stopColor="rgba(7, 12, 22, 0)" />
-											<stop offset="18%" stopColor="rgba(7, 12, 22, 0.04)" />
-											<stop offset="52%" stopColor="rgba(7, 12, 22, 0.14)" />
-											<stop offset="100%" stopColor="rgba(7, 12, 22, 0.46)" />
-										</linearGradient>
-									</defs>
-									<path
-										d={layerisPirate
-											? "M88 0 H30 C16 4 8 18 6 34 C2 43 0 47 0 50 C0 53 2 57 6 66 C8 82 16 96 30 100 H88 Z"
-											: "M0 0 H58 C72 4 80 18 82 34 C86 43 88 47 88 50 C88 53 86 57 82 66 C80 82 72 96 58 100 H0 Z"}
-										fill={`url(#edge-handle-fill-${layerFaction})`}
-									/>
-								</svg>
-								<svg
-									viewBox="0 0 24 24"
+								/>
+								{/* Chevron: deux carres concentriques tournes a 45deg dont seuls deux bords
+								    sont peints. Une couche = un seul element, donc pas de cumul d'alpha
+								    aux jointures, comme un trace unique. */}
+								<span
 									aria-hidden="true"
 									style={{
 										position: "relative",
@@ -934,23 +863,59 @@ function RegisterStep({ username, onSubmit, sceneEnterActive = false }: {
 										filter: `drop-shadow(0 0 12px ${layerData.glow}) drop-shadow(0 0 18px rgba(255, 255, 255, 0.28))`,
 									}}
 								>
-									<path
-										d={layerisPirate ? "M10 5 L17 12 L10 19" : "M14 5 L7 12 L14 19"}
-										fill="none"
-										stroke="rgba(7, 12, 22, 0.52)"
-										strokeWidth="7"
-										strokeLinecap="round"
-										strokeLinejoin="round"
-									/>
-									<path
-										d={layerisPirate ? "M10 5 L17 12 L10 19" : "M14 5 L7 12 L14 19"}
-										fill="none"
-										stroke="rgba(255, 252, 247, 1)"
-										strokeWidth="3.8"
-										strokeLinecap="round"
-										strokeLinejoin="round"
-									/>
-								</svg>
+									{CHEVRON_LAYERS.map((layer) => {
+										const arm = getChevronArm(layer.thickness, layerisPirate);
+										const endX = layerisPirate
+											? CHEVRON_GEOMETRY.pirate.endX
+											: CHEVRON_GEOMETRY.marine.endX;
+										return (
+											// Groupe d'opacite: les 3 elements de la couche sont peints
+											// opaques puis la transparence est appliquee une seule fois,
+											// comme un trace SVG unique (pas de cumul d'alpha au linecap).
+											<span
+												key={layer.color}
+												style={{ position: "absolute", inset: 0, opacity: layer.opacity }}
+											>
+												<span
+													style={{
+														position: "absolute",
+														top: `${CHEVRON_MID_Y}px`,
+														left: `${arm.centerX}px`,
+														width: `${arm.size}px`,
+														height: `${arm.size}px`,
+														marginTop: `${-arm.size / 2}px`,
+														marginLeft: `${-arm.size / 2}px`,
+														boxSizing: "border-box",
+														borderTop: `${layer.thickness}px solid ${layer.color}`,
+														[layerisPirate ? "borderRight" : "borderLeft"]: `${layer.thickness}px solid ${layer.color}`,
+														// Rayon = epaisseur/2 sur le coin du sommet: l'arc est alors
+														// centre sur le sommet du trace, soit un linejoin round exact.
+														borderRadius: layerisPirate
+															? `0 ${layer.thickness / 2}px 0 0`
+															: `${layer.thickness / 2}px 0 0 0`,
+														transform: `rotate(${layerisPirate ? 45 : -45}deg)`,
+													}}
+												/>
+												{CHEVRON_END_Y.map((endY) => (
+													<span
+														key={endY}
+														style={{
+															position: "absolute",
+															top: `${endY}px`,
+															left: `${endX}px`,
+															width: `${layer.thickness}px`,
+															height: `${layer.thickness}px`,
+															marginTop: `${-layer.thickness / 2}px`,
+															marginLeft: `${-layer.thickness / 2}px`,
+															borderRadius: "50%",
+															background: layer.color,
+														}}
+													/>
+												))}
+											</span>
+										);
+									})}
+								</span>
 							</button>
 
 							<div style={{
@@ -992,29 +957,30 @@ function RegisterStep({ username, onSubmit, sceneEnterActive = false }: {
 										opacity: 0.28,
 										pointerEvents: "none",
 									}}>
-										<svg
-											viewBox="0 0 100 100"
-											preserveAspectRatio="none"
-											aria-hidden="true"
-											style={{ width: "100%", height: "100%" }}
-										>
-											<path
-												d="M58 0 L68 12 L49 27 L61 42 L43 56 L55 72 L39 86 L47 100"
-												fill="none"
-												stroke={layerData.selected}
-												strokeWidth="10"
-												strokeLinecap="round"
-												strokeLinejoin="round"
-											/>
-											<path
-												d="M58 0 L68 12 L49 27 L61 42 L43 56 L55 72 L39 86 L47 100"
-												fill="none"
-												stroke="rgba(255, 248, 236, 0.72)"
-												strokeWidth="3"
-												strokeLinecap="round"
-												strokeLinejoin="round"
-											/>
-										</svg>
+										{/* Meme eclair, en masques alpha: la couche large est teintee par la
+										    faction, on ne peut donc pas la figer dans le PNG. */}
+										<div style={{
+											position: "absolute",
+											inset: 0,
+											backgroundColor: layerData.selected,
+											maskImage: "url(/img/decor/bolt-card-wide.png)",
+											WebkitMaskImage: "url(/img/decor/bolt-card-wide.png)",
+											maskSize: "100% 100%",
+											WebkitMaskSize: "100% 100%",
+											maskRepeat: "no-repeat",
+											WebkitMaskRepeat: "no-repeat",
+										}} />
+										<div style={{
+											position: "absolute",
+											inset: 0,
+											backgroundColor: "rgba(255, 248, 236, 0.72)",
+											maskImage: "url(/img/decor/bolt-card-thin.png)",
+											WebkitMaskImage: "url(/img/decor/bolt-card-thin.png)",
+											maskSize: "100% 100%",
+											WebkitMaskSize: "100% 100%",
+											maskRepeat: "no-repeat",
+											WebkitMaskRepeat: "no-repeat",
+										}} />
 									</div>
 
 									<div style={{

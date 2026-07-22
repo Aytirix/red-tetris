@@ -1,6 +1,8 @@
 export type PieceType = "I" | "J" | "L" | "O" | "S" | "T" | "Z";
 
-export type GameBoardCell = 0 | PieceType | "penalty";
+// "spectrum": cellule du spectre d'un adversaire (hauteur de pile, sans couleur).
+// Un joueur ne recoit que ca de ses adversaires; un spectateur recoit les vrais plateaux.
+export type GameBoardCell = 0 | PieceType | "penalty" | "spectrum";
 
 export type GameBoard = GameBoardCell[][];
 
