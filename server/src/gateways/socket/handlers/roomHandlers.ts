@@ -4,7 +4,7 @@ import { emitError } from "../emitters/systemEmitters.js";
 import { roomSocketStore } from "../roomSocketStore.js";
 import { createRoom, getRoom } from "../../../services/roomService.js";
 import { emitKickedRoom, emitPlayersRoom, emitRoomJoined, emitRoomSettings, emitSubscrib } from "../emitters/roomEmitters.js";
-import { emitSpectatorGame } from "../emitters/gameEmitters.js";
+import { emitCountdown, emitSpectatorGame } from "../emitters/gameEmitters.js";
 import { userSocketStore } from "../userSocketStore.js";
 import { Game } from "../../../core/Game.js";
 import { createPlayer } from "../../../services/playerService.js";
@@ -89,9 +89,12 @@ function leaveRoom(socket: Socket, room: Room) : boolean {
 	room.getGame()?.abandon(socket.id)
 	if (!room.removePlayerBySocketId(socket.id))
 		return false
-	if (room.countPlayer() === 0)
+	if (room.countPlayer() === 0) {
+		// Room videe: si un decompte etait en cours (pas encore de Game), il faut
+		// l'annuler pour qu'il ne cree pas une partie sur une room supprimee.
+		room.clearCountdown()
 		roomSocketStore.delete(room.name)
-	else
+	} else
 		emitPlayersRoom(room.getPlayers())
 	return true
 }
@@ -190,27 +193,55 @@ export function handleRoomSetPrivate(socket: Socket, payload: unknown) : void {
 	emitRoomSettings(room)
 }
 
+// Decompte de lancement: 3 -> 2 -> 1 (une valeur par seconde), puis demarrage reel.
+const COUNTDOWN_SEQUENCE = [3, 2, 1]
+const COUNTDOWN_STEP_MS = 1000
+
+// Lance une partie precedee d'un decompte 3-2-1. La room est deja verrouillee
+// (status "playing") par l'appelant, donc aucun nouveau joueur ni second start ne
+// peut s'intercaler pendant le decompte.
+function startGameWithCountdown(room: Room) : void {
+	emitCountdown(room.getPlayers(), COUNTDOWN_SEQUENCE[0]!)
+	let index = 0
+	const timer = setInterval(() => {
+		index++
+		if (index < COUNTDOWN_SEQUENCE.length) {
+			emitCountdown(room.getPlayers(), COUNTDOWN_SEQUENCE[index]!)
+			return
+		}
+		// Fin du decompte.
+		room.clearCountdown()
+		if (room.countPlayer() === 0) {
+			roomSocketStore.delete(room.name)
+			return
+		}
+		// Copie du tableau: getPlayers() renvoie la liste vivante de la Room, un depart
+		// en cours de partie muterait sinon retroactivement Game.players (dont dependent
+		// isSolo, getTickSpeed et updateLevel).
+		const game = new Game(room.getMode(), [...room.getPlayers()], room)
+		room.setGame(game)
+		game.start()
+	}, COUNTDOWN_STEP_MS)
+	room.setCountdownTimer(timer)
+}
+
 export function handleRoomStart(socket: Socket, payload: unknown) : void {
 	if (!payload) {
 		const room = getRoom(socket)
 		if (!room)
 			return
-		// Les controles passent AVANT la construction de la Game: son constructeur
-		// rattache tous les joueurs a la partie (setGame/setInGame). Le construire en
-		// premier laissait n'importe quel non-hote reattacher tout le monde a une partie
-		// morte, et un second room:start creait un deuxieme setInterval sans nettoyer le
-		// premier - deux boucles de gravite sur les memes joueurs.
+		// Les controles passent AVANT tout demarrage. Un second room:start (ou un start
+		// pendant le decompte) est bloque par le status "playing" pose juste apres.
 		if (socket.id !== room.getHostId())
 			return
 		if (room.getStatus() !== "waiting")
 			return
-		// Copie du tableau: getPlayers() renvoie la liste vivante de la Room, un depart
-		// en cours de partie muterait sinon retroactivement Game.players (dont dependent
-		// isSolo, getTickSpeed et updateLevel).
-		const game = new Game(room.getMode(), [...room.getPlayers()], room)
+		if (room.countPlayer() === 0)
+			return
+		// Verrou immediat: empeche l'arrivee de nouveaux joueurs et un second start
+		// pendant le decompte, avant meme que la Game n'existe.
 		room.setStatus("playing")
-		room.setGame(game)
-		game.start()
+		startGameWithCountdown(room)
 	}
 }
 

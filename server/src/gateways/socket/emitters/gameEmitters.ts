@@ -108,6 +108,13 @@ function getOpponentBoards(
 	return opponents;
 }
 
+// Decompte de lancement (3-2-1) diffuse a tous les joueurs de la room, avant que la
+// partie ne demarre reellement. value = le nombre a afficher (3, puis 2, puis 1).
+export function emitCountdown(players: Player[], value: number) : void {
+	for (const player of players)
+		player.getSocket().emit("game:countdown", { value })
+}
+
 export function emitGameStart(state: Map<string, PlayerGameState>, game: Game) : void {
 	for (const [socketId, playerState] of state) {
 		const socket = playerState.player.getSocket()

@@ -8,6 +8,7 @@ import { I, O, T } from "../../../types/game/piecesGameTypes.js";
 import { spectatorSocketStore } from "../spectatorSocketStore.js";
 import { userSocketStore } from "../userSocketStore.js";
 import {
+	emitCountdown,
 	emitGameOver,
 	emitGameStart,
 	emitGameUpdate,
@@ -120,6 +121,22 @@ describe("gameEmitters", () => {
 			state.currentPiece = piece;
 
 			expect(() => getRenderedBoard(state)).not.toThrow();
+		});
+	});
+
+	describe("emitCountdown", () => {
+		it("envoie game:countdown avec la valeur a tous les joueurs", () => {
+			const a = makeState("luffy");
+			const b = makeState("zoro");
+
+			emitCountdown([a.state.player, b.state.player], 3);
+
+			expect(a.socket.emit).toHaveBeenCalledWith("game:countdown", { value: 3 });
+			expect(b.socket.emit).toHaveBeenCalledWith("game:countdown", { value: 3 });
+		});
+
+		it("ne notifie personne pour une liste vide", () => {
+			expect(() => emitCountdown([], 2)).not.toThrow();
 		});
 	});
 

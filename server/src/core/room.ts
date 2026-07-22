@@ -10,6 +10,8 @@ export class Room {
 	private mode: "classique" | "ultra" | "sprint";
 	private visibility: boolean;
 	private game: Game | null;
+	// Timer du decompte 3-2-1 entre room:start et le vrai demarrage de la partie.
+	private countdownTimer: NodeJS.Timeout | null;
 	constructor (name: string) {
 		this.name = name;
 		this.players = [];
@@ -17,7 +19,19 @@ export class Room {
 		this.status = "waiting";
 		this.visibility = false;
 		this.game = null;
+		this.countdownTimer = null;
 		this.mode = "classique"
+	}
+	setCountdownTimer(timer: NodeJS.Timeout | null) : void {
+		this.countdownTimer = timer
+	}
+	// Annule le decompte en cours (room videe avant le demarrage). Sans ca l'interval
+	// continuerait a tourner et tenterait de creer une partie sur une room orpheline.
+	clearCountdown() : void {
+		if (this.countdownTimer) {
+			clearInterval(this.countdownTimer)
+			this.countdownTimer = null
+		}
 	}
 	addPlayer(player: Player) : boolean {
 		if (!this.canJoin())
