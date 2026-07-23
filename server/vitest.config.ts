@@ -15,6 +15,10 @@ export default defineConfig({
 				"src/server.ts",
 				"src/**/*.test.ts",
 				"src/types/**",
+				// Charge tfjs + le modèle MediaPipe au runtime (import dynamique): non
+				// testable sans exécuter réellement le modèle. La logique de gestes qui
+				// l'exploite (motion/gestures/actions/handsController) EST testée.
+				"src/hands/handDetectionService.ts",
 			],
 			thresholds: {
 				statements: 70,

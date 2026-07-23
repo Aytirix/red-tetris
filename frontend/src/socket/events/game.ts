@@ -38,3 +38,14 @@ export function emitSubscribeSpectator(roomId: string, user: string | null) {
 export function emitUnsubscribeSpectator() {
 	socket.emit("game:unsubscribeSpectatorGame", {});
 }
+
+// Mode "mains": active/désactive la caméra du joueur (visible dans le lobby).
+export function emitHandsSetReady(ready: boolean) {
+	socket.emit("hands:setReady", { ready });
+}
+
+// Mode "mains": envoie une image de la webcam au serveur, qui détecte la main et décide
+// l'action. `frame` doit faire 256×256×3 octets (RGB).
+export function emitHandsFrame(frame: Uint8Array) {
+	socket.emit("hands:frame", frame);
+}

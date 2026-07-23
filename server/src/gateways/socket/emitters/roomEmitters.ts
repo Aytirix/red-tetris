@@ -13,6 +13,7 @@ export function emitRoomJoined(socket: Socket, room: Room) : void {
 			username: player.getName(),
 			avatar: player.getAvatar(),
 			faction: player.getFaction(),
+			ready: player.getCameraReady(),
 		})),
 	}
 	socket.emit("room:joined", payload)
@@ -38,6 +39,7 @@ export function emitPlayersRoom(players: Player[]) : void {
 		username: player.getName(),
 		avatar: player.getAvatar(),
 		faction: player.getFaction(),
+		ready: player.getCameraReady(),
 	}))
 	for (const player of players) {
 		const socket = player.getSocket()

@@ -73,7 +73,7 @@ function placedPiece(shape: PieceShape, type: PieceType, x: number, y: number): 
 
 type Setup = { game: Game; room: Room; players: Player[]; states: PlayerGameState[] };
 
-function makeGame(playerCount = 1, mode: "classique" | "ultra" | "sprint" = "classique"): Setup {
+function makeGame(playerCount = 1, mode: "classique" | "ultra" | "sprint" | "mains" = "classique"): Setup {
 	const room = new Room("salle");
 	const players = Array.from({ length: playerCount }, (_v, i) => makePlayer(`joueur${i}`, `sock${i}`));
 	for (const player of players) room.addPlayer(player);

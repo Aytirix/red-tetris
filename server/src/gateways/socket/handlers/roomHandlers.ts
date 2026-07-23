@@ -238,6 +238,12 @@ export function handleRoomStart(socket: Socket, payload: unknown) : void {
 			return
 		if (room.countPlayer() === 0)
 			return
+		// Mode "mains": tout le monde doit avoir activé sa caméra avant de lancer. L'hote
+		// voit qui est pret dans le lobby et peut kicker ceux qui trainent.
+		if (room.getMode() === "mains" && !room.getPlayers().every((player) => player.getCameraReady())) {
+			emitError(socket, "room:start", "All players must enable their camera")
+			return
+		}
 		// Verrou immediat: empeche l'arrivee de nouveaux joueurs et un second start
 		// pendant le decompte, avant meme que la Game n'existe.
 		room.setStatus("playing")
