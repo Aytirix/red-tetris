@@ -18,5 +18,6 @@
     "moduleDetection": "force", // every file is a module
     "skipLibCheck": true // do not check library types
   },
-  "include": ["src"] // only compile src
+  "include": ["src"], // only compile src
+  "exclude": ["src/**/*.test.ts"] // tests are run by vitest, not shipped in dist
 }

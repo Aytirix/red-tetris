@@ -10,9 +10,9 @@ import {
 	emitLeaveRoom,
 	emitKickPlayer,
 	emitStartGame,
-	emitSetGameMode,
 	emitSetPrivate,
 } from "../socket/events/room";
+import { useCloudNavigate } from "../transition/TransitionContext";
 import { emitSubscribeSpectator, emitUnsubscribeSpectator } from "../socket/events/game";
 import { normalizeGameOver, normalizeGameState } from "../socket/gameState";
 import type { GameOverPayload, GameStatePayload } from "../types/game";
@@ -23,11 +23,8 @@ import GameOverView from "../components/game/GameOverView";
 
 type GameViewMode = "connecting" | "lobby" | "game";
 
-const GAME_MODES = [
-	{ id: "classic", label: "Classique" },
-	{ id: "sprint", label: "Sprint" },
-	{ id: "ultra", label: "Ultra" },
-];
+// Parties solo: nom prefixe "sologame_", forcees privees et non modifiables.
+const SOLO_PREFIX = "sologame_";
 
 type RoomPlayer = {
 	username: string;
@@ -41,7 +38,6 @@ function LobbyView({
 	roomName,
 	playerName,
 	players,
-	gameMode,
 	isPrivate,
 	isRoomLoading,
 	gameSummary,
@@ -50,13 +46,14 @@ function LobbyView({
 	roomName: string;
 	playerName: string;
 	players: RoomPlayer[];
-	gameMode: string;
 	isPrivate: boolean;
 	isRoomLoading: boolean;
 	gameSummary: GameOverPayload | null;
 	onLeave: () => void;
 }) {
 	const isAdmin = !isRoomLoading && players[0]?.username === playerName;
+	// Solo: acces verrouille sur "privee", non modifiable.
+	const isSolo = roomName.startsWith(SOLO_PREFIX);
 	const controlsDisabled = isRoomLoading || !isAdmin;
 	const statusLabel = isRoomLoading ? "Connexion" : isAdmin ? "Admin" : "Joueur";
 	const playerCountLabel = isRoomLoading
@@ -160,30 +157,17 @@ function LobbyView({
 
 					<div className={`game-lobby__settings${isRoomLoading ? " game-lobby__settings--loading" : ""}`}>
 						<div className="game-lobby__setting">
-							<span className="game-lobby__setting-label">Mode de jeu</span>
-							<div className="game-lobby__mode-list">
-								{GAME_MODES.map((m) => (
-									<button
-										key={m.id}
-										className={`game-lobby__mode-btn${gameMode === m.id ? " game-lobby__mode-btn--active" : ""}`}
-										onClick={() => isAdmin && emitSetGameMode(m.id)}
-										disabled={controlsDisabled}
-									>
-										{m.label}
-									</button>
-								))}
-							</div>
-						</div>
-
-						<div className="game-lobby__setting">
 							<span className="game-lobby__setting-label">Accès</span>
 							<button
-								className={`game-lobby__privacy-btn${isPrivate ? " game-lobby__privacy-btn--private" : ""}`}
-								onClick={() => isAdmin && emitSetPrivate(!isPrivate)}
-								disabled={controlsDisabled}
+								className={`game-lobby__privacy-btn${isPrivate || isSolo ? " game-lobby__privacy-btn--private" : ""}`}
+								onClick={() => isAdmin && !isSolo && emitSetPrivate(!isPrivate)}
+								disabled={controlsDisabled || isSolo}
 							>
-								{isPrivate ? "🔒 Privée" : "🌐 Publique"}
+								{isPrivate || isSolo ? "🔒 Privée" : "🌐 Publique"}
 							</button>
+							{isSolo && (
+								<span className="game-lobby__setting-hint">Partie solo — toujours privée</span>
+							)}
 						</div>
 					</div>
 
@@ -231,13 +215,17 @@ export default function GamePage() {
 	const session = useWsSession();
 	const { alert } = useAlert();
 	const navigate = useNavigate();
+	// Sorties vers le dashboard: transition « nuages ». navigate() reste utilisé pour
+	// la normalisation d'URL (même page, pas de changement visuel de page).
+	const cloudNavigate = useCloudNavigate();
 	const [view, setView] = useState<GameViewMode>("connecting");
 	const [players, setPlayers] = useState<RoomPlayer[]>([]);
-	const [gameMode, setGameMode] = useState("classic");
 	const [isPrivate, setIsPrivate] = useState(false);
 	const [isRoomLoading, setIsRoomLoading] = useState(true);
 	const [gameState, setGameState] = useState<GameStatePayload | null>(null);
 	const [gameOver, setGameOver] = useState<GameOverPayload | null>(null);
+	// Décompte 3-2-1 diffusé par le serveur entre room:start et le vrai démarrage.
+	const [countdown, setCountdown] = useState<number | null>(null);
 	// Élimination individuelle en multi (partie qui continue): déclenche l'overlay
 	// "GAME OVER" zoom, puis bascule en spectateur à la fin de l'animation.
 	const [eliminated, setEliminated] = useState(false);
@@ -390,9 +378,8 @@ export default function GamePage() {
 
 	useEffect(() => {
 		function handleSettings(data: unknown) {
-			const s = data as { mode?: string; private?: boolean } | null;
+			const s = data as { private?: boolean } | null;
 			if (!s) return;
-			if (typeof s.mode === "string") setGameMode(s.mode);
 			if (typeof s.private === "boolean") setIsPrivate(s.private);
 		}
 		socket.on("room:settings", handleSettings);
@@ -407,7 +394,7 @@ export default function GamePage() {
 			setGameState(null);
 			setGameOver(null);
 			setPlayers([]);
-			navigate("/dashboard");
+			cloudNavigate("/dashboard");
 			void alert({
 				title: "Expulsé de la salle",
 				message: "Vous avez été retiré de la room par l'admin.",
@@ -416,24 +403,61 @@ export default function GamePage() {
 			});
 		}
 
+		function handleDenied() {
+			hasLeftRoomRef.current = true;
+			hasJoinedRoomRef.current = false;
+			isSpectatorRef.current = false;
+			setGameState(null);
+			setGameOver(null);
+			setPlayers([]);
+			cloudNavigate("/dashboard");
+			void alert({
+				title: "Partie privée",
+				message: "Cette partie est privée : vous ne pouvez pas la rejoindre.",
+				confirmLabel: "Compris",
+				danger: true,
+			});
+		}
+
 		socket.on("room:kicked", handleKicked);
-		return () => { socket.off("room:kicked", handleKicked); };
+		socket.on("room:denied", handleDenied);
+		return () => {
+			socket.off("room:kicked", handleKicked);
+			socket.off("room:denied", handleDenied);
+		};
 	}, [socket, navigate, alert]);
 
 	// Game state events
 	useEffect(() => {
 		function handleStateUpdate(raw: unknown) {
+			// On quitte: ignorer les frames en vol pour ne pas repasser sur "game"
+			// devant la navigation differee (meme classe de course que le flash lobby).
+			if (hasLeftRoomRef.current) return;
 			const next = normalizeGameState(raw);
 			if (!next) return;
 			isSpectatorRef.current = next.spectator !== false;
 			if (next.spectator === false) {
 				lastPlayerLevelRef.current = next.level;
 			}
+			setCountdown(null);
 			setGameState(next);
 			setGameOver(null);
 			setView("game");
 		}
+		function handleCountdown(raw: unknown) {
+			if (hasLeftRoomRef.current) return;
+			const value = (raw as { value?: unknown } | null)?.value;
+			if (typeof value !== "number") return;
+			// Overlay 3-2-1 par-dessus le lobby, jusqu'à l'arrivée de game:start.
+			setGameOver(null);
+			setCountdown(value);
+		}
 		function handleOver(raw: unknown) {
+			// En quittant, le serveur renvoie game:over au partant. React Router v7
+			// navigue via startTransition (basse priorite): sans ce garde, le setView
+			// urgent ci-dessous passerait devant la navigation et ferait clignoter le
+			// lobby avant le dashboard. hasLeftRoomRef est deja pose par leaveRoomOnce.
+			if (hasLeftRoomRef.current) return;
 			const payload = normalizeGameOver(raw);
 			const nextPayload = payload && payload.scores.length === 1
 				? {
@@ -450,6 +474,7 @@ export default function GamePage() {
 			setView("lobby");
 		}
 		function handleEliminated(raw: unknown) {
+			if (hasLeftRoomRef.current) return;
 			// Le backend n'envoie ce signal qu'au joueur qui vient de topper alors
 			// que la partie continue. On garde l'écran de jeu (dernière frame) et on
 			// laisse l'overlay "GAME OVER" jouer; la bascule spectateur se fait à la
@@ -460,12 +485,14 @@ export default function GamePage() {
 			setEliminated(true);
 			setView("game");
 		}
+		socket.on("game:countdown", handleCountdown);
 		socket.on("game:start", handleStateUpdate);
 		socket.on("game:update", handleStateUpdate);
 		socket.on("game:SpectatorGame", handleStateUpdate);
 		socket.on("game:over", handleOver);
 		socket.on("game:eliminated", handleEliminated);
 		return () => {
+			socket.off("game:countdown", handleCountdown);
 			socket.off("game:start", handleStateUpdate);
 			socket.off("game:update", handleStateUpdate);
 			socket.off("game:SpectatorGame", handleStateUpdate);
@@ -475,8 +502,9 @@ export default function GamePage() {
 	}, [socket]);
 
 	function handleLeave() {
+		setCountdown(null);
 		leaveRoomOnce();
-		navigate("/dashboard");
+		cloudNavigate("/dashboard");
 	}
 
 	// Fin de l'animation "GAME OVER": on s'abonne comme spectateur d'un joueur
@@ -501,7 +529,6 @@ export default function GamePage() {
 					roomName={roomName}
 					playerName={playerName}
 					players={players}
-					gameMode={gameMode}
 					isPrivate={isPrivate}
 					isRoomLoading={isRoomLoading}
 					gameSummary={gameOver}
@@ -524,6 +551,12 @@ export default function GamePage() {
 						<ClipLoader color="var(--color-secondary)" size={26} />
 						<span>Chargement de la partie…</span>
 					</div>
+				</div>
+			)}
+			{countdown !== null && (
+				<div className="game-countdown" role="status" aria-live="assertive">
+					<span key={countdown} className="game-countdown__value">{countdown}</span>
+					<span className="game-countdown__label">La partie commence…</span>
 				</div>
 			)}
 		</div>

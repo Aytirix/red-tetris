@@ -1,0 +1,102 @@
+{
+	"/img/avatar/marine/akainu.png": {
+		"positionX": 50.08223684210527,
+		"positionY": 50,
+		"zoom": 1.0603921568627452
+	},
+	"/img/avatar/marine/aokiji.png": {
+		"positionX": 50,
+		"positionY": 49.946120689655174,
+		"zoom": 1.0652538631346578
+	},
+	"/img/avatar/marine/fujitora.png": {
+		"positionX": 50.632440476190474,
+		"positionY": 50,
+		"zoom": 1.0509473684210526
+	},
+	"/img/avatar/marine/garp.png": {
+		"positionX": 50.632440476190474,
+		"positionY": 50,
+		"zoom": 1.04
+	},
+	"/img/avatar/marine/kizaru.png": {
+		"positionX": 50.22977941176471,
+		"positionY": 50.05580357142857,
+		"zoom": 1.0898713450292399
+	},
+	"/img/avatar/marine/koby.png": {
+		"positionX": 50,
+		"positionY": 49.600290697674424,
+		"zoom": 1.0593103448275862
+	},
+	"/img/avatar/marine/ryokugyu.png": {
+		"positionX": 50.148809523809526,
+		"positionY": 50.065104166666664,
+		"zoom": 1.067807486631016
+	},
+	"/img/avatar/marine/sengoku.png": {
+		"positionX": 50.260416666666664,
+		"positionY": 50,
+		"zoom": 1.04
+	},
+	"/img/avatar/marine/smoker.png": {
+		"positionX": 50.61773255813954,
+		"positionY": 50,
+		"zoom": 1.0971428571428572
+	},
+	"/img/avatar/marine/tashigi.png": {
+		"positionX": 50.120192307692314,
+		"positionY": 50.08223684210527,
+		"zoom": 1.0980710659898478
+	},
+	"/img/avatar/pirate/brook.png": {
+		"positionX": 50,
+		"positionY": 48.2421875,
+		"zoom": 1.1500647948164147
+	},
+	"/img/avatar/pirate/chopper.png": {
+		"positionX": 50.244140625,
+		"positionY": 49.4140625,
+		"zoom": 1.3688431876606684
+	},
+	"/img/avatar/pirate/franky.png": {
+		"positionX": 50.09765625,
+		"positionY": 48.193359375,
+		"zoom": 1.2047058823529413
+	},
+	"/img/avatar/pirate/jinbei.png": {
+		"positionX": 50,
+		"positionY": 47.998046875,
+		"zoom": 1.200631341600902
+	},
+	"/img/avatar/pirate/luffy.png": {
+		"positionX": 50,
+		"positionY": 50,
+		"zoom": 1.1451182795698924
+	},
+	"/img/avatar/pirate/nami.png": {
+		"positionX": 49.21875,
+		"positionY": 49.853515625,
+		"zoom": 1.1992792792792792
+	},
+	"/img/avatar/pirate/robin.png": {
+		"positionX": 50,
+		"positionY": 49.169921875,
+		"zoom": 1.2738755980861245
+	},
+	"/img/avatar/pirate/sanji.png": {
+		"positionX": 49.951171875,
+		"positionY": 50,
+		"zoom": 1.1151413612565446
+	},
+	"/img/avatar/pirate/usopp.png": {
+		"positionX": 50.1953125,
+		"positionY": 47.216796875,
+		"zoom": 1.2368873403019744
+	},
+	"/img/avatar/pirate/zoro.png": {
+		"positionX": 50,
+		"positionY": 49.658203125,
+		"zoom": 1.1257505285412261
+	}
+}

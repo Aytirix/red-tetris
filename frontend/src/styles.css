@@ -886,6 +886,48 @@ a:hover {
 	flex-direction: column;
 }
 
+/* Décompte 3-2-1 avant le lancement, en overlay plein écran par-dessus le lobby. */
+.game-countdown {
+	position: fixed;
+	inset: 0;
+	z-index: 50;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: 0.5rem;
+	background: rgba(5, 8, 22, 0.82);
+	backdrop-filter: blur(6px);
+	-webkit-backdrop-filter: blur(6px);
+}
+
+.game-countdown__value {
+	font-family: var(--font-display, sans-serif);
+	font-size: clamp(6rem, 26vw, 16rem);
+	font-weight: 800;
+	line-height: 1;
+	color: rgba(255, 250, 244, 0.98);
+	text-shadow: 0 0 40px var(--color-secondary-glow, rgba(80, 200, 255, 0.6));
+	animation: game-countdown-pop 1s ease-out;
+}
+
+.game-countdown__label {
+	font-size: clamp(0.9rem, 2.5vw, 1.3rem);
+	letter-spacing: 0.35em;
+	text-transform: uppercase;
+	color: rgba(255, 250, 244, 0.7);
+}
+
+@keyframes game-countdown-pop {
+	0% { transform: scale(2.2); opacity: 0; }
+	25% { transform: scale(1); opacity: 1; }
+	100% { transform: scale(1); opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.game-countdown__value { animation: none; }
+}
+
 /* Connecting */
 
 .game-connecting {
@@ -1354,6 +1396,7 @@ a:hover {
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
+	flex-wrap: wrap;
 	gap: 1rem;
 }
 
@@ -1366,37 +1409,11 @@ a:hover {
 	flex-shrink: 0;
 }
 
-.game-lobby__mode-list {
-	display: flex;
-	gap: 0.35rem;
-}
-
-.game-lobby__mode-btn {
-	padding: 0.3rem 0.75rem;
-	border-radius: 999px;
-	border: 1px solid var(--color-glass-border);
-	background: transparent;
+.game-lobby__setting-hint {
+	flex-basis: 100%;
+	font-size: 0.72rem;
 	color: var(--color-text-muted-on-dark);
-	font-size: 0.78rem;
-	font-weight: 500;
-	cursor: pointer;
-	transition: background 0.15s, color 0.15s, border-color 0.15s;
-}
-
-.game-lobby__mode-btn:not(:disabled):hover {
-	border-color: rgba(255, 255, 255, 0.35);
-	color: var(--color-text-on-dark);
-}
-
-.game-lobby__mode-btn--active {
-	background: rgba(255, 54, 95, 0.15);
-	border-color: rgba(255, 54, 95, 0.4);
-	color: var(--color-primary);
-}
-
-.game-lobby__mode-btn:disabled {
-	cursor: default;
-	opacity: 0.6;
+	opacity: 0.8;
 }
 
 .game-lobby__privacy-btn {
@@ -1677,6 +1694,14 @@ a:hover {
 	--c: var(--piece-penalty);
 	background: linear-gradient(160deg, #4a4f63, #1d2030);
 	box-shadow: inset 0 0 calc(var(--cs, 20px) * 0.3) rgba(0, 0, 0, 0.6);
+}
+
+/* Spectre adverse = hauteur de pile uniquement. Volontairement monochrome et
+   indépendant du thème: le sujet interdit de montrer la couleur des pièces adverses. */
+.tetris-cell--filled[data-piece="spectrum"] {
+	--c: var(--piece-spectrum);
+	background: linear-gradient(160deg, #aeb8d3, #5b6582);
+	box-shadow: inset 0 0 calc(var(--cs, 20px) * 0.25) rgba(0, 0, 0, 0.45);
 }
 
 /* Pièce fantôme (projection d'atterrissage) : contour teinté de la pièce, sans
@@ -2331,10 +2356,11 @@ a:hover {
 	--piece-t: #b14bff;
 	--piece-z: #ff3b6b;
 	--piece-penalty: #2b3350;
+	--piece-spectrum: #7d879f;
 }
 
 /* Recipe: LIQUID GLASS — verre dépoli + rim-light + aura */
-[data-recipe="glass"] .tetris-cell--filled:not([data-piece="penalty"]) {
+[data-recipe="glass"] .tetris-cell--filled:not([data-piece="penalty"]):not([data-piece="spectrum"]) {
 	border-radius: calc(var(--cs, 20px) * 0.22);
 	background:
 		linear-gradient(135deg, rgba(255, 255, 255, 0.42), rgba(255, 255, 255, 0.06) 30%, transparent 60%),
@@ -2347,7 +2373,7 @@ a:hover {
 }
 
 /* Recipe: SOFT MINIMAL (aussi utilisé par le thème daltonien) */
-[data-recipe="minimal"] .tetris-cell--filled:not([data-piece="penalty"]) {
+[data-recipe="minimal"] .tetris-cell--filled:not([data-piece="penalty"]):not([data-piece="spectrum"]) {
 	border-radius: calc(var(--cs, 20px) * 0.2);
 	background: linear-gradient(180deg, color-mix(in oklab, var(--c) 88%, white), var(--c) 55%, color-mix(in oklab, var(--c) 90%, black));
 	box-shadow:
@@ -2357,7 +2383,7 @@ a:hover {
 }
 
 /* Recipe: SYNTHWAVE — cœur blanc électrique + gros halo */
-[data-recipe="synth"] .tetris-cell--filled:not([data-piece="penalty"]) {
+[data-recipe="synth"] .tetris-cell--filled:not([data-piece="penalty"]):not([data-piece="spectrum"]) {
 	border-radius: calc(var(--cs, 20px) * 0.12);
 	background: linear-gradient(160deg, color-mix(in oklab, var(--c) 55%, white), var(--c) 55%, color-mix(in oklab, var(--c) 70%, black));
 	box-shadow:
@@ -2369,7 +2395,7 @@ a:hover {
 }
 
 /* Recipe: JEWEL — cristal sombre à cœur lumineux + facettes */
-[data-recipe="jewel"] .tetris-cell--filled:not([data-piece="penalty"]) {
+[data-recipe="jewel"] .tetris-cell--filled:not([data-piece="penalty"]):not([data-piece="spectrum"]) {
 	border-radius: calc(var(--cs, 20px) * 0.16);
 	background:
 		radial-gradient(80% 70% at 50% 42%, color-mix(in oklab, var(--c) 70%, white) 0%, var(--c) 40%, color-mix(in oklab, var(--c) 55%, black) 100%),
@@ -2669,6 +2695,100 @@ a:hover {
 /* Contenu des panneaux en verre liquide (liquid-glass-react) : texte clair */
 .glass-panel {
 	color: var(--color-text-on-dark);
+}
+
+/* ─── Transition « nuages » entre pages (100% CSS, aucun canvas/SVG) ─────────── */
+
+.cloud-transition {
+	position: fixed;
+	inset: 0;
+	z-index: 99999;
+	overflow: hidden;
+	pointer-events: auto; /* bloque les interactions pendant la transition */
+}
+
+/* Deux bancs de nuages qui recouvrent le haut et le bas de l'écran. Chaque banc
+   fait 75vh: à translateY(0) ils se chevauchent au centre et masquent tout. */
+.cloud-transition__bank {
+	position: absolute;
+	left: -10%;
+	width: 120%;
+	height: 75vh;
+	filter: blur(11px);
+	will-change: transform;
+	background-repeat: repeat-x, no-repeat;
+}
+
+/* Banc du haut: corps plein + rangée de bosses floutées sur le bord bas (vers le centre). */
+.cloud-transition__bank--top {
+	top: 0;
+	transform: translateY(-102%);
+	background-image:
+		radial-gradient(ellipse 78px 66px at 50% 0%, #f4f8ff 60%, transparent 64%),
+		linear-gradient(#d7e4fa, #f8fbff);
+	background-position: 0 100%, 0 0;
+	background-size: 132px 66px, 100% calc(100% - 34px);
+}
+
+.cloud-transition__bank--bottom {
+	bottom: 0;
+	transform: translateY(102%);
+	background-image:
+		radial-gradient(ellipse 78px 66px at 50% 100%, #f4f8ff 60%, transparent 64%),
+		linear-gradient(#f8fbff, #d7e4fa);
+	background-position: 0 0, 0 100%;
+	background-size: 132px 66px, 100% calc(100% - 34px);
+}
+
+/* Voile blanc qui adoucit la jointure des deux bancs et sert d'horloge:
+   son animationend fait avancer la phase (cover -> reveal -> idle). */
+.cloud-transition__veil {
+	position: absolute;
+	inset: 0;
+	opacity: 0;
+	background: radial-gradient(circle at 50% 50%, rgba(248, 251, 255, 0.92), rgba(226, 236, 252, 0.78));
+}
+
+/* Phase COVER: les bancs entrent, le voile monte. */
+.cloud-transition--cover .cloud-transition__bank--top {
+	animation: cloudBankTopCover 700ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+.cloud-transition--cover .cloud-transition__bank--bottom {
+	animation: cloudBankBottomCover 700ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+.cloud-transition--cover .cloud-transition__veil {
+	animation: cloudVeilCover 700ms ease-in forwards;
+}
+
+/* Phase REVEAL: les bancs s'écartent, le voile se dissipe. */
+.cloud-transition--reveal .cloud-transition__bank--top {
+	animation: cloudBankTopReveal 800ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+.cloud-transition--reveal .cloud-transition__bank--bottom {
+	animation: cloudBankBottomReveal 800ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+.cloud-transition--reveal .cloud-transition__veil {
+	animation: cloudVeilReveal 800ms ease-out forwards;
+}
+
+@keyframes cloudBankTopCover { from { transform: translateY(-102%); } to { transform: translateY(0); } }
+@keyframes cloudBankBottomCover { from { transform: translateY(102%); } to { transform: translateY(0); } }
+@keyframes cloudBankTopReveal { from { transform: translateY(0); } to { transform: translateY(-102%); } }
+@keyframes cloudBankBottomReveal { from { transform: translateY(0); } to { transform: translateY(102%); } }
+@keyframes cloudVeilCover { from { opacity: 0; } to { opacity: 0.92; } }
+@keyframes cloudVeilReveal { from { opacity: 0.92; } to { opacity: 0; } }
+
+/* Accessibilité: on garde la mécanique (les animationend pilotent la phase) mais
+   quasi instantanée pour qui préfère moins de mouvement. */
+@media (prefers-reduced-motion: reduce) {
+	.cloud-transition--cover .cloud-transition__bank--top,
+	.cloud-transition--cover .cloud-transition__bank--bottom,
+	.cloud-transition--cover .cloud-transition__veil,
+	.cloud-transition--reveal .cloud-transition__bank--top,
+	.cloud-transition--reveal .cloud-transition__bank--bottom,
+	.cloud-transition--reveal .cloud-transition__veil {
+		animation-duration: 120ms;
+	}
 }
 
 .glass-panel h1,

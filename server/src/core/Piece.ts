@@ -23,6 +23,12 @@ export class Piece {
 	moveDown() : void {
 		this.y += 1
 	}
+	// Decalage libre (dx, dy): utilise par les wall kicks a la rotation. dy negatif
+	// remonte la piece (y croit vers le bas).
+	translate(dx: number, dy: number) : void {
+		this.x += dx
+		this.y += dy
+	}
 	getY() : number {
 		return this.y
 	}

@@ -3,8 +3,8 @@ import { isValidRoomJoinPayload, isValidRoomKickPayload, isValidRoomModePayload,
 import { emitError } from "../emitters/systemEmitters.js";
 import { roomSocketStore } from "../roomSocketStore.js";
 import { createRoom, getRoom } from "../../../services/roomService.js";
-import { emitKickedRoom, emitPlayersRoom, emitRoomJoined, emitRoomSettings, emitSubscrib } from "../emitters/roomEmitters.js";
-import { emitSpectatorGame } from "../emitters/gameEmitters.js";
+import { emitKickedRoom, emitPlayersRoom, emitRoomDenied, emitRoomJoined, emitRoomSettings, emitSubscrib } from "../emitters/roomEmitters.js";
+import { emitCountdown, emitSpectatorGame } from "../emitters/gameEmitters.js";
 import { userSocketStore } from "../userSocketStore.js";
 import { Game } from "../../../core/Game.js";
 import { createPlayer } from "../../../services/playerService.js";
@@ -23,6 +23,21 @@ export async function handlerRoomJoin(socket: Socket, payload: unknown): Promise
 		console.log("Error: roomId invalid");
 		return;
 	}
+	// Un socket ne doit jamais etre assis dans deux rooms a la fois: sinon le meme
+	// socketId peut etre injecte deux fois dans une partie et desynchroniser
+	// Room.players de Game.state.
+	const currentRoom = getRoom(socket)
+	if (currentRoom) {
+		// Meme room: join idempotent, on se contente de renvoyer l'etat courant.
+		if (currentRoom.name === payload.roomId) {
+			emitRoomJoined(socket, currentRoom)
+			return;
+		}
+		// Room differente: on quitte proprement l'ancienne (comme un room:leave) au
+		// lieu de refuser, sinon un changement de room plus rapide que l'aller-retour
+		// room:join/room:joined laisserait le client bloque sur l'ecran de connexion.
+		leaveRoom(socket, currentRoom)
+	}
 	const room = roomSocketStore.get(payload.roomId)
 	if (!room) {
 		const newRoom = await createRoom(socket, payload.roomId)
@@ -36,6 +51,17 @@ export async function handlerRoomJoin(socket: Socket, payload: unknown): Promise
 			emitPlayersRoom(newRoom.getPlayers())
 		}
 	else {
+			// Room privee (dont les parties solo): seul un membre (pseudo ayant deja
+			// rejoint cette room) peut y entrer/revenir. Un inconnu qui force l'URL est
+			// refuse et redirige. L'appartenance est par pseudo pour survivre a une
+			// reconnexion (le socket.id change apres un refresh).
+			if (room.getPrivate()) {
+				const username = userSocketStore.get(socket.id)?.username ?? null
+				if (!username || !room.isMember(username)) {
+					emitRoomDenied(socket, "private")
+					return
+				}
+			}
 			const newPlayer = await createPlayer(socket)
 			if (!newPlayer)
 				return
@@ -65,20 +91,34 @@ export function handlerRoomUnsubscribe(socket: Socket, payload: unknown) : void 
 	}
 }
 
+/**
+ * Sortie propre d'un socket de sa room. Quitter en pleine partie sort d'abord le
+ * joueur de la Game (mort + reevaluation de la fin de partie): sinon l'interval de
+ * gravite survivrait a la suppression de la room.
+ */
+function leaveRoom(socket: Socket, room: Room) : boolean {
+	room.getGame()?.abandon(socket.id)
+	if (!room.removePlayerBySocketId(socket.id))
+		return false
+	if (room.countPlayer() === 0) {
+		// Room videe: si un decompte etait en cours (pas encore de Game), il faut
+		// l'annuler pour qu'il ne cree pas une partie sur une room supprimee.
+		room.clearCountdown()
+		roomSocketStore.delete(room.name)
+	} else
+		emitPlayersRoom(room.getPlayers())
+	return true
+}
+
 export function handlerRoomLeave(socket: Socket, payload: unknown) : void {
 	if (!payload) {
 		const room = getRoom(socket)
 		if (!room)
 			return
-			const removed = room.removePlayerBySocketId(socket.id)
-			if (!removed)
-				return
-			if (room.countPlayer() === 0)
-				roomSocketStore.delete(room.name)
-			else
-				emitPlayersRoom(room.getPlayers())
-			socket.emit("room:left")
-			emitSubscrib()
+		if (!leaveRoom(socket, room))
+			return
+		socket.emit("room:left")
+		emitSubscrib()
 	}
 }
 
@@ -92,6 +132,13 @@ export function handleRoomKick(socket: Socket, payload: unknown) : void {
 	const room = getRoom(socket)
 	if (!room)
 		return
+	// Kicker en pleine partie retirerait le joueur de la Room sans le retirer de la
+	// Game: il ne pourrait plus jouer (getRoom -> null) alors que la gravite continue
+	// de faire tomber ses pieces = elimination a la demande par l'hote.
+	if (room.getStatus() !== "waiting") {
+		emitError(socket, "room:kick", "Cannot kick during a running game");
+		return
+	}
 	if (!room.searchName(username)) {
 		emitError(socket, "room:kick", "Invalid username");
 		console.log("Error: username invalid for kick");
@@ -122,6 +169,11 @@ export function handleRoomMode(socket: Socket, payload: unknown) : void {
 	const room = getRoom(socket)
 	if (!room)
 		return
+	// Changer le mode en pleine partie ferait diverger room.mode de game.mode.
+	if (room.getStatus() !== "waiting") {
+		emitError(socket, "room:setMode", "Cannot change mode during a running game");
+		return
+	}
 	if (!room.setMode(mode, socket)) {
 		emitError(socket, "room:setMode", "Invalid Mode or Not Host");
 		console.log("Error: Invalid Mode or Not Host");
@@ -140,12 +192,51 @@ export function handleRoomSetPrivate(socket: Socket, payload: unknown) : void {
 	const visibility = payload.private
 	if (!room)
 		return
+	if (room.getStatus() !== "waiting") {
+		emitError(socket, "room:setPrivate", "Cannot change visibility during a running game");
+		return
+	}
 	if (!room.setPrivate(visibility, socket)) {
 		emitError(socket, "room:setPrivate", "only host can change visibility");
 		console.log("Error: Invalid Mode or only host can change visibility");
 		return;
 	}
 	emitRoomSettings(room)
+	// La visibilite change: re-pousser la liste publique filtree aux abonnes du
+	// dashboard, sinon une room passee en privee resterait affichee (room fantome).
+	emitSubscrib()
+}
+
+// Decompte de lancement: 3 -> 2 -> 1 (une valeur par seconde), puis demarrage reel.
+const COUNTDOWN_SEQUENCE = [3, 2, 1]
+const COUNTDOWN_STEP_MS = 1000
+
+// Lance une partie precedee d'un decompte 3-2-1. La room est deja verrouillee
+// (status "playing") par l'appelant, donc aucun nouveau joueur ni second start ne
+// peut s'intercaler pendant le decompte.
+function startGameWithCountdown(room: Room) : void {
+	emitCountdown(room.getPlayers(), COUNTDOWN_SEQUENCE[0]!)
+	let index = 0
+	const timer = setInterval(() => {
+		index++
+		if (index < COUNTDOWN_SEQUENCE.length) {
+			emitCountdown(room.getPlayers(), COUNTDOWN_SEQUENCE[index]!)
+			return
+		}
+		// Fin du decompte.
+		room.clearCountdown()
+		if (room.countPlayer() === 0) {
+			roomSocketStore.delete(room.name)
+			return
+		}
+		// Copie du tableau: getPlayers() renvoie la liste vivante de la Room, un depart
+		// en cours de partie muterait sinon retroactivement Game.players (dont dependent
+		// isSolo, getTickSpeed et updateLevel).
+		const game = new Game(room.getMode(), [...room.getPlayers()], room)
+		room.setGame(game)
+		game.start()
+	}, COUNTDOWN_STEP_MS)
+	room.setCountdownTimer(timer)
 }
 
 export function handleRoomStart(socket: Socket, payload: unknown) : void {
@@ -153,14 +244,18 @@ export function handleRoomStart(socket: Socket, payload: unknown) : void {
 		const room = getRoom(socket)
 		if (!room)
 			return
-		const mode = room.getMode()
-		const players = room.getPlayers()
-		const game = new Game(mode, players, room)
-		if (socket.id === room.getHostId()) {
-			room.setStatus("playing")
-			room.setGame(game)
-			game.start()
-		}
+		// Les controles passent AVANT tout demarrage. Un second room:start (ou un start
+		// pendant le decompte) est bloque par le status "playing" pose juste apres.
+		if (socket.id !== room.getHostId())
+			return
+		if (room.getStatus() !== "waiting")
+			return
+		if (room.countPlayer() === 0)
+			return
+		// Verrou immediat: empeche l'arrivee de nouveaux joueurs et un second start
+		// pendant le decompte, avant meme que la Game n'existe.
+		room.setStatus("playing")
+		startGameWithCountdown(room)
 	}
 }
 
@@ -262,9 +357,31 @@ export function handleSubscribeSpectator(socket: Socket, payload: unknown) : voi
 		return
 	}
 
+	// Confidentialite d'une room privee: seul un membre (joueur eventuellement
+	// elimine) peut la spectater. Sinon un inconnu connaissant le nom contournerait
+	// la garde de join et verrait les plateaux reels. Message neutre pour ne pas
+	// divulguer l'existence de la room privee a un exterieur.
+	if (room.getPrivate()) {
+		const username = userSocketStore.get(socket.id)?.username ?? null
+		if (!username || !room.isMember(username)) {
+			emitError(socket, "game:subscribeSpectatorGame", "Room not found");
+			return
+		}
+	}
+
 	const game = getGameInRoom(room)
 	if (!game) {
 		emitError(socket, "game:subscribeSpectatorGame", "Game not found");
+		return
+	}
+
+	// Un joueur VIVANT de cette partie ne doit jamais pouvoir se mettre en spectateur:
+	// les frames spectateur contiennent les plateaux REELS des adversaires, ce qui
+	// annulerait completement le spectre impose par le sujet. Seuls un joueur elimine
+	// ou un socket exterieur a la partie peuvent spectater.
+	const requesterState = game.getPlayerStateBySocketId(socket.id)
+	if (requesterState && requesterState.isAlive) {
+		emitError(socket, "game:subscribeSpectatorGame", "Alive players cannot spectate");
 		return
 	}
 

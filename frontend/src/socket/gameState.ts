@@ -21,6 +21,7 @@ function normalizeCell(raw: unknown): GameBoardCell {
 	if (raw === 1) return "I"; // compat: ancien bloc générique → traité comme I
 	if (raw === 2) return "penalty"; // compat: ancien code pénalité
 	if (raw === "penalty") return "penalty";
+	if (raw === "spectrum") return "spectrum";
 	if (isPieceType(raw)) return raw;
 	return 0;
 }

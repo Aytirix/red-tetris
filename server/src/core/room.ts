@@ -7,24 +7,61 @@ export class Room {
 	private players: Player[];
 	private hostPlayerId: string | null ;
 	private status: "waiting" | "playing" | "finished" ;
-	private mode: "classique" | "ultra" | "sprint";
+	// Seul le mode "classique" est developpe: sprint/ultra ont ete retires.
+	private mode: "classique";
 	private visibility: boolean;
 	private game: Game | null;
+	// Timer du decompte 3-2-1 entre room:start et le vrai demarrage de la partie.
+	private countdownTimer: NodeJS.Timeout | null;
+	// Appartenance par pseudo (unique par compte): survit a la deconnexion/reconnexion
+	// d'un socket. Sert a autoriser un membre a revenir dans une room privee et a
+	// distinguer un membre d'un inconnu pour le join ET le spectateur.
+	private memberNames: Set<string>;
 	constructor (name: string) {
 		this.name = name;
 		this.players = [];
 		this.hostPlayerId = null;
 		this.status = "waiting";
-		this.visibility = false;
+		this.memberNames = new Set();
+		// Une partie solo est forcee privee et ne peut plus etre modifiee.
+		this.visibility = name.startsWith("sologame_");
 		this.game = null;
+		this.countdownTimer = null;
 		this.mode = "classique"
+	}
+	// Convention front: les rooms solo ont un nom prefixe "sologame_".
+	isSolo() : boolean {
+		return this.name.startsWith("sologame_")
+	}
+	// Un pseudo ayant deja rejoint la room reste membre tant que la room vit (meme
+	// apres un disconnect): il peut donc revenir dans une room privee, contrairement
+	// a un inconnu qui forcerait l'URL.
+	isMember(username: string) : boolean {
+		return this.memberNames.has(username)
+	}
+	setCountdownTimer(timer: NodeJS.Timeout | null) : void {
+		this.countdownTimer = timer
+	}
+	// Annule le decompte en cours (room videe avant le demarrage). Sans ca l'interval
+	// continuerait a tourner et tenterait de creer une partie sur une room orpheline.
+	clearCountdown() : void {
+		if (this.countdownTimer) {
+			clearInterval(this.countdownTimer)
+			this.countdownTimer = null
+		}
 	}
 	addPlayer(player: Player) : boolean {
 		if (!this.canJoin())
 			return (false);
+		// Un meme socket ne doit jamais figurer deux fois: la Game indexe son state par
+		// socketId, donc un doublon desynchronise players (N) et state (1) et fait finir
+		// la partie des le premier verrouillage.
+		if (this.players.some((current) => current.getSocketId() === player.getSocketId()))
+			return (false);
 		if (!this.hostPlayerId)
 			this.hostPlayerId = player.getSocketId()
 		this.players.push(player)
+		this.memberNames.add(player.getName())
 		return (true);
 	}
 	canJoin() : boolean {
@@ -36,17 +73,20 @@ export class Room {
 	setMode(mode: string, socket: Socket) : boolean {
 		if (socket.id !== this.hostPlayerId)
 			return false
-		if (mode !== "classique" && mode !== "ultra" && mode !== "sprint")
+		// Seul "classique" subsiste; toute autre valeur est rejetee.
+		if (mode !== "classique")
 			return false
 		this.mode = mode
 		return true
 	}
 	setPrivate(visibility: boolean, socket: Socket) : boolean {
-		if (socket.id === this.hostPlayerId) {
-			this.visibility = visibility
-			return true
-		}
-		return false
+		if (socket.id !== this.hostPlayerId)
+			return false
+		// Une partie solo reste privee: la visibilite n'est pas modifiable.
+		if (this.isSolo())
+			return false
+		this.visibility = visibility
+		return true
 	}
 	setGame(game: Game | null) : void {
 		this.game = game
@@ -69,7 +109,7 @@ export class Room {
 	getHostId() : string | null {
 		return this.hostPlayerId
 	}
-	getMode() : "classique" | "ultra" | "sprint" {
+	getMode() : "classique" {
 		return this.mode
 	}
 	getStatus() : "waiting" | "playing" | "finished" {

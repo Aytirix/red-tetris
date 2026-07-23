@@ -11,8 +11,16 @@ server/node_modules
 server/dist
 server/*.tsbuildinfo
 
+# Rapports de couverture (vitest)
+coverage/
+frontend/coverage
+server/coverage
+
 # Env files
-.env
+# Tout fichier d'environnement reste hors du depot (le sujet fait echouer
+# le projet si un secret est expose); seul .env.example est versionne.
+.env*
+!.env.example
 
 # macOS
 .DS_Store
