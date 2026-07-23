@@ -447,6 +447,161 @@ describe("Game", () => {
 		});
 	});
 
+	describe("penalty lines", () => {
+		it("createPenaltyLine builds a full solid row with no hole", () => {
+			const { game } = makeGame(1);
+			const line = game.createPenaltyLine();
+			expect(line.length).toBe(BOARD_WIDTH);
+			expect(line.every((cell) => cell === "penalty")).toBe(true);
+		});
+
+		it("addPenaltyLines stacks solid lines at the bottom and pushes the board up", () => {
+			const { game, states } = makeGame(1);
+			const state = states[0]!;
+			state.board = emptyBoard();
+			state.board[BOARD_HEIGHT - 1]![0] = "T";
+
+			game.addPenaltyLines(state, 2);
+
+			expect(state.board.length).toBe(BOARD_HEIGHT);
+			// Les 2 lignes du bas sont pleines de pénalité, sans brèche.
+			for (const y of [BOARD_HEIGHT - 1, BOARD_HEIGHT - 2])
+				expect(state.board[y]!.every((cell) => cell === "penalty")).toBe(true);
+			// L'ancien contenu a remonté de 2 rangs.
+			expect(state.board[BOARD_HEIGHT - 3]![0]).toBe("T");
+		});
+
+		it("clearLines never clears a penalty row (indestructible)", () => {
+			const { game, states } = makeGame(1);
+			const state = states[0]!;
+			state.board = emptyBoard();
+			state.board[BOARD_HEIGHT - 1] = game.createPenaltyLine();
+
+			game.clearLines(state);
+
+			expect(state.score).toBe(0);
+			expect(state.board[BOARD_HEIGHT - 1]!.every((cell) => cell === "penalty")).toBe(true);
+		});
+
+		it("sends n-1 penalty lines to opponents when n lines are cleared", () => {
+			const { game, states } = makeGame(2);
+			const [attacker, victim] = states as [PlayerGameState, PlayerGameState];
+			attacker.board = emptyBoard();
+			attacker.board[BOARD_HEIGHT - 1] = fullRow([4, 5]);
+			attacker.board[BOARD_HEIGHT - 2] = fullRow([4, 5]);
+			attacker.currentPiece = placedPiece(O, "O", 4, BOARD_HEIGHT - 2);
+			victim.board = emptyBoard();
+
+			game.lockAndSpawnNext(attacker);
+
+			// 2 lignes complétées -> 1 seule ligne de pénalité (n-1), pleine.
+			expect(victim.board.length).toBe(BOARD_HEIGHT);
+			expect(victim.board[BOARD_HEIGHT - 1]!.every((cell) => cell === "penalty")).toBe(true);
+			expect(victim.board[BOARD_HEIGHT - 2]!.every((cell) => cell === 0)).toBe(true);
+		});
+
+		it("sends no penalty when only a single line is cleared", () => {
+			const { game, states } = makeGame(2);
+			const [attacker, victim] = states as [PlayerGameState, PlayerGameState];
+			attacker.board = emptyBoard();
+			attacker.board[BOARD_HEIGHT - 1] = fullRow([4, 5]);
+			attacker.currentPiece = placedPiece(O, "O", 4, BOARD_HEIGHT - 2);
+			victim.board = emptyBoard();
+
+			game.lockAndSpawnNext(attacker);
+
+			// 1 ligne complétée -> n-1 = 0 pénalité: le plateau adverse reste vierge.
+			expect(victim.board.every((row) => row.every((cell) => cell === 0))).toBe(true);
+		});
+
+		it("remonte la piece en vol avec le plateau (elle ne s'incruste pas dans la penalite)", () => {
+			const { game, states } = makeGame(1);
+			const state = states[0]!;
+			state.board = emptyBoard();
+			// Piece posee tout en bas: sans correction, les lignes de penalite arrivent
+			// SOUS elle et la piece se retrouve a l'interieur de la zone indestructible.
+			state.currentPiece = placedPiece(O, "O", 4, BOARD_HEIGHT - 2);
+
+			game.addPenaltyLines(state, 2);
+
+			// La piece a ete remontee: sa position courante est libre de toute collision.
+			expect(game.canMove(state, 0, 0)).toBe(true);
+			expect(state.currentPiece!.getY()).toBe(BOARD_HEIGHT - 4);
+		});
+
+		it("garde les lignes de penalite pleines et indestructibles apres verrouillage", () => {
+			const { game, states } = makeGame(1);
+			const state = states[0]!;
+			state.board = emptyBoard();
+			state.currentPiece = placedPiece(O, "O", 4, BOARD_HEIGHT - 2);
+
+			game.addPenaltyLines(state, 2);
+			game.lockPiece(state);
+			const cleared = game.clearLines(state);
+
+			// La piece ne doit avoir ecrase aucune cellule "penalty": les 2 lignes du bas
+			// restent pleines, donc non nettoyables, et rien n'est credite.
+			for (const y of [BOARD_HEIGHT - 1, BOARD_HEIGHT - 2])
+				expect(state.board[y]!.every((cell) => cell === "penalty")).toBe(true);
+			expect(cleared).toBe(0);
+			expect(state.score).toBe(0);
+		});
+
+		it("tue le joueur quand la penalite pousse sa pile hors du plateau (top-out)", () => {
+			const { game, states } = makeGame(1);
+			const state = states[0]!;
+			state.board = emptyBoard();
+			// Bloc tout en haut: la ligne 0 va sortir du terrain -> top-out.
+			state.board[0]![3] = "T";
+
+			game.addPenaltyLines(state, 1);
+
+			expect(state.isAlive).toBe(false);
+		});
+
+		it("ne tue pas quand les lignes poussees dehors sont vides", () => {
+			const { game, states } = makeGame(1);
+			const state = states[0]!;
+			state.board = emptyBoard();
+			state.board[BOARD_HEIGHT - 1]![3] = "T";
+
+			game.addPenaltyLines(state, 2);
+
+			expect(state.isAlive).toBe(true);
+		});
+
+		it("elimine l'adversaire dont la pile deborde et le notifie", () => {
+			const { game, states } = makeGame(3);
+			const [attacker, victim, other] = states as [PlayerGameState, PlayerGameState, PlayerGameState];
+			attacker.board = emptyBoard();
+			attacker.board[BOARD_HEIGHT - 1] = fullRow([4, 5]);
+			attacker.board[BOARD_HEIGHT - 2] = fullRow([4, 5]);
+			attacker.currentPiece = placedPiece(O, "O", 4, BOARD_HEIGHT - 2);
+			victim.board = emptyBoard();
+			victim.board[0]![0] = "T"; // pile au plafond -> mourra sur la penalite
+			other.board = emptyBoard();
+
+			game.lockAndSpawnNext(attacker);
+
+			expect(victim.isAlive).toBe(false);
+			expect(other.isAlive).toBe(true);
+			// La partie continue (2 vivants) -> la victime est notifiee individuellement.
+			expect(emitPlayerEliminated).toHaveBeenCalled();
+		});
+
+		it("does not send penalty in solo mode", () => {
+			const { game, states } = makeGame(1);
+			const state = states[0]!;
+			state.board = emptyBoard();
+			state.board[BOARD_HEIGHT - 1] = fullRow([4, 5]);
+			state.board[BOARD_HEIGHT - 2] = fullRow([4, 5]);
+			state.currentPiece = placedPiece(O, "O", 4, BOARD_HEIGHT - 2);
+
+			// Aucun adversaire: addPenaltyToOpponents court-circuite via isSolo().
+			expect(() => game.lockAndSpawnNext(state)).not.toThrow();
+		});
+	});
+
 	describe("move", () => {
 		it("moves the piece to the left", () => {
 			const { game, states } = makeGame(1);

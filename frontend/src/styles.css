@@ -1531,6 +1531,29 @@ a:hover {
 	box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
 }
 
+/* Secousse déclenchée à la réception de lignes de pénalité. Deux classes alternées
+   (1/2) pour que deux salves rapprochées relancent réellement l'animation. */
+.tetris-stage__board-wrap--shake-1,
+.tetris-stage__board-wrap--shake-2 {
+	animation: tetris-board-shake 0.36s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+}
+
+@keyframes tetris-board-shake {
+	10%, 90% { transform: translate3d(-2px, 0, 0); }
+	20%, 80% { transform: translate3d(3px, 0, 0); }
+	30%, 50%, 70% { transform: translate3d(-5px, 1px, 0); }
+	40%, 60% { transform: translate3d(5px, -1px, 0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+	/* Durée quasi nulle plutôt que `animation: none` : `animationend` doit continuer à
+	   se déclencher, sinon la classe de secousse ne serait jamais retirée. */
+	.tetris-stage__board-wrap--shake-1,
+	.tetris-stage__board-wrap--shake-2 {
+		animation-duration: 0.01ms;
+	}
+}
+
 .tetris-stage__hint {
 	margin: 0;
 	font-size: 0.75rem;

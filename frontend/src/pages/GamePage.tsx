@@ -249,6 +249,15 @@ export default function GamePage() {
 	// de distinguer un mort-devenu-spectateur d'un simple spectateur au moment de partir.
 	const wasPlayerRef = useRef(false);
 	const lastPlayerLevelRef = useRef(1);
+	// Vrai dès qu'on a reçu game:eliminated: ce client a DÉJÀ vu son zoom "GAME OVER".
+	// À game:over on ne le lui rejoue pas (récap direct). Le gagnant et les spectateurs,
+	// eux, ne l'ont jamais vu → on joue le zoom puis on affiche le récap.
+	const hasSeenGameOverRef = useRef(false);
+	// Récap mis en attente pendant le zoom de fin de partie (gagnant/spectateur), affiché
+	// à la fin de l'animation. Distingue le zoom "fin de partie" du zoom "élimination".
+	const pendingOverRef = useRef<GameOverPayload | null>(null);
+	// Dernière frame de jeu connue (lecture sans closure périmée dans les handlers socket).
+	const gameStateRef = useRef<GameStatePayload | null>(null);
 	useEffect(() => { rawRoomRef.current = rawRoom; }, [rawRoom]);
 	useEffect(() => { roomNameRef.current = roomName; }, [roomName]);
 	useEffect(() => { playerNameRef.current = playerName; }, [playerName]);
@@ -308,6 +317,9 @@ export default function GamePage() {
 		setGameOver(null);
 		setEliminated(false);
 		lastPlayerLevelRef.current = 1;
+		hasSeenGameOverRef.current = false;
+		pendingOverRef.current = null;
+		gameStateRef.current = null;
 
 		function handlePageExit() {
 			leaveRoomOnce();
@@ -440,15 +452,34 @@ export default function GamePage() {
 				lastPlayerLevelRef.current = next.level;
 			}
 			setCountdown(null);
+			gameStateRef.current = next;
 			setGameState(next);
 			setGameOver(null);
 			setView("game");
+		}
+		// Une NOUVELLE partie commence: purger tout reliquat de la précédente. Sans ça
+		// l'overlay "GAME OVER" du gagnant (5 s) reste collé par-dessus la nouvelle
+		// partie, et à la fin de son animation handleEliminationDone prend la branche
+		// pendingOverRef et éjecte le joueur vers le lobby alors qu'il est en train de
+		// jouer. Réinitialise aussi hasSeenGameOverRef pour que le zoom rejoue en manche
+		// suivante. Volontairement PAS fait dans handleStateUpdate: un game:update
+		// pendant le zoom d'élimination annulerait la bascule spectateur.
+		function resetEndOfGameOverlay() {
+			pendingOverRef.current = null;
+			hasSeenGameOverRef.current = false;
+			setEliminated(false);
+		}
+		function handleGameStart(raw: unknown) {
+			if (hasLeftRoomRef.current) return;
+			resetEndOfGameOverlay();
+			handleStateUpdate(raw);
 		}
 		function handleCountdown(raw: unknown) {
 			if (hasLeftRoomRef.current) return;
 			const value = (raw as { value?: unknown } | null)?.value;
 			if (typeof value !== "number") return;
 			// Overlay 3-2-1 par-dessus le lobby, jusqu'à l'arrivée de game:start.
+			resetEndOfGameOverlay();
 			setGameOver(null);
 			setCountdown(value);
 		}
@@ -468,6 +499,17 @@ export default function GamePage() {
 					}],
 				}
 				: payload;
+
+			// Morts déjà "GAME OVER"-és → récap direct. Gagnant / spectateur (n'ont jamais
+			// vu le zoom) → on joue d'abord l'overlay zoom, le récap s'affiche à la fin de
+			// l'animation (handleEliminationDone via pendingOverRef).
+			if (!hasSeenGameOverRef.current && gameStateRef.current) {
+				pendingOverRef.current = nextPayload;
+				setEliminated(true);
+				setView("game");
+				return;
+			}
+			gameStateRef.current = null;
 			setGameOver(nextPayload);
 			setGameState(null);
 			setEliminated(false);
@@ -482,18 +524,19 @@ export default function GamePage() {
 			const p = (raw ?? {}) as { spectate?: unknown };
 			eliminateSpectateRef.current = typeof p.spectate === "string" ? p.spectate : null;
 			isSpectatorRef.current = true;
+			hasSeenGameOverRef.current = true;
 			setEliminated(true);
 			setView("game");
 		}
 		socket.on("game:countdown", handleCountdown);
-		socket.on("game:start", handleStateUpdate);
+		socket.on("game:start", handleGameStart);
 		socket.on("game:update", handleStateUpdate);
 		socket.on("game:SpectatorGame", handleStateUpdate);
 		socket.on("game:over", handleOver);
 		socket.on("game:eliminated", handleEliminated);
 		return () => {
 			socket.off("game:countdown", handleCountdown);
-			socket.off("game:start", handleStateUpdate);
+			socket.off("game:start", handleGameStart);
 			socket.off("game:update", handleStateUpdate);
 			socket.off("game:SpectatorGame", handleStateUpdate);
 			socket.off("game:over", handleOver);
@@ -510,6 +553,22 @@ export default function GamePage() {
 	// Fin de l'animation "GAME OVER": on s'abonne comme spectateur d'un joueur
 	// encore vivant (nom fourni par le backend) et on retire l'overlay.
 	function handleEliminationDone() {
+		// On quitte la room: l'animation peut se terminer AVANT le démontage (navigation
+		// différée par la transition nuages). Sans ce garde on se ré-abonnerait comme
+		// spectateur d'une room quittée (le serveur bloquerait alors move/rotate/drop
+		// dans la partie suivante), ou on ferait flasher lobby+récap devant le dashboard.
+		if (hasLeftRoomRef.current) return;
+		// Zoom de FIN DE PARTIE (gagnant/spectateur): afficher le récap, pas d'abonnement.
+		if (pendingOverRef.current) {
+			gameStateRef.current = null;
+			setGameOver(pendingOverRef.current);
+			pendingOverRef.current = null;
+			setGameState(null);
+			setEliminated(false);
+			setView("lobby");
+			return;
+		}
+		// Zoom d'ÉLIMINATION en cours de partie: on devient spectateur d'un vivant.
 		emitSubscribeSpectator(roomNameRef.current, eliminateSpectateRef.current);
 		setEliminated(false);
 	}

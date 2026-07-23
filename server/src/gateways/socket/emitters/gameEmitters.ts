@@ -263,4 +263,21 @@ export function emitGameOver(state: Map<string, PlayerGameState>, winner: string
 			level: playerState.level,
 		})
 	}
+
+	// Les spectateurs purs (arrives en cours de partie, jamais presents dans `state`)
+	// doivent eux aussi recevoir la fin de partie: sans ca ils restent bloques sur un
+	// plateau fige, sans recap ni retour au lobby.
+	for (const [spectatorSocketId, subscription] of spectatorSocketStore) {
+		if (subscription.game.getState() !== state)
+			continue
+		// Un joueur ELIMINE est a la fois dans `state` et abonne comme spectateur:
+		// il vient deja d'etre notifie par la boucle ci-dessus, on ne double pas.
+		if (state.has(spectatorSocketId))
+			continue
+		const spectatorSession = userSocketStore.get(spectatorSocketId)
+		if (!spectatorSession)
+			continue
+		// Un spectateur n'a pas de niveau propre: seuls winner/scores sont exploites.
+		spectatorSession.socket.emit("game:over", { winner, scores })
+	}
 }

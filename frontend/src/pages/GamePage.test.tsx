@@ -438,8 +438,14 @@ describe("GamePage — elimination", () => {
 });
 
 describe("GamePage — fin de partie", () => {
-	it("revient au lobby et affiche le classement", () => {
-		renderGamePage();
+	/** Termine l'animation du zoom "GAME OVER" affiché sur l'écran de jeu. */
+	function endGameOverZoom(container: HTMLElement) {
+		const overlay = container.querySelector(".tetris-gameover-overlay__text") as HTMLElement;
+		act(() => { fireEvent.animationEnd(overlay); });
+	}
+
+	it("joue le zoom GAME OVER au gagnant puis affiche le classement", () => {
+		const { container } = renderGamePage();
 		joinLobby([{ username: "luffy", faction: "pirate" }, { username: "zoro", faction: "pirate" }]);
 		receive("game:update", { board: emptyBoard(), score: 10, level: 1, spectator: false });
 		receive("game:over", {
@@ -447,39 +453,114 @@ describe("GamePage — fin de partie", () => {
 			scores: [{ username: "luffy", score: 900 }, { username: "zoro", score: 400 }],
 		});
 
+		// Le gagnant n'a jamais vu le zoom: il joue d'abord, le récap n'est pas encore là.
+		expect(container.querySelector(".tetris-gameover-overlay__text")?.textContent).toBe("GAME OVER");
+		expect(screen.queryByRole("heading", { name: "Victoire" })).toBeNull();
+
+		endGameOverZoom(container);
+
 		expect(screen.getByRole("heading", { name: "Victoire" })).toBeInTheDocument();
 		expect(screen.getByRole("heading", { name: "room-42" })).toBeInTheDocument();
 	});
 
+	it("joue le zoom GAME OVER a un spectateur pur puis affiche le classement", () => {
+		ctx.params = { roomName: "room-42", playerName: "nami" };
+		const { container } = renderGamePage();
+		// Spectateur pur: room:joined { joined:false } -> abonnement spectateur.
+		receive("room:joined", { players: [{ username: "luffy", faction: "pirate" }], joined: false });
+		receive("game:SpectatorGame", { board: emptyBoard(), score: 10, level: 4, spectator: "luffy" });
+		receive("game:over", { winner: "luffy", scores: [{ username: "luffy", score: 900 }] });
+
+		expect(container.querySelector(".tetris-gameover-overlay__text")?.textContent).toBe("GAME OVER");
+		endGameOverZoom(container);
+
+		expect(screen.getByRole("heading", { name: "room-42" })).toBeInTheDocument();
+	});
+
 	it("complete le level manquant d'un resume solo avec le dernier level joue", () => {
-		renderGamePage();
+		const { container } = renderGamePage();
 		joinLobby([{ username: "luffy", faction: "pirate" }]);
 		receive("game:update", { board: emptyBoard(), score: 10, level: 7, spectator: false });
 		receive("game:over", { winner: "luffy", scores: [{ username: "luffy", score: 900 }] });
+		endGameOverZoom(container);
 
 		const soloStats = screen.getByText("Level final").parentElement as HTMLElement;
 		expect(soloStats.querySelector("strong")?.textContent).toBe("7");
 	});
 
 	it("ne remonte pas le level d'un etat observe en spectateur", () => {
-		renderGamePage();
+		const { container } = renderGamePage();
 		joinLobby([{ username: "luffy", faction: "pirate" }]);
 		receive("game:update", { board: emptyBoard(), score: 10, level: 7, spectator: false });
 		receive("game:SpectatorGame", { board: emptyBoard(), score: 10, level: 12, spectator: "zoro" });
 		receive("game:over", { winner: "luffy", scores: [{ username: "luffy", score: 900 }] });
+		endGameOverZoom(container);
 
 		const soloStats = screen.getByText("Level final").parentElement as HTMLElement;
 		expect(soloStats.querySelector("strong")?.textContent).toBe("7");
 	});
 
-	it("efface l'overlay d'elimination quand la partie se termine", () => {
+	it("purge l'overlay de fin quand une NOUVELLE partie demarre pendant le zoom", () => {
 		const { container } = renderGamePage();
-		joinLobby([{ username: "luffy", faction: "pirate" }]);
+		joinLobby([{ username: "luffy", faction: "pirate" }, { username: "zoro", faction: "pirate" }]);
+		receive("game:update", { board: emptyBoard(), score: 10, level: 1, spectator: false });
+		receive("game:over", { winner: "luffy", scores: [{ username: "luffy", score: 900 }] });
+		expect(container.querySelector(".tetris-gameover-overlay")).not.toBeNull();
+
+		// L'hote relance avant la fin des 5 s de zoom.
+		receive("game:start", { board: emptyBoard(), score: 0, level: 1, spectator: false });
+
+		// L'overlay de l'ANCIENNE partie ne doit plus etre colle par-dessus la nouvelle.
+		expect(container.querySelector(".tetris-gameover-overlay")).toBeNull();
+		expect(container.querySelector(".tetris-board")).not.toBeNull();
+	});
+
+	it("n'ejecte pas vers le lobby si l'animation de l'ancien zoom finit en pleine partie", () => {
+		const { container } = renderGamePage();
+		joinLobby([{ username: "luffy", faction: "pirate" }, { username: "zoro", faction: "pirate" }]);
+		receive("game:update", { board: emptyBoard(), score: 10, level: 1, spectator: false });
+		receive("game:over", { winner: "luffy", scores: [{ username: "luffy", score: 900 }] });
+		receive("game:countdown", { value: 3 });
+		receive("game:start", { board: emptyBoard(), score: 0, level: 1, spectator: false });
+
+		// Plus aucun overlay: rien ne peut declencher handleEliminationDone.
+		expect(container.querySelector(".tetris-gameover-overlay__text")).toBeNull();
+		// Le joueur reste bien dans la partie en cours, pas au lobby.
+		expect(container.querySelector(".game-lobby")).toBeNull();
+		expect(container.querySelector(".tetris-board")).not.toBeNull();
+	});
+
+	it("ne se reabonne pas et n'affiche pas le recap si l'animation finit APRES le depart", () => {
+		const { container } = renderGamePage();
+		joinLobby([{ username: "luffy", faction: "pirate" }, { username: "zoro", faction: "pirate" }]);
 		receive("game:update", { board: emptyBoard(), score: 10, level: 2, spectator: false });
 		receive("game:eliminated", { spectate: "zoro" });
-		receive("game:over", { winner: "zoro", scores: [{ username: "luffy", score: 10 }] });
+		gameEvents.emitSubscribeSpectator.mockClear();
+
+		// Le joueur quitte pendant le zoom; la navigation est differee (transition nuages)
+		// donc l'animation peut encore se terminer avant le demontage.
+		fireEvent.click(screen.getByRole("button", { name: "Quitter la partie" }));
+		endGameOverZoom(container);
+
+		expect(gameEvents.emitSubscribeSpectator).not.toHaveBeenCalled();
+		expect(container.querySelector(".game-lobby")).toBeNull();
+	});
+
+	it("affiche le recap directement a un joueur deja elimine, sans rejouer le zoom", () => {
+		const { container } = renderGamePage();
+		joinLobby([{ username: "luffy", faction: "pirate" }, { username: "zoro", faction: "pirate" }]);
+		receive("game:update", { board: emptyBoard(), score: 10, level: 2, spectator: false });
+		// Le joueur meurt en cours de partie: il voit SON zoom, puis devient spectateur.
+		receive("game:eliminated", { spectate: "zoro" });
+		endGameOverZoom(container);
+		gameEvents.emitSubscribeSpectator.mockClear();
+
+		// Fin de partie: aucun second zoom, récap direct, aucun nouvel abonnement.
+		receive("game:over", { winner: "zoro", scores: [{ username: "luffy", score: 10 }, { username: "zoro", score: 50 }] });
 
 		expect(container.querySelector(".tetris-gameover-overlay")).toBeNull();
+		expect(screen.getByRole("heading", { name: "room-42" })).toBeInTheDocument();
+		expect(gameEvents.emitSubscribeSpectator).not.toHaveBeenCalled();
 	});
 });
 

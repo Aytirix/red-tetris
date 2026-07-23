@@ -172,14 +172,27 @@ describe("Room", () => {
 	});
 
 	describe("appartenance par pseudo (isMember)", () => {
-		it("enregistre le pseudo a l'ajout et le conserve apres depart", () => {
+		it("enregistre le pseudo a l'ajout", () => {
 			room.addPlayer(makePlayer("luffy", "host"));
 			expect(room.isMember("luffy")).toBe(true);
 			expect(room.isMember("zoro")).toBe(false);
+		});
 
-			// Le membre part (deconnexion): il reste membre tant que la room vit.
-			room.removePlayerByName("host", "luffy");
+		it("conserve l'appartenance apres un depart/refresh (removePlayerBySocketId)", () => {
+			room.addPlayer(makePlayer("luffy", "host"));
+			// Refresh/déconnexion: la socket part mais le pseudo reste membre -> peut revenir.
+			room.removePlayerBySocketId("host");
 			expect(room.countPlayer()).toBe(0);
+			expect(room.isMember("luffy")).toBe(true);
+		});
+
+		it("revoque l'appartenance a l'expulsion (kick) -> ne peut plus revenir", () => {
+			room.addPlayer(makePlayer("luffy", "host"));
+			room.addPlayer(makePlayer("zoro", "guest"));
+			// Kick par l'hôte: le pseudo n'est plus membre -> traité comme un inconnu.
+			expect(room.removePlayerByName("host", "zoro")).toBe(true);
+			expect(room.isMember("zoro")).toBe(false);
+			// L'hôte, lui, reste membre.
 			expect(room.isMember("luffy")).toBe(true);
 		});
 	});

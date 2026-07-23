@@ -1,4 +1,4 @@
-import { useEffect, useMemo, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import type { GameStatePayload } from "../../types/game";
 import { emitGameDrop, emitGameMove, emitGameRotate, emitSubscribeSpectator } from "../../socket/events/game";
 import { useShop } from "../../contexts/ShopContext";
@@ -34,6 +34,37 @@ export default function GameView({ state, roomName, playerName, eliminated = fal
 
 	const boardRows = state.board.length;
 	const mainBoardHeightPx = boardRows * MAIN_CELL_SIZE;
+
+	// Secousse du plateau quand le joueur encaisse des lignes de pénalité.
+	// Une ligne de pénalité est une rangée entièrement composée de cellules "penalty"
+	// (les lignes serveur sont pleines) : la pièce en chute ne peut jamais en former
+	// une, donc ce comptage est fiable.
+	const penaltyRows = useMemo(
+		() => state.board.filter((row) => row.length > 0 && row.every((cell) => cell === "penalty")).length,
+		[state.board]
+	);
+	// Alterne 1/2 : reposer la MÊME classe ne relance pas l'animation, donc deux salves
+	// rapprochées ne produiraient qu'une seule secousse. 0 = pas de secousse.
+	const [shakePhase, setShakePhase] = useState(0);
+	// null au premier rendu : sert de valeur de référence, aucune secousse à l'entrée
+	// (utile si on rejoint/spectate un plateau déjà pénalisé).
+	const prevPenaltyRows = useRef<number | null>(null);
+	// Le plateau AFFICHÉ peut changer d'identité (bascule spectateur / clic sur un
+	// mini-plateau) : on rebase alors le compteur, sinon passer sur un adversaire déjà
+	// pénalisé déclencherait une secousse alors qu'on n'a rien encaissé.
+	const watchedBoard = state.spectator;
+	const prevWatchedBoard = useRef(watchedBoard);
+	useEffect(() => {
+		const targetChanged = prevWatchedBoard.current !== watchedBoard;
+		prevWatchedBoard.current = watchedBoard;
+		if (targetChanged || prevPenaltyRows.current === null) {
+			prevPenaltyRows.current = penaltyRows;
+			return;
+		}
+		if (penaltyRows > prevPenaltyRows.current)
+			setShakePhase((phase) => (phase === 1 ? 2 : 1));
+		prevPenaltyRows.current = penaltyRows;
+	}, [penaltyRows, watchedBoard]);
 
 	// Split opponents: left column fills until full (2 minis per row), then right (under next piece)
 	const { left, right } = useMemo(() => {
@@ -118,7 +149,10 @@ export default function GameView({ state, roomName, playerName, eliminated = fal
 						showLevel={showLevel}
 						spectatorOf={spectatorOf}
 					/>
-					<div className="tetris-stage__board-wrap">
+					<div
+						className={`tetris-stage__board-wrap${shakePhase ? ` tetris-stage__board-wrap--shake-${shakePhase}` : ""}`}
+						onAnimationEnd={() => setShakePhase(0)}
+					>
 						<GameBoard
 							board={state.board}
 							cellSize={MAIN_CELL_SIZE}

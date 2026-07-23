@@ -290,3 +290,81 @@ describe("GameView — quitter et élimination", () => {
 		expect(onEliminationDone).toHaveBeenCalledTimes(1);
 	});
 });
+
+describe("GameView — secousse à la réception de lignes de pénalité", () => {
+	const base = { roomName: "room-42", playerName: "luffy" } as const;
+
+	function penaltyBoard(penaltyCount: number, rows = 20, cols = 10): GameBoardCell[][] {
+		const b = board(rows, cols);
+		for (let y = rows - penaltyCount; y < rows; y++)
+			b[y] = Array.from({ length: cols }, () => "penalty" as GameBoardCell);
+		return b;
+	}
+
+	function wrapOf(container: HTMLElement) {
+		return container.querySelector(".tetris-stage__board-wrap") as HTMLElement;
+	}
+
+	it("ne secoue pas au premier rendu, même si le plateau est déjà pénalisé", () => {
+		const { container } = render(<GameView state={makeState({ board: penaltyBoard(2) })} {...base} />);
+		expect(wrapOf(container).className).not.toContain("--shake");
+	});
+
+	it("secoue le plateau quand le nombre de lignes de pénalité augmente", () => {
+		const { container, rerender } = render(
+			<GameView state={makeState({ board: penaltyBoard(0) })} {...base} />,
+		);
+		expect(wrapOf(container).className).not.toContain("--shake");
+
+		rerender(<GameView state={makeState({ board: penaltyBoard(1) })} {...base} />);
+		expect(wrapOf(container).className).toContain("--shake");
+	});
+
+	it("ne secoue pas quand le nombre de lignes de pénalité est inchangé", () => {
+		const { container, rerender } = render(
+			<GameView state={makeState({ board: penaltyBoard(1) })} {...base} />,
+		);
+		rerender(<GameView state={makeState({ board: penaltyBoard(1), score: 999 })} {...base} />);
+		expect(wrapOf(container).className).not.toContain("--shake");
+	});
+
+	it("ne secoue pas quand on change de plateau observe (bascule spectateur)", () => {
+		const { container, rerender } = render(
+			<GameView state={makeState({ board: penaltyBoard(0), spectator: "zoro" })} {...base} />,
+		);
+		// Nouvelle cible deja penalisee: on rebase, on ne crie pas "penalite recue".
+		rerender(<GameView state={makeState({ board: penaltyBoard(4), spectator: "sanji" })} {...base} />);
+		expect(wrapOf(container).className).not.toContain("--shake");
+
+		// Une vraie penalite sur la MEME cible secoue toujours.
+		rerender(<GameView state={makeState({ board: penaltyBoard(5), spectator: "sanji" })} {...base} />);
+		expect(wrapOf(container).className).toContain("--shake");
+	});
+
+	it("relance l'animation quand une 2e salve arrive avant la fin de la 1re", () => {
+		const { container, rerender } = render(
+			<GameView state={makeState({ board: penaltyBoard(0) })} {...base} />,
+		);
+		rerender(<GameView state={makeState({ board: penaltyBoard(1) })} {...base} />);
+		const first = wrapOf(container).className;
+		expect(first).toContain("--shake");
+
+		// Sans fin d'animation entre les deux: la classe doit CHANGER, sinon le
+		// navigateur ne rejouerait pas la secousse.
+		rerender(<GameView state={makeState({ board: penaltyBoard(3) })} {...base} />);
+		const second = wrapOf(container).className;
+		expect(second).toContain("--shake");
+		expect(second).not.toBe(first);
+	});
+
+	it("retire la classe de secousse à la fin de l'animation", () => {
+		const { container, rerender } = render(
+			<GameView state={makeState({ board: penaltyBoard(0) })} {...base} />,
+		);
+		rerender(<GameView state={makeState({ board: penaltyBoard(1) })} {...base} />);
+		expect(wrapOf(container).className).toContain("--shake");
+
+		fireEvent.animationEnd(wrapOf(container));
+		expect(wrapOf(container).className).not.toContain("--shake");
+	});
+});
