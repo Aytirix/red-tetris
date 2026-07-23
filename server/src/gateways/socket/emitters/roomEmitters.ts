@@ -20,15 +20,19 @@ export function emitRoomJoined(socket: Socket, room: Room) : void {
 }
 
 export function emitSubscrib() : void {
-	for (const [socket, objet] of userSocketStore) {
+	// Une room privee (dont les parties solo, forcees privees) n'apparait pas dans
+	// la liste publique: elle reste joignable uniquement par son URL directe.
+	const publicRooms = Array.from(roomSocketStore.values())
+		.filter((room) => !room.getPrivate())
+		.map((room) => ({
+			roomId: room.name,
+			playerCount: room.countPlayer(),
+			maxPlayers: 4,
+			mode: room.getMode(),
+		}))
+	for (const [, objet] of userSocketStore) {
 		if (objet.subscribe) {
-			const roomList = Array.from(roomSocketStore.values()).map((room) => ({
-					roomId: room.name,
-					playerCount: room.countPlayer(),
-					maxPlayers: 4,
-					mode: room.getMode(),
-				}))
-			objet.socket.emit("room:list", roomList);// checker dans room 
+			objet.socket.emit("room:list", publicRooms);
 		}
 	}
 }
@@ -59,4 +63,9 @@ export function emitRoomSettings(room: Room) : void {
 
 export function emitKickedRoom(socket: Socket) : void {
 	socket.emit("room:kicked")
+}
+
+// Refus d'entree dans une room: le client est redirige (ex: partie privee).
+export function emitRoomDenied(socket: Socket, reason: "private") : void {
+	socket.emit("room:denied", { reason })
 }

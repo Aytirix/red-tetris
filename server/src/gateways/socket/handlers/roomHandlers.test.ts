@@ -153,6 +153,58 @@ describe("roomHandlers", () => {
 			expect(room.countPlayer()).toBe(1);
 			expect(lastEmit(socket, "room:joined")![1]).toMatchObject({ joined: false });
 		});
+
+		it("refuse un non-membre qui force l'URL d'une room privee", async () => {
+			const { room, sockets } = seedRoom("salle1", ["luffy"]);
+			room.setPrivate(true, sockets.get("luffy")!);
+			const intrus = makeSocket("s2");
+			userSocketStore.set("s2", { username: "zoro", subscribe: false, socket: intrus });
+
+			await handlerRoomJoin(intrus, { roomId: "salle1" });
+
+			expect(room.countPlayer()).toBe(1);
+			expect(lastEmit(intrus, "room:denied")).toEqual(["room:denied", { reason: "private" }]);
+			expect(lastEmit(intrus, "room:joined")).toBeUndefined();
+		});
+
+		it("refuse un non-membre qui force l'URL d'une partie solo", async () => {
+			const { room } = seedRoom("sologame_luffy", ["luffy"]);
+			expect(room.getPrivate()).toBe(true);
+			const intrus = makeSocket("s2");
+			userSocketStore.set("s2", { username: "zoro", subscribe: false, socket: intrus });
+
+			await handlerRoomJoin(intrus, { roomId: "sologame_luffy" });
+
+			expect(room.countPlayer()).toBe(1);
+			expect(lastEmit(intrus, "room:denied")).toEqual(["room:denied", { reason: "private" }]);
+		});
+
+		it("laisse un membre existant rejoindre sa room privee (idempotent)", async () => {
+			const { room, sockets } = seedRoom("salle1", ["luffy"]);
+			room.setPrivate(true, sockets.get("luffy")!);
+
+			await handlerRoomJoin(sockets.get("luffy")!, { roomId: "salle1" });
+
+			expect(lastEmit(sockets.get("luffy")!, "room:denied")).toBeUndefined();
+			expect(lastEmit(sockets.get("luffy")!, "room:joined")).toBeDefined();
+		});
+
+		it("laisse un membre revenir dans une room privee apres reconnexion (nouveau socket)", async () => {
+			const { room, sockets } = seedRoom("salle1", ["luffy", "zoro"]);
+			room.setPrivate(true, sockets.get("luffy")!);
+			// zoro se deconnecte (refresh): son slot est libere mais la room survit (luffy reste).
+			room.removePlayerBySocketId(sockets.get("zoro")!.id);
+			expect(room.countPlayer()).toBe(1);
+			// zoro revient avec un NOUVEAU socket.id mais le meme pseudo.
+			const zoroReco = makeSocket("s-zoro-2");
+			userSocketStore.set("s-zoro-2", { username: "zoro", subscribe: false, socket: zoroReco });
+
+			await handlerRoomJoin(zoroReco, { roomId: "salle1" });
+
+			expect(lastEmit(zoroReco, "room:denied")).toBeUndefined();
+			expect(lastEmit(zoroReco, "room:joined")).toBeDefined();
+			expect(room.countPlayer()).toBe(2);
+		});
 	});
 
 	describe("handlerRoomSubscribe / handlerRoomUnsubscribe", () => {
@@ -277,13 +329,24 @@ describe("roomHandlers", () => {
 	});
 
 	describe("handleRoomMode", () => {
-		it("lets the host change the mode and broadcasts the settings", () => {
+		it("lets the host set the classique mode and broadcasts the settings", () => {
 			const { room, sockets } = seedRoom("salle1", ["luffy", "zoro"]);
+
+			handleRoomMode(sockets.get("luffy")!, { mode: "classique" });
+
+			expect(room.getMode()).toBe("classique");
+			expect(lastEmit(sockets.get("zoro")!, "room:settings")![1]).toEqual({ mode: "classique", private: false });
+		});
+
+		it("refuses the removed sprint/ultra modes", () => {
+			const { room, sockets } = seedRoom("salle1", ["luffy"]);
 
 			handleRoomMode(sockets.get("luffy")!, { mode: "ultra" });
 
-			expect(room.getMode()).toBe("ultra");
-			expect(lastEmit(sockets.get("zoro")!, "room:settings")![1]).toEqual({ mode: "ultra", private: false });
+			expect(room.getMode()).toBe("classique");
+			expect(lastEmit(sockets.get("luffy")!, "system:Error")![1]).toMatchObject({
+				message: "Invalid Mode or Not Host",
+			});
 		});
 
 		it("refuses an invalid payload", () => {
@@ -314,7 +377,7 @@ describe("roomHandlers", () => {
 
 		it("refuses a non-host", () => {
 			const { room, sockets } = seedRoom("salle1", ["luffy", "zoro"]);
-			handleRoomMode(sockets.get("zoro")!, { mode: "ultra" });
+			handleRoomMode(sockets.get("zoro")!, { mode: "classique" });
 			expect(room.getMode()).toBe("classique");
 		});
 	});
@@ -351,6 +414,30 @@ describe("roomHandlers", () => {
 
 			expect(room.getPrivate()).toBe(false);
 			expect(lastEmit(sockets.get("zoro")!, "system:Error")![1]).toMatchObject({
+				message: "only host can change visibility",
+			});
+		});
+
+		it("re-pousse la liste publique aux abonnes quand la room devient privee", () => {
+			const { sockets } = seedRoom("salle1", ["luffy"]);
+			const watcher = makeSocket("watcher");
+			userSocketStore.set("watcher", { username: "watcher", subscribe: true, socket: watcher });
+
+			handleRoomSetPrivate(sockets.get("luffy")!, { private: true });
+
+			// La derniere room:list poussee au watcher ne contient plus salle1 (privee).
+			const list = lastEmit(watcher, "room:list")![1] as { roomId: string }[];
+			expect(list.map((r) => r.roomId)).not.toContain("salle1");
+		});
+
+		it("refuse de rendre publique une partie solo (forcee privee)", () => {
+			const { room, sockets } = seedRoom("sologame_abc", ["luffy"]);
+			expect(room.getPrivate()).toBe(true);
+
+			handleRoomSetPrivate(sockets.get("luffy")!, { private: false });
+
+			expect(room.getPrivate()).toBe(true);
+			expect(lastEmit(sockets.get("luffy")!, "system:Error")![1]).toMatchObject({
 				message: "only host can change visibility",
 			});
 		});
@@ -600,6 +687,36 @@ describe("roomHandlers", () => {
 			handleSubscribeSpectator(spectator, { roomId: "salle1", user: null });
 
 			expect(spectatorSocketStore.get("spec1")!.player.getName()).toBe("luffy");
+		});
+
+		it("refuse un spectateur exterieur sur une room privee (message neutre)", () => {
+			const seeded = seedRoom("salle1", ["luffy", "zoro"]);
+			seeded.room.setPrivate(true, seeded.sockets.get("luffy")!);
+			handleRoomStart(seeded.sockets.get("luffy")!, undefined);
+			vi.advanceTimersByTime(3000);
+			const intrus = makeSocket("spec-intrus");
+			userSocketStore.set("spec-intrus", { username: "nami", subscribe: false, socket: intrus });
+
+			handleSubscribeSpectator(intrus, { roomId: "salle1", user: "zoro" });
+
+			// Message neutre "Room not found": on ne divulgue pas l'existence de la room privee.
+			expect(lastEmit(intrus, "system:Error")![1]).toMatchObject({ message: "Room not found" });
+			expect(spectatorSocketStore.has("spec-intrus")).toBe(false);
+			expect(lastEmit(intrus, "game:SpectatorGame")).toBeUndefined();
+		});
+
+		it("laisse un membre elimine spectater sa room privee", () => {
+			const seeded = seedRoom("salle1", ["luffy", "zoro"]);
+			seeded.room.setPrivate(true, seeded.sockets.get("luffy")!);
+			handleRoomStart(seeded.sockets.get("luffy")!, undefined);
+			vi.advanceTimersByTime(3000);
+			// zoro est elimine mais reste membre (pseudo enregistre a l'ajout).
+			seeded.room.getGame()!.getPlayerStateBySocketId("sock-zoro")!.isAlive = false;
+
+			handleSubscribeSpectator(seeded.sockets.get("zoro")!, { roomId: "salle1", user: "luffy" });
+
+			expect(spectatorSocketStore.get("sock-zoro")!.player.getName()).toBe("luffy");
+			expect(lastEmit(seeded.sockets.get("zoro")!, "game:SpectatorGame")).toBeDefined();
 		});
 
 		it("refuses an invalid payload", () => {

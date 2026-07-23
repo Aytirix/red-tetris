@@ -110,17 +110,19 @@ describe("Room", () => {
 			room.addPlayer(makePlayer("zoro", "guest"));
 		});
 
-		it("lets the host change the mode", () => {
-			expect(room.setMode("ultra", makeSocket("host"))).toBe(true);
-			expect(room.getMode()).toBe("ultra");
-			expect(room.setMode("sprint", makeSocket("host"))).toBe(true);
-			expect(room.getMode()).toBe("sprint");
+		it("accepts classique for the host (seul mode restant)", () => {
 			expect(room.setMode("classique", makeSocket("host"))).toBe(true);
 			expect(room.getMode()).toBe("classique");
 		});
 
+		it("refuses the removed sprint/ultra modes even for the host", () => {
+			expect(room.setMode("ultra", makeSocket("host"))).toBe(false);
+			expect(room.setMode("sprint", makeSocket("host"))).toBe(false);
+			expect(room.getMode()).toBe("classique");
+		});
+
 		it("refuses a non-host", () => {
-			expect(room.setMode("ultra", makeSocket("guest"))).toBe(false);
+			expect(room.setMode("classique", makeSocket("guest"))).toBe(false);
 			expect(room.getMode()).toBe("classique");
 		});
 
@@ -146,6 +148,39 @@ describe("Room", () => {
 		it("refuses a non-host", () => {
 			expect(room.setPrivate(true, makeSocket("guest"))).toBe(false);
 			expect(room.getPrivate()).toBe(false);
+		});
+	});
+
+	describe("partie solo (nom prefixe sologame_)", () => {
+		it("est privee des la construction et se declare solo", () => {
+			const solo = new Room("sologame_abc");
+			expect(solo.isSolo()).toBe(true);
+			expect(solo.getPrivate()).toBe(true);
+		});
+
+		it("refuse tout changement de visibilite, meme par l'hote", () => {
+			const solo = new Room("sologame_abc");
+			solo.addPlayer(makePlayer("luffy", "host"));
+			expect(solo.setPrivate(false, makeSocket("host"))).toBe(false);
+			expect(solo.getPrivate()).toBe(true);
+		});
+
+		it("une room classique n'est pas solo et reste publique", () => {
+			expect(room.isSolo()).toBe(false);
+			expect(room.getPrivate()).toBe(false);
+		});
+	});
+
+	describe("appartenance par pseudo (isMember)", () => {
+		it("enregistre le pseudo a l'ajout et le conserve apres depart", () => {
+			room.addPlayer(makePlayer("luffy", "host"));
+			expect(room.isMember("luffy")).toBe(true);
+			expect(room.isMember("zoro")).toBe(false);
+
+			// Le membre part (deconnexion): il reste membre tant que la room vit.
+			room.removePlayerByName("host", "luffy");
+			expect(room.countPlayer()).toBe(0);
+			expect(room.isMember("luffy")).toBe(true);
 		});
 	});
 

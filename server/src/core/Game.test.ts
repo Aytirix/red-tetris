@@ -73,7 +73,7 @@ function placedPiece(shape: PieceShape, type: PieceType, x: number, y: number): 
 
 type Setup = { game: Game; room: Room; players: Player[]; states: PlayerGameState[] };
 
-function makeGame(playerCount = 1, mode: "classique" | "ultra" | "sprint" = "classique"): Setup {
+function makeGame(playerCount = 1, mode: "classique" = "classique"): Setup {
 	const room = new Room("salle");
 	const players = Array.from({ length: playerCount }, (_v, i) => makePlayer(`joueur${i}`, `sock${i}`));
 	for (const player of players) room.addPlayer(player);
@@ -119,8 +119,7 @@ describe("Game", () => {
 		});
 
 		it("keeps the mode given at construction", () => {
-			expect(makeGame(1, "ultra").game.mode).toBe("ultra");
-			expect(makeGame(1, "sprint").game.mode).toBe("sprint");
+			expect(makeGame(1, "classique").game.mode).toBe("classique");
 		});
 
 		it("indexes the states by socket id", () => {

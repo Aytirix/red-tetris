@@ -1396,6 +1396,7 @@ a:hover {
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
+	flex-wrap: wrap;
 	gap: 1rem;
 }
 
@@ -1408,37 +1409,11 @@ a:hover {
 	flex-shrink: 0;
 }
 
-.game-lobby__mode-list {
-	display: flex;
-	gap: 0.35rem;
-}
-
-.game-lobby__mode-btn {
-	padding: 0.3rem 0.75rem;
-	border-radius: 999px;
-	border: 1px solid var(--color-glass-border);
-	background: transparent;
+.game-lobby__setting-hint {
+	flex-basis: 100%;
+	font-size: 0.72rem;
 	color: var(--color-text-muted-on-dark);
-	font-size: 0.78rem;
-	font-weight: 500;
-	cursor: pointer;
-	transition: background 0.15s, color 0.15s, border-color 0.15s;
-}
-
-.game-lobby__mode-btn:not(:disabled):hover {
-	border-color: rgba(255, 255, 255, 0.35);
-	color: var(--color-text-on-dark);
-}
-
-.game-lobby__mode-btn--active {
-	background: rgba(255, 54, 95, 0.15);
-	border-color: rgba(255, 54, 95, 0.4);
-	color: var(--color-primary);
-}
-
-.game-lobby__mode-btn:disabled {
-	cursor: default;
-	opacity: 0.6;
+	opacity: 0.8;
 }
 
 .game-lobby__privacy-btn {
