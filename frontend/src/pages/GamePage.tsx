@@ -54,6 +54,7 @@ function LobbyView({
 	gameSummary,
 	onLeave,
 	cameraOn,
+	cameraReady,
 	handsError,
 	onToggleCamera,
 }: {
@@ -66,6 +67,7 @@ function LobbyView({
 	gameSummary: GameOverPayload | null;
 	onLeave: () => void;
 	cameraOn: boolean;
+	cameraReady: boolean;
 	handsError: string | null;
 	onToggleCamera: () => void;
 }) {
@@ -212,13 +214,19 @@ function LobbyView({
 							<div className="game-lobby__setting game-lobby__setting--camera">
 								<span className="game-lobby__setting-label">Caméra (obligatoire)</span>
 								<button
-									className={`game-lobby__privacy-btn${cameraOn ? " game-lobby__privacy-btn--private" : ""}`}
+									className={`game-lobby__privacy-btn${cameraReady ? " game-lobby__privacy-btn--private" : ""}`}
 									onClick={onToggleCamera}
 									disabled={isRoomLoading}
 								>
-									{cameraOn ? "📷 Caméra activée" : "○ Activer la caméra"}
+									{cameraReady
+										? "📷 Caméra activée"
+										: cameraOn
+											? "⏳ Démarrage de la caméra…"
+											: "○ Activer la caméra"}
 								</button>
-								{handsError && <span className="game-lobby__camera-error">{handsError}</span>}
+								{cameraOn && !cameraReady && handsError && (
+									<span className="game-lobby__camera-error">⚠ {handsError}</span>
+								)}
 							</div>
 						)}
 					</div>
@@ -297,18 +305,23 @@ export default function GamePage() {
 
 	// La capture WebCodecs tourne dès que la caméra est allumée; on envoie les frames
 	// au serveur seulement pendant une vraie partie en mode mains (pas en spectateur).
-	const { error: handsError } = useHandsCapture({
+	const { status: handsStatus, error: handsError } = useHandsCapture({
 		cameraOn,
 		streaming: cameraOn && isHandsMode && view === "game" && !isSpectatorView,
 		videoRef,
 	});
 
+	// "Prêt" est piloté par l'état RÉEL de la caméra, pas par le clic: si le joueur
+	// refuse/bloque la caméra, le hook passe en "error" et il ne doit PAS être compté
+	// prêt. On n'est prêt que quand la capture tourne effectivement ("on").
+	const cameraReady = handsStatus === "on";
+	useEffect(() => {
+		if (isHandsMode)
+			emitHandsSetReady(cameraReady);
+	}, [isHandsMode, cameraReady]);
+
 	function toggleCamera() {
-		setCameraOn((on) => {
-			const next = !on;
-			emitHandsSetReady(next);
-			return next;
-		});
+		setCameraOn((on) => !on);
 	}
 
 	useEffect(() => {
@@ -585,6 +598,7 @@ export default function GamePage() {
 					gameSummary={gameOver}
 					onLeave={handleLeave}
 					cameraOn={cameraOn}
+					cameraReady={cameraReady}
 					handsError={handsError}
 					onToggleCamera={toggleCamera}
 				/>
