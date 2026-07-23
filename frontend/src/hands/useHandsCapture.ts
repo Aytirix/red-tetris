@@ -59,44 +59,69 @@ export function useHandsCapture(opts: UseHandsCaptureOptions): { status: HandsCa
 		setStatus("starting");
 		setError(null);
 
-		(async () => {
-			try {
-				const video = videoRef.current;
-				if (!video) throw new Error("élément vidéo non monté");
-				stream = await navigator.mediaDevices.getUserMedia({
-					video: { width: 640, height: 480, frameRate: 30 },
-					audio: false,
-				});
-				if (cancelled) return;
-				video.srcObject = stream;
-				await video.play().catch(() => undefined);
-				const track = stream.getVideoTracks()[0];
-				if (!track) throw new Error("aucune piste vidéo");
-				const activeReader = new MediaStreamTrackProcessor({ track }).readable.getReader();
-				reader = activeReader;
-				setStatus("on");
+		// Une passe de capture: ouvre la caméra, lit les frames, envoie celles à streamer.
+		// Retourne quand le reader se termine (track arrêté) — l'appelant redémarre alors.
+		async function runCapture(): Promise<void> {
+			const video = videoRef.current;
+			if (!video) throw new Error("élément vidéo non monté");
+			stream = await navigator.mediaDevices.getUserMedia({
+				video: { width: 640, height: 480, frameRate: 30 },
+				audio: false,
+			});
+			if (cancelled) return;
+			video.srcObject = stream;
+			await video.play().catch(() => undefined);
+			const track = stream.getVideoTracks()[0];
+			if (!track) throw new Error("aucune piste vidéo");
+			const activeReader = new MediaStreamTrackProcessor({ track }).readable.getReader();
+			reader = activeReader;
+			setStatus("on");
 
-				while (!cancelled) {
-					const { value: frame, done } = await activeReader.read();
-					if (done) break;
-					if (!frame) continue;
-					const now = performance.now();
-					if (!streamingRef.current || now - lastSend < SEND_INTERVAL_MS) {
-						frame.close();
-						continue;
-					}
-					lastSend = now;
-					try {
-						const rgb = await frameToRgb(frame);
-						if (rgb) emitHandsFrame(rgb);
-					} finally {
-						frame.close();
-					}
+			while (!cancelled) {
+				const { value: frame, done } = await activeReader.read();
+				if (done) break;
+				if (!frame) continue;
+				const now = performance.now();
+				// Throttle + on ne convertit/envoie que si on stream réellement.
+				if (!streamingRef.current || now - lastSend < SEND_INTERVAL_MS) {
+					frame.close();
+					continue;
 				}
-			} catch (err) {
+				lastSend = now;
+				// Chaque frame est isolée: une conversion qui échoue ne doit JAMAIS
+				// tuer la boucle de capture (sinon plus aucune frame n'est envoyée).
+				try {
+					const rgb = await frameToRgb(frame);
+					if (rgb) emitHandsFrame(rgb);
+				} catch {
+					/* frame ignorée */
+				} finally {
+					frame.close();
+				}
+			}
+			// Reader terminé (track arrêté): on libère ce flux, l'appelant relancera.
+			for (const t of stream.getTracks()) t.stop();
+			stream = null;
+		}
+
+		(async () => {
+			// Boucle de résilience: tant que la caméra doit rester active, si une passe
+			// se TERMINE (reader done = track arrêté par l'OS, changement d'appareil,
+			// glitch), on relance — c'est ce qui empêchait les frames de repartir. En
+			// revanche un ÉCHEC de démarrage (permission refusée, pas de caméra) est
+			// définitif: on passe en "error" sans réessayer en boucle.
+			while (!cancelled) {
+				try {
+					await runCapture();
+				} catch (err) {
+					if (cancelled) return;
+					setError(err instanceof Error ? err.message : String(err));
+					setStatus("error");
+					return;
+				}
 				if (cancelled) return;
-				setError(err instanceof Error ? err.message : String(err));
-				setStatus("error");
+				// Reader terminé mais la caméra doit rester on: courte pause puis relance.
+				await new Promise((r) => setTimeout(r, 200));
 			}
 		})();
 
