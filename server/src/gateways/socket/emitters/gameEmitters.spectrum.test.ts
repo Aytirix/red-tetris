@@ -7,7 +7,7 @@ import { BOARD_HEIGHT, BOARD_WIDTH, type Board, type Cell, type PlayerGameState 
 import { I, O } from "../../../types/game/piecesGameTypes.js";
 import { spectatorSocketStore } from "../spectatorSocketStore.js";
 import { userSocketStore } from "../userSocketStore.js";
-import { emitGameStart, emitGameUpdate, emitSpectatorGame, getSpectrumBoard } from "./gameEmitters.js";
+import { emitGameOver, emitGameStart, emitGameUpdate, emitSpectatorGame, getSpectrumBoard } from "./gameEmitters.js";
 
 type FakeSocket = Socket & { emit: ReturnType<typeof vi.fn> };
 
@@ -207,6 +207,57 @@ describe("spectre des adversaires", () => {
 			const payload = lastPayload(payloadSocket, "game:SpectatorGame");
 
 			expect(payload.opponents).toHaveLength(0);
+		});
+	});
+
+	describe("emitGameOver — spectateurs purs", () => {
+		it("notifie aussi les spectateurs abonnes a la partie", () => {
+			const luffy = makeState("luffy", "sock-luffy");
+			const state = new Map<string, PlayerGameState>([["sock-luffy", luffy.state]]);
+			const game = fakeGame(state);
+			// Spectateur pur: present dans les stores, jamais dans `state`.
+			const nami = makeSocket("sock-nami");
+			spectatorSocketStore.set("sock-nami", { game, player: luffy.state.player });
+			userSocketStore.set("sock-nami", { username: "nami", subscribe: false, socket: nami });
+
+			emitGameOver(state, "luffy");
+
+			const payload = lastPayload(nami, "game:over");
+			expect(payload).toBeDefined();
+			expect(payload.winner).toBe("luffy");
+			expect(payload.scores).toEqual([{ username: "luffy", score: 0 }]);
+		});
+
+		it("ne notifie pas deux fois un joueur elimine devenu spectateur", () => {
+			const luffy = makeState("luffy", "sock-luffy");
+			const zoro = makeState("zoro", "sock-zoro");
+			zoro.state.isAlive = false;
+			const state = new Map<string, PlayerGameState>([
+				["sock-luffy", luffy.state],
+				["sock-zoro", zoro.state],
+			]);
+			const game = fakeGame(state);
+			// zoro est mort ET abonne comme spectateur: il est dans les DEUX boucles.
+			spectatorSocketStore.set("sock-zoro", { game, player: luffy.state.player });
+			userSocketStore.set("sock-zoro", { username: "zoro", subscribe: false, socket: zoro.socket });
+
+			emitGameOver(state, "luffy");
+
+			const overCalls = zoro.socket.emit.mock.calls.filter((call) => call[0] === "game:over");
+			expect(overCalls).toHaveLength(1);
+		});
+
+		it("n'envoie rien aux spectateurs d'une AUTRE partie", () => {
+			const luffy = makeState("luffy", "sock-luffy");
+			const state = new Map<string, PlayerGameState>([["sock-luffy", luffy.state]]);
+			const autreState = new Map<string, PlayerGameState>();
+			const nami = makeSocket("sock-nami");
+			spectatorSocketStore.set("sock-nami", { game: fakeGame(autreState), player: luffy.state.player });
+			userSocketStore.set("sock-nami", { username: "nami", subscribe: false, socket: nami });
+
+			emitGameOver(state, "luffy");
+
+			expect(lastPayload(nami, "game:over")).toBeUndefined();
 		});
 	});
 });

@@ -205,6 +205,38 @@ describe("roomHandlers", () => {
 			expect(lastEmit(zoroReco, "room:joined")).toBeDefined();
 			expect(room.countPlayer()).toBe(2);
 		});
+
+		it("refuse l'auto-kick (sinon la room privee devient injoignable a vie)", async () => {
+			const { room, sockets } = seedRoom("salle1", ["luffy"]);
+			room.setPrivate(true, sockets.get("luffy")!);
+
+			handleRoomKick(sockets.get("luffy")!, { username: "luffy" });
+
+			// L'hote reste en place ET reste membre: il peut toujours revenir.
+			expect(room.countPlayer()).toBe(1);
+			expect(room.isMember("luffy")).toBe(true);
+			expect(lastEmit(sockets.get("luffy")!, "system:Error")![1]).toEqual({
+				event: "room:kick",
+				message: "Cannot kick yourself",
+			});
+		});
+
+		it("refuse un membre EXPULSE de revenir dans une room privee", async () => {
+			const { room, sockets } = seedRoom("salle1", ["luffy", "zoro"]);
+			room.setPrivate(true, sockets.get("luffy")!);
+			// L'hote expulse zoro: le kick revoque son appartenance.
+			handleRoomKick(sockets.get("luffy")!, { username: "zoro" });
+			expect(room.isMember("zoro")).toBe(false);
+			// zoro tente de revenir (nouveau socket, meme pseudo): il est desormais un inconnu.
+			const zoroReco = makeSocket("s-zoro-2");
+			userSocketStore.set("s-zoro-2", { username: "zoro", subscribe: false, socket: zoroReco });
+
+			await handlerRoomJoin(zoroReco, { roomId: "salle1" });
+
+			expect(lastEmit(zoroReco, "room:denied")).toEqual(["room:denied", { reason: "private" }]);
+			expect(lastEmit(zoroReco, "room:joined")).toBeUndefined();
+			expect(room.countPlayer()).toBe(1);
+		});
 	});
 
 	describe("handlerRoomSubscribe / handlerRoomUnsubscribe", () => {

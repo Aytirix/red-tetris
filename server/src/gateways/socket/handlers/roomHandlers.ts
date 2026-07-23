@@ -150,6 +150,15 @@ export function handleRoomKick(socket: Socket, payload: unknown) : void {
 		console.log("Error: player not found for kick");
 		return;
 	}
+	// Auto-kick interdit. Le kick revoque l'appartenance (memberNames): un hote qui se
+	// kicke lui-meme viderait la room sans la supprimer (le kick, contrairement a
+	// room:leave/disconnect, ne detruit pas une room vide) et perdrait son statut de
+	// membre => le nom de room deviendrait injoignable pour TOUT LE MONDE, hote inclus.
+	// Pour partir, on utilise room:leave.
+	if (playerToKick.getSocketId() === socket.id) {
+		emitError(socket, "room:kick", "Cannot kick yourself");
+		return;
+	}
 	if (!room.removePlayerByName(socket.id, username)) {
 		emitError(socket, "room:kick", "Only host can kick players");
 		console.log("Error: Only host can kick players");

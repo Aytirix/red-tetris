@@ -146,12 +146,17 @@ export class Room {
 		
 		return this.removePlayer(playerToRemove);
 	}
+	// Kick (host uniquement): retire le joueur ET révoque son appartenance. Un kické
+	// n'est donc plus un « membre »: il redevient un inconnu et ne peut plus revenir
+	// dans une room privée (contrairement à un simple départ/refresh qui conserve
+	// l'appartenance via removePlayerBySocketId).
 	removePlayerByName(socketId: string, username: string) : boolean {
 		if (this.getHostId() === socketId) {
 			const players = this.getPlayers()
 			for (const player of players) {
 				if (player.getName() === username) {
 					this.removePlayer(player)
+					this.memberNames.delete(username)
 					return true
 				}
 			}

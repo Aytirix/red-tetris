@@ -195,17 +195,22 @@ export class Game {
 		return clearedLines
 	}
 	createPenaltyLine() : Cell[] {
-		const holeIndex = Math.floor(Math.random() * BOARD_WIDTH)
-		return Array.from({ length: BOARD_WIDTH }, (_, index) => {
-			if (index === holeIndex)
-				return 0
-			return "penalty"
-		})
+		// Lignes de pénalité pleines et indestructibles (sujet) : aucune brèche.
+		// clearLines() les exclut déjà via le marqueur "penalty" ; les rendre pleines
+		// garantit qu'elles ne peuvent jamais être complétées ni nettoyées.
+		return Array.from({ length: BOARD_WIDTH }, () => "penalty")
 	}
 	addPenaltyLines(playerState: PlayerGameState, count: number) : void {
 		if (count <= 0)
 			return
 		const penaltyCount = Math.min(count, BOARD_HEIGHT)
+		// Les `penaltyCount` lignes du HAUT sortent du terrain. Si elles portent le
+		// moindre bloc, la pile a ete poussee au-dela du plafond => top-out. Sans ca la
+		// penalite "nettoierait" gratuitement le sommet d'une pile haute au lieu d'etre
+		// punitive (une pile au plafond survivait a une salve de penalites).
+		const toppedOut = playerState.board
+			.slice(0, penaltyCount)
+			.some((row) => row.some((cell) => cell !== 0))
 		const penaltyLines = Array.from(
 			{ length: penaltyCount },
 			() => this.createPenaltyLine()
@@ -214,19 +219,47 @@ export class Game {
 			...playerState.board.slice(penaltyCount),
 			...penaltyLines,
 		]
-	}
-	addPenaltyToOpponents(sourcePlayerState: PlayerGameState, clearedLines: number) : void {
-		if (this.isSolo() || clearedLines <= 0)
+		if (toppedOut) {
+			playerState.isAlive = false
 			return
+		}
+		// Le plateau vient de remonter de penaltyCount: la piece en vol doit remonter
+		// avec lui. Sinon elle se retrouve incrustee DANS les lignes de penalite et,
+		// au verrouillage, getRenderedBoard ecrase des cellules "penalty": la ligne
+		// perd son marqueur, redevient nettoyable par clearLines et n'est donc plus
+		// indestructible (et le joueur gagne des cases gratuites).
+		const piece = playerState.currentPiece
+		if (!piece)
+			return
+		while (piece.getY() > 0 && !this.canMove(playerState, 0, 0))
+			piece.translate(0, -1)
+	}
+	addPenaltyToOpponents(sourcePlayerState: PlayerGameState, penaltyCount: number) : void {
+		if (this.isSolo() || penaltyCount <= 0)
+			return
+		// Une penalite peut TUER (pile poussee au-dela du plafond): on collecte les
+		// victimes pour les notifier comme n'importe quelle elimination.
+		const eliminated: PlayerGameState[] = []
 		for (const [, playerState] of this.state) {
 			if (playerState === sourcePlayerState)
 				continue
 			if (!playerState.isAlive)
 				continue
-			this.addPenaltyLines(playerState, clearedLines)
+			this.addPenaltyLines(playerState, penaltyCount)
+			// Emettre le plateau final AVANT toute elimination: la victime (et ses
+			// spectateurs) doivent voir les lignes qui viennent de la tuer.
 			emitGameUpdate(playerState, this.state)
 			emitSpectatorForPlayer(playerState, this.state)
+			if (!playerState.isAlive)
+				eliminated.push(playerState)
 		}
+		if (eliminated.length === 0)
+			return
+		// Si ces morts terminent la partie, emitGameOver s'en charge pour tout le monde.
+		if (this.checkGameOver())
+			return
+		for (const victim of eliminated)
+			emitPlayerEliminated(victim, this.state)
 	}
 	drop(socketId: string) : void {
 		const playerState = this.state.get(socketId)
@@ -338,13 +371,6 @@ export class Game {
 		this.room.setStatus("waiting")
 		this.room.setGame(null)
 
-		// Les abonnements spectateur pointent sur une partie terminee: sans purge ils
-		// bloquent encore game:move/rotate/drop du socket concerne a la partie suivante.
-		for (const [spectatorSocketId, subscription] of spectatorSocketStore) {
-			if (subscription.game === this)
-				spectatorSocketStore.delete(spectatorSocketId)
-		}
-
 		const winner = !isSolo && alivePlayers[0] ? alivePlayers[0].player.getName() : null
 		// Crédit du butin: chaque joueur gagne son score final en berrys (persisté DB).
 		// Appelé une seule fois par partie (interval nettoyé + break dans tick()).
@@ -354,7 +380,19 @@ export class Game {
 			socket: playerState.player.getSocket(),
 		}))
 		void settleGameRewards(rewardEntries)
-		emitGameOver(this.state, winner)
+		// emitGameOver notifie AUSSI les spectateurs purs (jamais presents dans state):
+		// la purge des abonnements doit donc venir APRES, sinon ils resteraient bloques
+		// sur l'ecran de jeu fige, sans recap ni retour lobby. Le finally garantit que
+		// la purge a lieu meme si une emission leve: un abonnement fantome bloquerait
+		// game:move/rotate/drop du socket concerne a la partie suivante.
+		try {
+			emitGameOver(this.state, winner)
+		} finally {
+			for (const [spectatorSocketId, subscription] of spectatorSocketStore) {
+				if (subscription.game === this)
+					spectatorSocketStore.delete(spectatorSocketId)
+			}
+		}
 		return true
 	}
 	lockPiece(playerState: PlayerGameState) : void {
@@ -363,7 +401,9 @@ export class Game {
 	lockAndSpawnNext(playerState: PlayerGameState) : boolean {
 		this.lockPiece(playerState)
 		const clearedLines = this.clearLines(playerState)
-		this.addPenaltyToOpponents(playerState, clearedLines)
+		// Sujet : les adversaires reçoivent n-1 lignes de pénalité (0 pour 1 ligne
+		// complétée). Le garde `<= 0` dans addPenaltyToOpponents absorbe le cas 0.
+		this.addPenaltyToOpponents(playerState, clearedLines - 1)
 		playerState.pieceIndex ++
 		this.spawnPiece(playerState)
 		const justEliminated = !playerState.isAlive
