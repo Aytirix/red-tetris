@@ -160,7 +160,8 @@ export class Game {
 		let clearedLines = 0
 
 		const newBoard = playerState.board.filter(row => {
-			const isFull = row.every(cell => cell !== 0)
+			const hasPenalty = row.some(cell => cell === "penalty")
+			const isFull = !hasPenalty && row.every(cell => cell !== 0)
 			if (isFull)
 				clearedLines++
 			return !isFull
