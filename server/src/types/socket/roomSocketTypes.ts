@@ -9,7 +9,6 @@ export type RoomJoinedPayload = {
 		username: string;
 		avatar: string;
 		faction: string;
-		ready: boolean;
 	}[];
 };
 

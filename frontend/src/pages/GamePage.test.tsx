@@ -30,20 +30,10 @@ const gameEvents = vi.hoisted(() => ({
 	emitGameDrop: vi.fn(),
 	emitSubscribeSpectator: vi.fn(),
 	emitUnsubscribeSpectator: vi.fn(),
-	emitHandsSetReady: vi.fn(),
-	emitHandsFrame: vi.fn(),
 }));
 
 vi.mock("../socket/events/room", () => roomEvents);
 vi.mock("../socket/events/game", () => gameEvents);
-// La capture caméra (WebCodecs) n'existe pas sous jsdom: on la neutralise.
-// `handsMock` pilote le statut RÉEL renvoyé quand la caméra est allumée (on/error…),
-// pour tester que "prêt" suit l'état réel et pas le clic.
-const handsMock = vi.hoisted(() => ({ status: "on" as string, error: null as string | null }));
-vi.mock("../hands/useHandsCapture", () => ({
-	useHandsCapture: (opts: { cameraOn: boolean }) =>
-		opts.cameraOn ? { status: handsMock.status, error: handsMock.error } : { status: "idle", error: null },
-}));
 vi.mock("../contexts/SocketContext", () => ({
 	useSocket: () => ({ socket: ctx.socket, isConnected: true }),
 }));
@@ -89,7 +79,7 @@ function receive(event: string, ...args: unknown[]) {
 }
 
 /** Amene la page dans le lobby avec la liste de joueurs donnee. */
-function joinLobby(players: { username: string; avatar?: string; faction?: string; ready?: boolean }[]) {
+function joinLobby(players: { username: string; avatar?: string; faction?: string }[]) {
 	receive("room:joined", { players, joined: true });
 }
 
@@ -98,8 +88,6 @@ beforeEach(() => {
 	ctx.params = { roomName: "room-42", playerName: "luffy" };
 	ctx.session = { faction: null, lastUsernameAvailability: null };
 	ctx.navigate = vi.fn();
-	handsMock.status = "on";
-	handsMock.error = null;
 	for (const fn of Object.values(roomEvents)) fn.mockClear();
 	for (const fn of Object.values(gameEvents)) fn.mockClear();
 });
@@ -265,106 +253,6 @@ describe("GamePage — lobby", () => {
 
 		fireEvent.click(screen.getByRole("button", { name: "Sprint" }));
 		expect(roomEvents.emitSetGameMode).not.toHaveBeenCalled();
-	});
-});
-
-describe("GamePage — mode mains (caméra)", () => {
-	/** Passe en mode mains avec la liste de joueurs donnée. */
-	function handsLobby(players: { username: string; faction?: string; ready?: boolean }[]) {
-		joinLobby(players);
-		receive("room:settings", { mode: "mains", private: false });
-	}
-
-	it("affiche le panneau caméra et les pastilles prêt/pas prêt", () => {
-		renderGamePage();
-		handsLobby([{ username: "luffy", faction: "pirate", ready: false }]);
-
-		expect(screen.getByRole("button", { name: /Activer la caméra/ })).toBeInTheDocument();
-		expect(screen.getByText("○ Caméra off")).toBeInTheDocument();
-	});
-
-	it("marque prêt seulement quand la caméra démarre RÉELLEMENT", () => {
-		renderGamePage();
-		handsLobby([{ username: "luffy", faction: "pirate", ready: false }]);
-
-		fireEvent.click(screen.getByRole("button", { name: /Activer la caméra/ }));
-		// La caméra démarre (mock status "on") -> prêt = true.
-		expect(gameEvents.emitHandsSetReady).toHaveBeenCalledWith(true);
-		expect(screen.getByRole("button", { name: /Caméra activée/ })).toBeInTheDocument();
-	});
-
-	it("NE marque PAS prêt si la caméra est refusée/bloquée", () => {
-		// Le joueur clique mais la caméra échoue (permission refusée).
-		handsMock.status = "error";
-		handsMock.error = "Permission refusée";
-		renderGamePage();
-		handsLobby([{ username: "luffy", faction: "pirate", ready: false }]);
-
-		fireEvent.click(screen.getByRole("button", { name: /Activer la caméra/ }));
-
-		// Jamais prêt: on ne signale prêt qu'en cas de succès réel.
-		expect(gameEvents.emitHandsSetReady).not.toHaveBeenCalledWith(true);
-		expect(screen.getByText(/Permission refusée/)).toBeInTheDocument();
-	});
-
-	it("bloque le lancement tant que tout le monde n'est pas prêt", () => {
-		renderGamePage();
-		handsLobby([
-			{ username: "luffy", faction: "pirate", ready: true },
-			{ username: "zoro", faction: "pirate", ready: false },
-		]);
-
-		const start = screen.getByRole("button", { name: "▶ Lancer" });
-		expect(start).toBeDisabled();
-		fireEvent.click(start);
-		expect(roomEvents.emitStartGame).not.toHaveBeenCalled();
-	});
-
-	it("autorise le lancement quand tous les joueurs sont prêts", () => {
-		renderGamePage();
-		handsLobby([
-			{ username: "luffy", faction: "pirate", ready: true },
-			{ username: "zoro", faction: "pirate", ready: true },
-		]);
-
-		const start = screen.getByRole("button", { name: "▶ Lancer" });
-		expect(start).not.toBeDisabled();
-		fireEvent.click(start);
-		expect(roomEvents.emitStartGame).toHaveBeenCalled();
-	});
-
-	it("n'affiche pas le panneau caméra hors mode mains", () => {
-		renderGamePage();
-		joinLobby([{ username: "luffy", faction: "pirate" }]);
-		expect(screen.queryByRole("button", { name: /Activer la caméra/ })).toBeNull();
-	});
-
-	it("coupe la caméra à la fin de la partie (anti-lag persistant)", () => {
-		renderGamePage();
-		handsLobby([{ username: "luffy", faction: "pirate", ready: false }]);
-		fireEvent.click(screen.getByRole("button", { name: /Activer la caméra/ }));
-		expect(screen.getByRole("button", { name: /Caméra activée/ })).toBeInTheDocument();
-
-		// La partie démarre puis se termine.
-		receive("game:start", { board: emptyBoard(), score: 0, level: 1, spectator: false });
-		receive("game:over", { winner: "luffy", scores: [{ username: "luffy", score: 100 }] });
-
-		// De retour au lobby, la caméra doit être ÉTEINTE (capture stoppée).
-		expect(screen.getByRole("button", { name: /Activer la caméra/ })).toBeInTheDocument();
-		expect(screen.queryByRole("button", { name: /Caméra activée/ })).toBeNull();
-	});
-
-	it("coupe la caméra si on repasse en mode classique", () => {
-		renderGamePage();
-		handsLobby([{ username: "luffy", faction: "pirate", ready: false }]);
-		fireEvent.click(screen.getByRole("button", { name: /Activer la caméra/ }));
-		expect(screen.getByRole("button", { name: /Caméra activée/ })).toBeInTheDocument();
-
-		// Retour au mode classique.
-		receive("room:settings", { mode: "classique", private: false });
-
-		// Le panneau caméra disparaît et la capture est coupée.
-		expect(screen.queryByRole("button", { name: /caméra/i })).toBeNull();
 	});
 });
 

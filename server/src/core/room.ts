@@ -7,7 +7,7 @@ export class Room {
 	private players: Player[];
 	private hostPlayerId: string | null ;
 	private status: "waiting" | "playing" | "finished" ;
-	private mode: "classique" | "ultra" | "sprint" | "mains";
+	private mode: "classique" | "ultra" | "sprint";
 	private visibility: boolean;
 	private game: Game | null;
 	// Timer du decompte 3-2-1 entre room:start et le vrai demarrage de la partie.
@@ -55,7 +55,7 @@ export class Room {
 	setMode(mode: string, socket: Socket) : boolean {
 		if (socket.id !== this.hostPlayerId)
 			return false
-		if (mode !== "classique" && mode !== "ultra" && mode !== "sprint" && mode !== "mains")
+		if (mode !== "classique" && mode !== "ultra" && mode !== "sprint")
 			return false
 		this.mode = mode
 		return true
@@ -88,7 +88,7 @@ export class Room {
 	getHostId() : string | null {
 		return this.hostPlayerId
 	}
-	getMode() : "classique" | "ultra" | "sprint" | "mains" {
+	getMode() : "classique" | "ultra" | "sprint" {
 		return this.mode
 	}
 	getStatus() : "waiting" | "playing" | "finished" {
