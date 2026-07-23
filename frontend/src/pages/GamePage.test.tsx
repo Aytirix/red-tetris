@@ -37,8 +37,12 @@ const gameEvents = vi.hoisted(() => ({
 vi.mock("../socket/events/room", () => roomEvents);
 vi.mock("../socket/events/game", () => gameEvents);
 // La capture caméra (WebCodecs) n'existe pas sous jsdom: on la neutralise.
+// `handsMock` pilote le statut RÉEL renvoyé quand la caméra est allumée (on/error…),
+// pour tester que "prêt" suit l'état réel et pas le clic.
+const handsMock = vi.hoisted(() => ({ status: "on" as string, error: null as string | null }));
 vi.mock("../hands/useHandsCapture", () => ({
-	useHandsCapture: () => ({ status: "idle", error: null }),
+	useHandsCapture: (opts: { cameraOn: boolean }) =>
+		opts.cameraOn ? { status: handsMock.status, error: handsMock.error } : { status: "idle", error: null },
 }));
 vi.mock("../contexts/SocketContext", () => ({
 	useSocket: () => ({ socket: ctx.socket, isConnected: true }),
@@ -94,6 +98,8 @@ beforeEach(() => {
 	ctx.params = { roomName: "room-42", playerName: "luffy" };
 	ctx.session = { faction: null, lastUsernameAvailability: null };
 	ctx.navigate = vi.fn();
+	handsMock.status = "on";
+	handsMock.error = null;
 	for (const fn of Object.values(roomEvents)) fn.mockClear();
 	for (const fn of Object.values(gameEvents)) fn.mockClear();
 });
@@ -277,12 +283,28 @@ describe("GamePage — mode mains (caméra)", () => {
 		expect(screen.getByText("○ Caméra off")).toBeInTheDocument();
 	});
 
-	it("émet hands:setReady au clic sur le bouton caméra", () => {
+	it("marque prêt seulement quand la caméra démarre RÉELLEMENT", () => {
 		renderGamePage();
 		handsLobby([{ username: "luffy", faction: "pirate", ready: false }]);
 
 		fireEvent.click(screen.getByRole("button", { name: /Activer la caméra/ }));
+		// La caméra démarre (mock status "on") -> prêt = true.
 		expect(gameEvents.emitHandsSetReady).toHaveBeenCalledWith(true);
+		expect(screen.getByRole("button", { name: /Caméra activée/ })).toBeInTheDocument();
+	});
+
+	it("NE marque PAS prêt si la caméra est refusée/bloquée", () => {
+		// Le joueur clique mais la caméra échoue (permission refusée).
+		handsMock.status = "error";
+		handsMock.error = "Permission refusée";
+		renderGamePage();
+		handsLobby([{ username: "luffy", faction: "pirate", ready: false }]);
+
+		fireEvent.click(screen.getByRole("button", { name: /Activer la caméra/ }));
+
+		// Jamais prêt: on ne signale prêt qu'en cas de succès réel.
+		expect(gameEvents.emitHandsSetReady).not.toHaveBeenCalledWith(true);
+		expect(screen.getByText(/Permission refusée/)).toBeInTheDocument();
 	});
 
 	it("bloque le lancement tant que tout le monde n'est pas prêt", () => {
