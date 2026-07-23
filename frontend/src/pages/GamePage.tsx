@@ -320,6 +320,14 @@ export default function GamePage() {
 			emitHandsSetReady(cameraReady);
 	}, [isHandsMode, cameraReady]);
 
+	// La caméra ne doit tourner QUE quand le mode mains est actif. Sinon (retour au
+	// mode classique, ou simplement plus en mode mains) on la coupe: sans ça la capture
+	// continuait de tourner et faisait ramer le lobby et les parties suivantes.
+	useEffect(() => {
+		if (!isHandsMode && cameraOn)
+			setCameraOn(false);
+	}, [isHandsMode, cameraOn]);
+
 	function toggleCamera() {
 		setCameraOn((on) => !on);
 	}
@@ -536,6 +544,10 @@ export default function GamePage() {
 			setGameState(null);
 			setEliminated(false);
 			setView("lobby");
+			// Fin de partie: on coupe la caméra pour ne pas laisser la capture tourner
+			// dans le lobby (source de lag persistant). Le joueur la réactive pour une
+			// nouvelle partie mains.
+			setCameraOn(false);
 		}
 		function handleEliminated(raw: unknown) {
 			// Le backend n'envoie ce signal qu'au joueur qui vient de topper alors

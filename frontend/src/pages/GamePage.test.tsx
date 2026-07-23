@@ -338,6 +338,34 @@ describe("GamePage — mode mains (caméra)", () => {
 		joinLobby([{ username: "luffy", faction: "pirate" }]);
 		expect(screen.queryByRole("button", { name: /Activer la caméra/ })).toBeNull();
 	});
+
+	it("coupe la caméra à la fin de la partie (anti-lag persistant)", () => {
+		renderGamePage();
+		handsLobby([{ username: "luffy", faction: "pirate", ready: false }]);
+		fireEvent.click(screen.getByRole("button", { name: /Activer la caméra/ }));
+		expect(screen.getByRole("button", { name: /Caméra activée/ })).toBeInTheDocument();
+
+		// La partie démarre puis se termine.
+		receive("game:start", { board: emptyBoard(), score: 0, level: 1, spectator: false });
+		receive("game:over", { winner: "luffy", scores: [{ username: "luffy", score: 100 }] });
+
+		// De retour au lobby, la caméra doit être ÉTEINTE (capture stoppée).
+		expect(screen.getByRole("button", { name: /Activer la caméra/ })).toBeInTheDocument();
+		expect(screen.queryByRole("button", { name: /Caméra activée/ })).toBeNull();
+	});
+
+	it("coupe la caméra si on repasse en mode classique", () => {
+		renderGamePage();
+		handsLobby([{ username: "luffy", faction: "pirate", ready: false }]);
+		fireEvent.click(screen.getByRole("button", { name: /Activer la caméra/ }));
+		expect(screen.getByRole("button", { name: /Caméra activée/ })).toBeInTheDocument();
+
+		// Retour au mode classique.
+		receive("room:settings", { mode: "classique", private: false });
+
+		// Le panneau caméra disparaît et la capture est coupée.
+		expect(screen.queryByRole("button", { name: /caméra/i })).toBeNull();
+	});
 });
 
 describe("GamePage — partie en cours", () => {
