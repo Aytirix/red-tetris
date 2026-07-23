@@ -2697,6 +2697,100 @@ a:hover {
 	color: var(--color-text-on-dark);
 }
 
+/* ─── Transition « nuages » entre pages (100% CSS, aucun canvas/SVG) ─────────── */
+
+.cloud-transition {
+	position: fixed;
+	inset: 0;
+	z-index: 99999;
+	overflow: hidden;
+	pointer-events: auto; /* bloque les interactions pendant la transition */
+}
+
+/* Deux bancs de nuages qui recouvrent le haut et le bas de l'écran. Chaque banc
+   fait 75vh: à translateY(0) ils se chevauchent au centre et masquent tout. */
+.cloud-transition__bank {
+	position: absolute;
+	left: -10%;
+	width: 120%;
+	height: 75vh;
+	filter: blur(11px);
+	will-change: transform;
+	background-repeat: repeat-x, no-repeat;
+}
+
+/* Banc du haut: corps plein + rangée de bosses floutées sur le bord bas (vers le centre). */
+.cloud-transition__bank--top {
+	top: 0;
+	transform: translateY(-102%);
+	background-image:
+		radial-gradient(ellipse 78px 66px at 50% 0%, #f4f8ff 60%, transparent 64%),
+		linear-gradient(#d7e4fa, #f8fbff);
+	background-position: 0 100%, 0 0;
+	background-size: 132px 66px, 100% calc(100% - 34px);
+}
+
+.cloud-transition__bank--bottom {
+	bottom: 0;
+	transform: translateY(102%);
+	background-image:
+		radial-gradient(ellipse 78px 66px at 50% 100%, #f4f8ff 60%, transparent 64%),
+		linear-gradient(#f8fbff, #d7e4fa);
+	background-position: 0 0, 0 100%;
+	background-size: 132px 66px, 100% calc(100% - 34px);
+}
+
+/* Voile blanc qui adoucit la jointure des deux bancs et sert d'horloge:
+   son animationend fait avancer la phase (cover -> reveal -> idle). */
+.cloud-transition__veil {
+	position: absolute;
+	inset: 0;
+	opacity: 0;
+	background: radial-gradient(circle at 50% 50%, rgba(248, 251, 255, 0.92), rgba(226, 236, 252, 0.78));
+}
+
+/* Phase COVER: les bancs entrent, le voile monte. */
+.cloud-transition--cover .cloud-transition__bank--top {
+	animation: cloudBankTopCover 700ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+.cloud-transition--cover .cloud-transition__bank--bottom {
+	animation: cloudBankBottomCover 700ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+.cloud-transition--cover .cloud-transition__veil {
+	animation: cloudVeilCover 700ms ease-in forwards;
+}
+
+/* Phase REVEAL: les bancs s'écartent, le voile se dissipe. */
+.cloud-transition--reveal .cloud-transition__bank--top {
+	animation: cloudBankTopReveal 800ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+.cloud-transition--reveal .cloud-transition__bank--bottom {
+	animation: cloudBankBottomReveal 800ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+.cloud-transition--reveal .cloud-transition__veil {
+	animation: cloudVeilReveal 800ms ease-out forwards;
+}
+
+@keyframes cloudBankTopCover { from { transform: translateY(-102%); } to { transform: translateY(0); } }
+@keyframes cloudBankBottomCover { from { transform: translateY(102%); } to { transform: translateY(0); } }
+@keyframes cloudBankTopReveal { from { transform: translateY(0); } to { transform: translateY(-102%); } }
+@keyframes cloudBankBottomReveal { from { transform: translateY(0); } to { transform: translateY(102%); } }
+@keyframes cloudVeilCover { from { opacity: 0; } to { opacity: 0.92; } }
+@keyframes cloudVeilReveal { from { opacity: 0.92; } to { opacity: 0; } }
+
+/* Accessibilité: on garde la mécanique (les animationend pilotent la phase) mais
+   quasi instantanée pour qui préfère moins de mouvement. */
+@media (prefers-reduced-motion: reduce) {
+	.cloud-transition--cover .cloud-transition__bank--top,
+	.cloud-transition--cover .cloud-transition__bank--bottom,
+	.cloud-transition--cover .cloud-transition__veil,
+	.cloud-transition--reveal .cloud-transition__bank--top,
+	.cloud-transition--reveal .cloud-transition__bank--bottom,
+	.cloud-transition--reveal .cloud-transition__veil {
+		animation-duration: 120ms;
+	}
+}
+
 .glass-panel h1,
 .glass-panel h2,
 .glass-panel h3,

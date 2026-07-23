@@ -6,11 +6,99 @@
 		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 		<title>Red Piece</title>
 		<link rel="icon" type="image/png" sizes="64x64" href="/favicon.png" />
+
+		<!-- Nuages de démarrage : CSS critique inline pour qu'ils recouvrent l'écran
+		     dès le premier paint (avant le chargement du JS), puis s'ouvrent quand tout
+		     est chargé. 100% CSS (aucun canvas/SVG). -->
+		<style>
+			#boot-clouds {
+				position: fixed;
+				inset: 0;
+				z-index: 100000;
+				overflow: hidden;
+				/* Fond de repli PENDANT le chargement uniquement. Il se dissipe à
+				   l'ouverture, sinon il masquerait la page derrière les nuages qui s'écartent. */
+				background-color: #cfe0f7;
+				transition: background-color 600ms ease-out;
+			}
+			#boot-clouds .bc-bank {
+				position: absolute;
+				left: -10%;
+				width: 120%;
+				height: 75vh;
+				filter: blur(11px);
+				background-repeat: repeat-x, no-repeat;
+				transition: transform 800ms cubic-bezier(0.4, 0, 0.2, 1);
+			}
+			#boot-clouds .bc-bank--top {
+				top: 0;
+				transform: translateY(0);
+				background-image:
+					radial-gradient(ellipse 78px 66px at 50% 0%, #f4f8ff 60%, transparent 64%),
+					linear-gradient(#d7e4fa, #f8fbff);
+				background-position: 0 100%, 0 0;
+				background-size: 132px 66px, 100% calc(100% - 34px);
+			}
+			#boot-clouds .bc-bank--bottom {
+				bottom: 0;
+				transform: translateY(0);
+				background-image:
+					radial-gradient(ellipse 78px 66px at 50% 100%, #f4f8ff 60%, transparent 64%),
+					linear-gradient(#f8fbff, #d7e4fa);
+				background-position: 0 0, 0 100%;
+				background-size: 132px 66px, 100% calc(100% - 34px);
+			}
+			#boot-clouds .bc-veil {
+				position: absolute;
+				inset: 0;
+				opacity: 0.92;
+				background: radial-gradient(circle at 50% 50%, rgba(248, 251, 255, 0.92), rgba(226, 236, 252, 0.78));
+				transition: opacity 800ms ease-out;
+			}
+			/* Ouverture : le fond de repli disparaît puis les bancs s'écartent et le
+			   voile se dissipe, révélant la page déjà peinte derrière. */
+			#boot-clouds.is-open { pointer-events: none; background-color: transparent; }
+			#boot-clouds.is-open .bc-bank--top { transform: translateY(-102%); }
+			#boot-clouds.is-open .bc-bank--bottom { transform: translateY(102%); }
+			#boot-clouds.is-open .bc-veil { opacity: 0; }
+			@media (prefers-reduced-motion: reduce) {
+				#boot-clouds .bc-bank,
+				#boot-clouds .bc-veil { transition-duration: 150ms; }
+			}
+		</style>
 	</head>
 
 	<body>
+		<!-- Overlay de démarrage, retiré une fois l'ouverture terminée. -->
+		<div id="boot-clouds" aria-hidden="true">
+			<div class="bc-bank bc-bank--top"></div>
+			<div class="bc-bank bc-bank--bottom"></div>
+			<div class="bc-veil"></div>
+		</div>
+
 		<div id="root"></div>
 		<script type="module" src="/src/main.tsx"></script>
+
+		<script>
+			// Les nuages de démarrage restent tant que React n'a pas peint la première
+			// page: c'est React (RootLayout) qui appelle window.__openBootClouds() après
+			// son premier paint. Sinon on ouvrirait sur un #root encore blanc.
+			(function () {
+				var clouds = document.getElementById("boot-clouds");
+				if (!clouds) return;
+				var opened = false;
+				function open() {
+					if (opened) return;
+					opened = true;
+					clouds.classList.add("is-open");
+					window.setTimeout(function () {
+						if (clouds.parentNode) clouds.parentNode.removeChild(clouds);
+					}, 900);
+				}
+				window.__openBootClouds = open;
+				window.setTimeout(open, 8000); // filet de sécurité si React ne signale jamais
+			})();
+		</script>
 	</body>
 
 </html>

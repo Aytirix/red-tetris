@@ -68,4 +68,14 @@ describe("RootLayout", () => {
 
 		expect(container.querySelector("main")?.className).toBe("page page-wide");
 	});
+
+	it("ouvre les nuages de démarrage après le premier paint", async () => {
+		const open = vi.fn();
+		window.__openBootClouds = open;
+
+		renderAt("/");
+
+		await vi.waitFor(() => expect(open).toHaveBeenCalledTimes(1));
+		delete window.__openBootClouds;
+	});
 });
