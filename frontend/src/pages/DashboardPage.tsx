@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useCloudNavigate } from "../transition/TransitionContext";
 import { ClipLoader } from "react-spinners";
 import { useWsSession } from "../contexts/WsStateContext";
 import { useSocket } from "../contexts/SocketContext";
@@ -109,7 +109,7 @@ export default function DashboardPage() {
 	const { faction } = useWsSession();
 	const { socket } = useSocket();
 	const { berrys } = useShop();
-	const navigate = useNavigate();
+	const navigate = useCloudNavigate();
 	const theme = faction ?? "pirate";
 
 	// screen = dashboard | shop → on switch les composants SANS quitter la page

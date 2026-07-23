@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useLocation } from "react-router-dom";
+import { useCloudNavigate } from "../transition/TransitionContext";
 import { ClipLoader } from "react-spinners";
 import { useSocket } from "../contexts/SocketContext";
 import { useRememberCurrentUserFaction } from "../contexts/WsStateContext";
@@ -1108,7 +1109,7 @@ function RegisterStep({ username, onSubmit, sceneEnterActive = false }: {
 // ─── Page ────────────────────────────────────────────────────────────────────
 
 export default function HomePage() {
-	const navigate = useNavigate();
+	const navigate = useCloudNavigate();
 	const location = useLocation();
 	const { socket } = useSocket();
 	const { alert } = useAlert();

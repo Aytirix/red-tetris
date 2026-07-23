@@ -12,6 +12,7 @@ import {
 	emitStartGame,
 	emitSetPrivate,
 } from "../socket/events/room";
+import { useCloudNavigate } from "../transition/TransitionContext";
 import { emitSubscribeSpectator, emitUnsubscribeSpectator } from "../socket/events/game";
 import { normalizeGameOver, normalizeGameState } from "../socket/gameState";
 import type { GameOverPayload, GameStatePayload } from "../types/game";
@@ -214,6 +215,9 @@ export default function GamePage() {
 	const session = useWsSession();
 	const { alert } = useAlert();
 	const navigate = useNavigate();
+	// Sorties vers le dashboard: transition « nuages ». navigate() reste utilisé pour
+	// la normalisation d'URL (même page, pas de changement visuel de page).
+	const cloudNavigate = useCloudNavigate();
 	const [view, setView] = useState<GameViewMode>("connecting");
 	const [players, setPlayers] = useState<RoomPlayer[]>([]);
 	const [isPrivate, setIsPrivate] = useState(false);
@@ -390,7 +394,7 @@ export default function GamePage() {
 			setGameState(null);
 			setGameOver(null);
 			setPlayers([]);
-			navigate("/dashboard");
+			cloudNavigate("/dashboard");
 			void alert({
 				title: "Expulsé de la salle",
 				message: "Vous avez été retiré de la room par l'admin.",
@@ -406,7 +410,7 @@ export default function GamePage() {
 			setGameState(null);
 			setGameOver(null);
 			setPlayers([]);
-			navigate("/dashboard");
+			cloudNavigate("/dashboard");
 			void alert({
 				title: "Partie privée",
 				message: "Cette partie est privée : vous ne pouvez pas la rejoindre.",
@@ -500,7 +504,7 @@ export default function GamePage() {
 	function handleLeave() {
 		setCountdown(null);
 		leaveRoomOnce();
-		navigate("/dashboard");
+		cloudNavigate("/dashboard");
 	}
 
 	// Fin de l'animation "GAME OVER": on s'abonne comme spectateur d'un joueur
