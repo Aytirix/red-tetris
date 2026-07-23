@@ -6,7 +6,11 @@
 	"scripts": {
 		"dev": "vite",
 		"build": "tsc --noEmit && vite build",
-		"preview": "vite preview --host 0.0.0.0"
+		"preview": "vite preview --host 0.0.0.0",
+		"generate:avatar-crops": "node scripts/generate-avatar-crops.mjs",
+		"test": "vitest run --coverage",
+		"test:coverage": "vitest run --coverage",
+		"test:watch": "vitest"
 	},
 	"dependencies": {
 		"@mediapipe/tasks-vision": "^0.10.34",
@@ -19,12 +23,18 @@
 	},
 	"devDependencies": {
 		"@tailwindcss/vite": "^4.2.2",
+		"@testing-library/jest-dom": "^7.0.0",
+		"@testing-library/react": "^16.3.2",
+		"@types/node": "^26.1.1",
 		"@types/react": "^19.2.2",
 		"@types/react-dom": "^19.2.2",
 		"@vitejs/plugin-react": "^4.7.0",
+		"@vitest/coverage-v8": "^4.1.10",
+		"jsdom": "^26.1.0",
 		"sass": "^1.99.0",
 		"tailwindcss": "^4.2.2",
 		"typescript": "^5.9.3",
-		"vite": "^6.4.1"
+		"vite": "^6.4.1",
+		"vitest": "^4.1.10"
 	}
 }

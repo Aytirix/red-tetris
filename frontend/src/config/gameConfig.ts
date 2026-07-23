@@ -99,6 +99,12 @@ export const CELL_THEME: Record<Exclude<GameBoardCell, 0> | "empty" | "filled", 
 		glow: "inset 0 0 6px rgba(0, 0, 0, 0.6)",
 		border: "rgba(255, 255, 255, 0.1)",
 	},
+	// Spectre adverse: volontairement monochrome, on ne montre qu'une hauteur de pile.
+	spectrum: {
+		gradient: "linear-gradient(160deg, #aeb8d3 0%, #5b6582 100%)",
+		glow: "0 0 6px rgba(174, 184, 211, 0.4)",
+		border: "rgba(255, 255, 255, 0.18)",
+	},
 };
 
 export function getCellTheme(cell: GameBoardCell): CellThemeEntry {

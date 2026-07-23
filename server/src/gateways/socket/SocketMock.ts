@@ -106,7 +106,7 @@ export function registerSocketMock(socket: Socket): void {
 		if (typeof payload.responseName !== "string") return;
 
 		const doc = mockableEvents.get(payload.eventName);
-		if (!doc?.responseName || doc.responseName !== payload.responseName) return;
+		if (!doc?.responseName || !doc.response || doc.responseName !== payload.responseName) return;
 
 		if (typeof payload.response === "undefined") {
 			socket.emit(doc.responseName, buildMockResponse(doc.response, payload.requestPayload));
