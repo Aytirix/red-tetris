@@ -156,7 +156,7 @@ export class Game {
 			this.tick()
 		}, this.getTickSpeed())
 	}
-	clearLines(playerState: PlayerGameState) : void {
+	clearLines(playerState: PlayerGameState) : number {
 		let clearedLines = 0
 
 		const newBoard = playerState.board.filter(row => {
@@ -172,6 +172,41 @@ export class Game {
 		playerState.board = [...emptyRows, ...newBoard]
 		playerState.score += clearedLines * 100
 		this.updateLevel(playerState)
+		return clearedLines
+	}
+	createPenaltyLine() : Cell[] {
+		const holeIndex = Math.floor(Math.random() * BOARD_WIDTH)
+		return Array.from({ length: BOARD_WIDTH }, (_, index) => {
+			if (index === holeIndex)
+				return 0
+			return "penalty"
+		})
+	}
+	addPenaltyLines(playerState: PlayerGameState, count: number) : void {
+		if (count <= 0)
+			return
+		const penaltyCount = Math.min(count, BOARD_HEIGHT)
+		const penaltyLines = Array.from(
+			{ length: penaltyCount },
+			() => this.createPenaltyLine()
+		)
+		playerState.board = [
+			...playerState.board.slice(penaltyCount),
+			...penaltyLines,
+		]
+	}
+	addPenaltyToOpponents(sourcePlayerState: PlayerGameState, clearedLines: number) : void {
+		if (this.isSolo() || clearedLines <= 0)
+			return
+		for (const [, playerState] of this.state) {
+			if (playerState === sourcePlayerState)
+				continue
+			if (!playerState.isAlive)
+				continue
+			this.addPenaltyLines(playerState, clearedLines)
+			emitGameUpdate(playerState, this.state)
+			emitSpectatorForPlayer(playerState, this.state)
+		}
 	}
 	drop(socketId: string) : void {
 		const playerState = this.state.get(socketId)
@@ -279,7 +314,8 @@ export class Game {
 	}
 	lockAndSpawnNext(playerState: PlayerGameState) : boolean {
 		this.lockPiece(playerState)
-		this.clearLines(playerState)
+		const clearedLines = this.clearLines(playerState)
+		this.addPenaltyToOpponents(playerState, clearedLines)
 		playerState.pieceIndex ++
 		this.spawnPiece(playerState)
 		const justEliminated = !playerState.isAlive
