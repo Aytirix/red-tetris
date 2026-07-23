@@ -47,8 +47,8 @@ describe("roomEmitters", () => {
 				roomId: "salle1",
 				joined: true,
 				players: [
-					{ username: "luffy", avatar: "luffy-avatar", faction: "pirate" },
-					{ username: "zoro", avatar: "zoro-avatar", faction: "pirate" },
+					{ username: "luffy", avatar: "luffy-avatar", faction: "pirate", ready: false },
+					{ username: "zoro", avatar: "zoro-avatar", faction: "pirate", ready: false },
 				],
 			});
 		});
@@ -129,8 +129,8 @@ describe("roomEmitters", () => {
 			emitPlayersRoom([luffy.player, zoro.player]);
 
 			const expected = [
-				{ username: "luffy", avatar: "luffy-avatar", faction: "pirate" },
-				{ username: "zoro", avatar: "zoro-avatar", faction: "pirate" },
+				{ username: "luffy", avatar: "luffy-avatar", faction: "pirate", ready: false },
+				{ username: "zoro", avatar: "zoro-avatar", faction: "pirate", ready: false },
 			];
 			expect(luffy.socket.emit).toHaveBeenCalledWith("room:players", expected);
 			expect(zoro.socket.emit).toHaveBeenCalledWith("room:players", expected);

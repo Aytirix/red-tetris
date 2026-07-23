@@ -13,7 +13,8 @@ import {
 	emitSetGameMode,
 	emitSetPrivate,
 } from "../socket/events/room";
-import { emitSubscribeSpectator, emitUnsubscribeSpectator } from "../socket/events/game";
+import { emitHandsSetReady, emitSubscribeSpectator, emitUnsubscribeSpectator } from "../socket/events/game";
+import { useHandsCapture } from "../hands/useHandsCapture";
 import { normalizeGameOver, normalizeGameState } from "../socket/gameState";
 import type { GameOverPayload, GameStatePayload } from "../types/game";
 import GameView from "../components/game/GameView";
@@ -27,12 +28,18 @@ const GAME_MODES = [
 	{ id: "classic", label: "Classique" },
 	{ id: "sprint", label: "Sprint" },
 	{ id: "ultra", label: "Ultra" },
+	{ id: "mains", label: "✋ Mains" },
 ];
+
+// Le mode "mains" se joue à la caméra: le serveur détecte la main et décide l'action.
+const HANDS_MODE = "mains";
 
 type RoomPlayer = {
 	username: string;
 	avatar: string;
 	faction: "pirate" | "marine" | null;
+	// Mode mains: caméra activée et prêt à jouer.
+	ready: boolean;
 };
 
 // ─── Lobby ───────────────────────────────────────────────────────────────────
@@ -46,6 +53,9 @@ function LobbyView({
 	isRoomLoading,
 	gameSummary,
 	onLeave,
+	cameraOn,
+	handsError,
+	onToggleCamera,
 }: {
 	roomName: string;
 	playerName: string;
@@ -55,9 +65,16 @@ function LobbyView({
 	isRoomLoading: boolean;
 	gameSummary: GameOverPayload | null;
 	onLeave: () => void;
+	cameraOn: boolean;
+	handsError: string | null;
+	onToggleCamera: () => void;
 }) {
 	const isAdmin = !isRoomLoading && players[0]?.username === playerName;
 	const controlsDisabled = isRoomLoading || !isAdmin;
+	const isHandsMode = gameMode === HANDS_MODE;
+	// En mode mains, l'hôte ne peut lancer que si TOUT le monde a activé sa caméra.
+	const allReady = players.length > 0 && players.every((p) => p.ready);
+	const startBlocked = isHandsMode && !allReady;
 	const statusLabel = isRoomLoading ? "Connexion" : isAdmin ? "Admin" : "Joueur";
 	const playerCountLabel = isRoomLoading
 		? "Chargement"
@@ -124,6 +141,11 @@ function LobbyView({
 										{i === 0 && <span className="game-lobby__player-tag game-lobby__player-tag--host">Admin</span>}
 										{isPirate && <span className="game-lobby__player-tag game-lobby__player-tag--pirate">☠ Pirate</span>}
 										{isMarine && <span className="game-lobby__player-tag game-lobby__player-tag--marine">⚓ Marine</span>}
+										{isHandsMode && (
+											<span className={`game-lobby__player-tag game-lobby__player-tag--${p.ready ? "ready" : "notready"}`}>
+												{p.ready ? "📷 Prêt" : "○ Caméra off"}
+											</span>
+										)}
 									</div>
 
 									{isAdmin && !isMe && (
@@ -185,6 +207,20 @@ function LobbyView({
 								{isPrivate ? "🔒 Privée" : "🌐 Publique"}
 							</button>
 						</div>
+
+						{isHandsMode && (
+							<div className="game-lobby__setting game-lobby__setting--camera">
+								<span className="game-lobby__setting-label">Caméra (obligatoire)</span>
+								<button
+									className={`game-lobby__privacy-btn${cameraOn ? " game-lobby__privacy-btn--private" : ""}`}
+									onClick={onToggleCamera}
+									disabled={isRoomLoading}
+								>
+									{cameraOn ? "📷 Caméra activée" : "○ Activer la caméra"}
+								</button>
+								{handsError && <span className="game-lobby__camera-error">{handsError}</span>}
+							</div>
+						)}
 					</div>
 
 					<footer className="game-lobby__footer">
@@ -193,10 +229,14 @@ function LobbyView({
 								<ClipLoader color="var(--color-secondary)" size={13} />
 								<span>Chargement de la room…</span>
 							</div>
-						) : !isAdmin && (
+						) : !isAdmin ? (
 							<div className="game-lobby__waiting-hint">
 								<ClipLoader color="var(--color-secondary)" size={13} />
 								<span>En attente de l'admin…</span>
+							</div>
+						) : startBlocked && (
+							<div className="game-lobby__waiting-hint">
+								<span>✋ En attente que tout le monde active sa caméra…</span>
 							</div>
 						)}
 						<div className="game-lobby__footer-actions">
@@ -204,7 +244,11 @@ function LobbyView({
 								Quitter
 							</button>
 							{(isRoomLoading || isAdmin) && (
-								<button className="button button-primary" onClick={emitStartGame} disabled={isRoomLoading}>
+								<button
+									className="button button-primary"
+									onClick={emitStartGame}
+									disabled={isRoomLoading || startBlocked}
+								>
 									▶ Lancer
 								</button>
 							)}
@@ -243,8 +287,29 @@ export default function GamePage() {
 	// Élimination individuelle en multi (partie qui continue): déclenche l'overlay
 	// "GAME OVER" zoom, puis bascule en spectateur à la fin de l'animation.
 	const [eliminated, setEliminated] = useState(false);
+	// Mode mains: caméra activée par le joueur (aperçu + "prêt" côté lobby).
+	const [cameraOn, setCameraOn] = useState(false);
+	const videoRef = useRef<HTMLVideoElement | null>(null);
 
 	const roomName = rawRoom.slice(0, MAX_NAME_LENGTH);
+	const isHandsMode = gameMode === HANDS_MODE;
+	const isSpectatorView = gameState?.spectator !== false && gameState != null;
+
+	// La capture WebCodecs tourne dès que la caméra est allumée; on envoie les frames
+	// au serveur seulement pendant une vraie partie en mode mains (pas en spectateur).
+	const { error: handsError } = useHandsCapture({
+		cameraOn,
+		streaming: cameraOn && isHandsMode && view === "game" && !isSpectatorView,
+		videoRef,
+	});
+
+	function toggleCamera() {
+		setCameraOn((on) => {
+			const next = !on;
+			emitHandsSetReady(next);
+			return next;
+		});
+	}
 
 	useEffect(() => {
 		if (rawRoom !== roomName) {
@@ -352,11 +417,11 @@ export default function GamePage() {
 
 	// Room events — including spectator detection on room:joined { joined: false }
 	useEffect(() => {
-		type RawPlayer = { username: string; avatar?: string; faction?: string };
+		type RawPlayer = { username: string; avatar?: string; faction?: string; ready?: boolean };
 
 		function parsePlayer(p: RawPlayer): RoomPlayer {
 			const faction = p.faction === "pirate" || p.faction === "marine" ? p.faction : null;
-			return { username: p.username, avatar: p.avatar ?? "", faction };
+			return { username: p.username, avatar: p.avatar ?? "", faction, ready: p.ready === true };
 		}
 
 		function handleRoomJoined(room: unknown) {
@@ -519,6 +584,9 @@ export default function GamePage() {
 					isRoomLoading={isRoomLoading}
 					gameSummary={gameOver}
 					onLeave={handleLeave}
+					cameraOn={cameraOn}
+					handsError={handsError}
+					onToggleCamera={toggleCamera}
 				/>
 			)}
 			{view === "game" && gameState && (
@@ -545,6 +613,12 @@ export default function GamePage() {
 					<span className="game-countdown__label">La partie commence…</span>
 				</div>
 			)}
+			{/* Aperçu caméra (mode mains). Miroir façon selfie. Persistant entre lobby et
+			    partie pour ne pas couper le flux au démarrage. Masqué si caméra éteinte. */}
+			<div className={`game-handcam${cameraOn ? " game-handcam--on" : ""}`} aria-hidden={!cameraOn}>
+				<video ref={videoRef} playsInline muted className="game-handcam__video" />
+				{cameraOn && <span className="game-handcam__hint">✋ Mode mains</span>}
+			</div>
 		</div>
 	);
 }
