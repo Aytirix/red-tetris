@@ -16,7 +16,7 @@ export class Game {
 	private static readonly ROTATION_KICKS: ReadonlyArray<readonly [number, number]> = [
 		[0, 0], [-1, 0], [1, 0], [-2, 0], [2, 0], [-3, 0], [3, 0],
 	]
-	public mode: "classique" | "ultra" | "sprint" | "mains"
+	public mode: "classique" | "ultra" | "sprint"
 	public players: Player[];
 	private room: Room;
 	private state: Map<string, PlayerGameState>;
@@ -26,7 +26,7 @@ export class Game {
 	// depart d'un joueur): ce drapeau garantit qu'une partie ne se termine qu'une fois,
 	// donc pas de double game:over ni de double credit de berrys.
 	private isOver: boolean;
-	constructor (mode: "classique" | "ultra" | "sprint" | "mains", players: Player[], room: Room) {
+	constructor (mode: "classique" | "ultra" | "sprint", players: Player[], room: Room) {
 		this.mode = mode;
 		this.players = players;
 		this.room = room;

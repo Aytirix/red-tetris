@@ -63,7 +63,7 @@ describe("handlerDisconnect", () => {
 
 		expect(room.countPlayer()).toBe(1);
 		expect(staying.socket.emit).toHaveBeenCalledWith("room:players", [
-			{ username: "zoro", avatar: "zoro-avatar", faction: "pirate", ready: false },
+			{ username: "zoro", avatar: "zoro-avatar", faction: "pirate" },
 		]);
 	});
 

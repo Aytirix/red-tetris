@@ -9,9 +9,6 @@ export class Player {
 	private readonly faction: string;
 	private game: Game | undefined;
 	private inGame: boolean;
-	// Mode "mains": le joueur a activé sa caméra et est prêt à jouer aux gestes.
-	// Ignoré dans les autres modes.
-	private cameraReady: boolean;
 	constructor (name: string, socket: Socket, avatar: string, faction: string) {
 		this.name = name
 		this.socketId = socket.id
@@ -19,7 +16,6 @@ export class Player {
 		this.avatar = avatar
 		this.faction = faction
 		this.inGame = false
-		this.cameraReady = false
 	}
 	getName() : string {
 		return this.name
@@ -47,11 +43,5 @@ export class Player {
 	}
 	setInGame(inGame: boolean) : void {
 		this.inGame = inGame
-	}
-	getCameraReady() : boolean {
-		return this.cameraReady
-	}
-	setCameraReady(ready: boolean) : void {
-		this.cameraReady = ready
 	}
 }

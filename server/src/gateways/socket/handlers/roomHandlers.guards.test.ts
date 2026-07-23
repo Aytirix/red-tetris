@@ -9,7 +9,6 @@ import {
 	handleRoomKick,
 	handleRoomMode,
 	handleRoomSetPrivate,
-	handleRoomStart,
 	handleSubscribeSpectator,
 	handlerRoomJoin,
 	handlerRoomLeave,
@@ -161,53 +160,6 @@ describe("garde-fous d'integrite de partie", () => {
 				"Cannot change mode during a running game",
 				"Cannot change visibility during a running game",
 			]);
-		});
-	});
-
-	// --- Mode "mains": caméra obligatoire avant de lancer ----------------------
-	describe("mode mains — caméra obligatoire", () => {
-		beforeEach(() => { vi.useFakeTimers(); });
-
-		it("refuse le lancement tant qu'un joueur n'a pas activé sa caméra", () => {
-			const { room, sockets } = seedRoom("arene", ["luffy", "zoro"]);
-			const host = sockets.get("luffy")!;
-			handleRoomMode(host, { mode: "mains" });
-			room.findPlayerByName("luffy")!.setCameraReady(true);
-			// zoro n'est pas prêt.
-			host.emit.mockClear();
-
-			handleRoomStart(host, undefined);
-			vi.advanceTimersByTime(3000);
-
-			expect(errorsOf(host)).toContain("All players must enable their camera");
-			expect(room.getStatus()).toBe("waiting");
-			expect(room.getGame()).toBeNull();
-		});
-
-		it("lance quand TOUS les joueurs sont prêts", () => {
-			const { room, sockets } = seedRoom("arene", ["luffy", "zoro"]);
-			const host = sockets.get("luffy")!;
-			handleRoomMode(host, { mode: "mains" });
-			for (const player of room.getPlayers()) player.setCameraReady(true);
-
-			handleRoomStart(host, undefined);
-			vi.advanceTimersByTime(3000);
-
-			expect(room.getStatus()).toBe("playing");
-			expect(room.getGame()).toBeInstanceOf(Game);
-		});
-
-		it("les autres modes ne sont pas concernés par la caméra", () => {
-			const { room, sockets } = seedRoom("arene", ["luffy", "zoro"]);
-			const host = sockets.get("luffy")!;
-			handleRoomMode(host, { mode: "sprint" });
-			// Personne n'est prêt, mais le mode n'est pas "mains".
-
-			handleRoomStart(host, undefined);
-			vi.advanceTimersByTime(3000);
-
-			expect(room.getStatus()).toBe("playing");
-			expect(room.getGame()).toBeInstanceOf(Game);
 		});
 	});
 
