@@ -8,22 +8,13 @@ import RouteErrorPage from "./pages/RouteErrorPage";
 import DashboardPage from "./pages/DashboardPage";
 import GamePage from "./pages/GamePage";
 
-// Routes DEV-only, chargées à la demande :
-// - DocsWsPage : documentation des events websocket, inutile en production.
-// - TestPage : bac à sable de détection de mains (piste « jouer au clavier virtuel »),
-//   qui tire @mediapipe/tasks-vision — lequel crée un <canvas> WebGL, interdit par le
-//   sujet. Le code reste dans le dépôt et utilisable en dev, mais ne doit RIEN laisser
-//   dans le bundle de production.
+// Route DEV-only, chargée à la demande : DocsWsPage (documentation des events
+// websocket), inutile en production.
 // Le lazy() est placé DANS la branche DEV : en production `import.meta.env.DEV` vaut
-// false et la branche est éliminée. Vérifié sur un build réel : ni TestPage ni
-// @mediapipe ne subsistent dans dist/. Rollup peut malgré tout matérialiser un chunk
-// asynchrone vide pour un import() resté dans le graphe — sans conséquence tant qu'il
-// ne contient aucune API interdite.
+// false et la branche est éliminée du bundle livré.
 const DocsWsPage = import.meta.env.DEV ? /*#__PURE__*/ lazy(() => import("./pages/DocsWsPage")) : null;
-const TestPage = import.meta.env.DEV ? /*#__PURE__*/ lazy(() => import("./test/TestPage")) : null;
 
 const docsWsRoute = DocsWsPage ? [{ path: "docs-ws", element: <DocsWsPage /> }] : [];
-const testRoute = TestPage ? [{ path: "test", element: <TestPage /> }] : [];
 
 export const router = createBrowserRouter([
 	{
@@ -45,7 +36,6 @@ export const router = createBrowserRouter([
 				},
 				element: <GamePage />,
 			},
-			...testRoute,
 			{ path: "*", element: <NotFoundPage /> },
 		],
 	},
