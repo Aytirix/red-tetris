@@ -8,7 +8,9 @@ import { afterAll, describe, expect, it } from "vitest";
 // Le sujet interdit Canvas et SVG cote client. Or ces interdits ne vivent pas dans le
 // code source: ils dependent de ce que le BUILD embarque reellement. Deux pieges reels
 // rencontres sur ce projet:
-//   - la route DEV-only /test tire @mediapipe/tasks-vision, qui cree un <canvas> WebGL;
+//   - l'ancienne route DEV-only /test tirait @mediapipe/tasks-vision, qui cree un
+//     <canvas> WebGL. Code et dependance ont depuis ete SUPPRIMES du depot; les
+//     assertions restent comme garde-fou anti-reintroduction;
 //   - le .env de la racine porte NODE_ENV=development, que Vite recupere via loadEnv,
 //     ce qui basculait TOUT le build en mode dev: `import.meta.env.DEV` valait true,
 //     la branche DEV survivait et le chunk canvas atterrissait dans dist/.
@@ -47,11 +49,11 @@ describe("bundle de production", () => {
 		expect(scripts.length).toBeGreaterThan(0);
 		const bundle = scripts.map((file) => readFileSync(file, "utf-8")).join("\n");
 
-		// Canvas: interdit par le sujet, arrivait par @mediapipe via la page /test.
+		// Canvas: interdit par le sujet, arrivait autrefois par @mediapipe (page /test).
 		expect(bundle).not.toContain("createElement(\"canvas\")");
 		expect(bundle).not.toContain("OffscreenCanvas");
 		expect(bundle).not.toContain("webgl2");
-		// La page de detection de mains et sa dependance ne doivent rien laisser.
+		// La detection de mains a ete supprimee: rien ne doit la reintroduire.
 		expect(bundle).not.toContain("HandLandmarker");
 		expect(bundle.toLowerCase()).not.toContain("mediapipe");
 		// Le build doit etre un vrai build de production, pas un build de dev deguise.
