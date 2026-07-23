@@ -3,7 +3,7 @@ import { isValidRoomJoinPayload, isValidRoomKickPayload, isValidRoomModePayload,
 import { emitError } from "../emitters/systemEmitters.js";
 import { roomSocketStore } from "../roomSocketStore.js";
 import { createRoom, getRoom } from "../../../services/roomService.js";
-import { emitKickedRoom, emitPlayersRoom, emitRoomJoined, emitRoomSettings, emitSubscrib } from "../emitters/roomEmitters.js";
+import { emitKickedRoom, emitPlayersRoom, emitRoomDenied, emitRoomJoined, emitRoomSettings, emitSubscrib } from "../emitters/roomEmitters.js";
 import { emitCountdown, emitSpectatorGame } from "../emitters/gameEmitters.js";
 import { userSocketStore } from "../userSocketStore.js";
 import { Game } from "../../../core/Game.js";
@@ -51,6 +51,17 @@ export async function handlerRoomJoin(socket: Socket, payload: unknown): Promise
 			emitPlayersRoom(newRoom.getPlayers())
 		}
 	else {
+			// Room privee (dont les parties solo): seul un membre (pseudo ayant deja
+			// rejoint cette room) peut y entrer/revenir. Un inconnu qui force l'URL est
+			// refuse et redirige. L'appartenance est par pseudo pour survivre a une
+			// reconnexion (le socket.id change apres un refresh).
+			if (room.getPrivate()) {
+				const username = userSocketStore.get(socket.id)?.username ?? null
+				if (!username || !room.isMember(username)) {
+					emitRoomDenied(socket, "private")
+					return
+				}
+			}
 			const newPlayer = await createPlayer(socket)
 			if (!newPlayer)
 				return
@@ -191,6 +202,9 @@ export function handleRoomSetPrivate(socket: Socket, payload: unknown) : void {
 		return;
 	}
 	emitRoomSettings(room)
+	// La visibilite change: re-pousser la liste publique filtree aux abonnes du
+	// dashboard, sinon une room passee en privee resterait affichee (room fantome).
+	emitSubscrib()
 }
 
 // Decompte de lancement: 3 -> 2 -> 1 (une valeur par seconde), puis demarrage reel.
@@ -341,6 +355,18 @@ export function handleSubscribeSpectator(socket: Socket, payload: unknown) : voi
 	if (!room) {
 		emitError(socket, "game:subscribeSpectatorGame", "Room not found");
 		return
+	}
+
+	// Confidentialite d'une room privee: seul un membre (joueur eventuellement
+	// elimine) peut la spectater. Sinon un inconnu connaissant le nom contournerait
+	// la garde de join et verrait les plateaux reels. Message neutre pour ne pas
+	// divulguer l'existence de la room privee a un exterieur.
+	if (room.getPrivate()) {
+		const username = userSocketStore.get(socket.id)?.username ?? null
+		if (!username || !room.isMember(username)) {
+			emitError(socket, "game:subscribeSpectatorGame", "Room not found");
+			return
+		}
 	}
 
 	const game = getGameInRoom(room)

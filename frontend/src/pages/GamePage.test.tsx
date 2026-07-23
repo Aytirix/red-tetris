@@ -214,12 +214,9 @@ describe("GamePage — lobby", () => {
 		expect(screen.queryByRole("button", { name: "▶ Lancer" })).toBeNull();
 	});
 
-	it("permet a l'admin de changer le mode, la visibilite et de lancer la partie", () => {
+	it("permet a l'admin de changer la visibilite et de lancer la partie", () => {
 		renderGamePage();
 		joinLobby([{ username: "luffy", faction: "pirate" }]);
-
-		fireEvent.click(screen.getByRole("button", { name: "Sprint" }));
-		expect(roomEvents.emitSetGameMode).toHaveBeenCalledWith("sprint");
 
 		fireEvent.click(screen.getByRole("button", { name: "🌐 Publique" }));
 		expect(roomEvents.emitSetPrivate).toHaveBeenCalledWith(true);
@@ -228,15 +225,21 @@ describe("GamePage — lobby", () => {
 		expect(roomEvents.emitStartGame).toHaveBeenCalledTimes(1);
 	});
 
-	it("reflete les reglages recus du serveur", () => {
+	it("n'affiche plus de selecteur de mode de jeu", () => {
 		const { container } = renderGamePage();
 		joinLobby([{ username: "luffy", faction: "pirate" }]);
-		receive("room:settings", { mode: "ultra", private: true });
+
+		expect(container.querySelector(".game-lobby__mode-list")).toBeNull();
+		expect(screen.queryByRole("button", { name: "Sprint" })).toBeNull();
+		expect(screen.queryByRole("button", { name: "Ultra" })).toBeNull();
+	});
+
+	it("reflete la visibilite recue du serveur", () => {
+		renderGamePage();
+		joinLobby([{ username: "luffy", faction: "pirate" }]);
+		receive("room:settings", { private: true });
 
 		expect(screen.getByRole("button", { name: "🔒 Privée" })).toBeInTheDocument();
-		expect(
-			container.querySelector(".game-lobby__mode-btn--active")?.textContent,
-		).toBe("Ultra");
 	});
 
 	it("ignore un payload de reglages vide", () => {
@@ -251,8 +254,20 @@ describe("GamePage — lobby", () => {
 		renderGamePage();
 		joinLobby([{ username: "zoro", faction: "pirate" }, { username: "luffy", faction: "pirate" }]);
 
-		fireEvent.click(screen.getByRole("button", { name: "Sprint" }));
-		expect(roomEvents.emitSetGameMode).not.toHaveBeenCalled();
+		fireEvent.click(screen.getByRole("button", { name: "🌐 Publique" }));
+		expect(roomEvents.emitSetPrivate).not.toHaveBeenCalled();
+	});
+
+	it("verrouille l'acces sur prive et non modifiable en partie solo", () => {
+		ctx.params = { roomName: "sologame_abcd", playerName: "luffy" };
+		renderGamePage();
+		joinLobby([{ username: "luffy", faction: "pirate" }]);
+
+		const privacyBtn = screen.getByRole("button", { name: "🔒 Privée" });
+		expect(privacyBtn).toBeDisabled();
+		fireEvent.click(privacyBtn);
+		expect(roomEvents.emitSetPrivate).not.toHaveBeenCalled();
+		expect(screen.getByText("Partie solo — toujours privée")).toBeInTheDocument();
 	});
 });
 
@@ -479,6 +494,30 @@ describe("GamePage — sortie de room", () => {
 		expect(ctx.navigate).toHaveBeenCalledWith("/dashboard");
 	});
 
+	it("ne flashe pas le lobby en quittant une partie en cours", () => {
+		const { container } = renderGamePage();
+		joinLobby([{ username: "luffy", faction: "pirate" }]);
+		receive("game:update", {
+			board: emptyBoard(),
+			score: 0,
+			level: 1,
+			spectator: false,
+			currentPiece: { type: "T" },
+			nextPiece: { type: "I" },
+			opponents: [],
+			ghost: [],
+		});
+		expect(container.querySelector(".tetris-board")).not.toBeNull();
+
+		fireEvent.click(screen.getByRole("button", { name: "Quitter la partie" }));
+		// Le serveur renvoie game:over au partant: le garde doit l'ignorer pour ne pas
+		// rebasculer sur le lobby avant la navigation vers le dashboard.
+		receive("game:over", { scores: [{ username: "luffy", score: 0 }] });
+
+		expect(ctx.navigate).toHaveBeenCalledWith("/dashboard");
+		expect(container.querySelector(".game-lobby")).toBeNull();
+	});
+
 	it("ne quitte qu'une seule fois meme apres demontage", () => {
 		const { unmount } = renderGamePage();
 		joinLobby([{ username: "luffy", faction: "pirate" }]);
@@ -502,7 +541,7 @@ describe("GamePage — sortie de room", () => {
 		const { unmount } = renderGamePage();
 		unmount();
 
-		for (const event of ["room:joined", "room:players", "room:settings", "room:kicked", "game:start", "game:update", "game:SpectatorGame", "game:over", "game:eliminated", "user:ResultUsernameAvailable"]) {
+		for (const event of ["room:joined", "room:players", "room:settings", "room:kicked", "room:denied", "game:start", "game:update", "game:SpectatorGame", "game:over", "game:eliminated", "user:ResultUsernameAvailable"]) {
 			expect(ctx.socket.listenerCount(event)).toBe(0);
 		}
 	});
@@ -523,5 +562,13 @@ describe("GamePage — sortie de room", () => {
 		receive("room:kicked", {});
 
 		expect(roomEvents.emitLeaveRoom).not.toHaveBeenCalled();
+	});
+
+	it("redirige avec une alerte quand la room est privee (room:denied)", async () => {
+		renderGamePage();
+		receive("room:denied", { reason: "private" });
+
+		expect(ctx.navigate).toHaveBeenCalledWith("/dashboard");
+		expect(await screen.findByText("Partie privée")).toBeInTheDocument();
 	});
 });

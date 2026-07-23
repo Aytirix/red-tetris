@@ -196,8 +196,8 @@ export default function DashboardPage() {
 					</span>
 				</div>
 
-				{/* ── Cacher : haut-droite, uniquement sur le dashboard ── */}
-				{screen === "dashboard" && (
+				{/* ── Cacher : haut-droite, uniquement sur l'accueil du dashboard ── */}
+				{screen === "dashboard" && view === "home" && (
 					<button
 						className={`button button-ghost ${styles.hideBtn}`}
 						onClick={() => setHideUI((h) => !h)}
@@ -209,92 +209,90 @@ export default function DashboardPage() {
 				{/* ── Écran BOUTIQUE ── */}
 				{screen === "shop" && <ShopScreen />}
 
-				{/* ── Écran DASHBOARD ── */}
-				{screen === "dashboard" && (
-					<>
-						{/* Home panel */}
-						{!hideUI && view === "home" && (
-							<div className={`${styles.panel} ${theme === "marine" ? styles.panelMarine : ""}`}>
-								<p className="eyebrow">
-									{theme === "pirate" ? "Pirates" : "Marines"}
-								</p>
-								<h2 style={{ marginTop: "0.4rem", marginBottom: 0 }}>Jouer</h2>
+				{/* ── Accueil : panneau Solo / Multijoueur ── */}
+				{screen === "dashboard" && view === "home" && !hideUI && (
+					<div className={`${styles.panel} ${theme === "marine" ? styles.panelMarine : ""}`}>
+						<p className="eyebrow">
+							{theme === "pirate" ? "Pirates" : "Marines"}
+						</p>
+						<h2 style={{ marginTop: "0.4rem", marginBottom: 0 }}>Jouer</h2>
 
-								<div className={styles.actions}>
-									<button className="button button-primary" onClick={handleSolo}>
-										Solo
-									</button>
-									<button
-										className="button button-outline"
-										onClick={() => setView("multiplayer")}
-									>
-										Multijoueur
-									</button>
-								</div>
+						<div className={styles.actions}>
+							<button className="button button-primary" onClick={handleSolo}>
+								Solo
+							</button>
+							<button
+								className="button button-outline"
+								onClick={() => setView("multiplayer")}
+							>
+								Multijoueur
+							</button>
+						</div>
+					</div>
+				)}
+
+				{/* ── Écran MULTIJOUEUR : plein écran centré, façon boutique ── */}
+				{screen === "dashboard" && view === "multiplayer" && (
+					<div className={styles.mpScreen}>
+						<div className={styles.mpInner}>
+							<button
+								className={styles.mpBack}
+								onClick={() => setView("home")}
+								title="Retour"
+							>
+								&#8592;
+							</button>
+
+							<div className={styles.mpHead}>
+								<p className="eyebrow">Multijoueur</p>
+								<h2 className={styles.mpTitle}>Salles disponibles</h2>
+								<p className={styles.mpHint}>Rejoins une salle existante ou crée la tienne.</p>
 							</div>
-						)}
 
-						{/* Multiplayer panel */}
-						{!hideUI && view === "multiplayer" && (
-							<div className={`${styles.panel} ${theme === "marine" ? styles.panelMarine : ""}`}>
+							{/* Créer une salle — nom d'équipage One Piece attribué automatiquement */}
+							<button
+								className="button button-primary"
+								style={{ width: "100%" }}
+								onClick={handleCreateRoom}
+							>
+								+ Créer une salle
+							</button>
 
-								<button
-									className={styles.backBtn}
-									onClick={() => setView("home")}
-									title="Retour"
-								>
-									&#8592;
-								</button>
-
-								{/* Créer une salle — nom d'équipage One Piece attribué automatiquement */}
-								<button
-									className="button button-primary"
-									style={{ width: "100%" }}
-									onClick={handleCreateRoom}
-								>
-									+ Créer une salle
-								</button>
-
-								{/* Room list */}
-								<div className={styles.roomListSection}>
-									<p className={styles.sectionLabel}>Salles disponibles</p>
-									<div className={styles.roomList}>
-										{roomsLoading ? (
-											<div className={styles.emptyRooms}>
-												<ClipLoader color="var(--color-secondary)" size={14} />
-												<span style={{ marginLeft: "0.5rem" }}>Recherche de salles…</span>
-											</div>
-										) : visibleRooms.length === 0 ? (
-											<div className={styles.emptyRooms}>
-												<span>Aucune salle disponible</span>
-											</div>
-										) : (
-											visibleRooms.map(room => (
-												<div key={room.roomId} className={styles.roomItem}>
-													<span className={styles.roomName}>{room.roomId}</span>
-													<span className={styles.roomMeta}>
-														{room.playerCount}
-														{room.maxPlayers ? `/${room.maxPlayers}` : ""}
-													</span>
-													{room.mode && (
-														<span className="badge">{room.mode}</span>
-													)}
-													<button
-														className="button button-outline"
-														style={{ padding: "0.35rem 0.75rem", fontSize: "0.82rem", flexShrink: 0 }}
-														onClick={() => handleJoinRoom(room.roomId)}
-													>
-														Rejoindre
-													</button>
-												</div>
-											))
-										)}
+							{/* Room list */}
+							<div className={styles.mpRoomList}>
+								{roomsLoading ? (
+									<div className={styles.emptyRooms}>
+										<ClipLoader color="var(--color-secondary)" size={14} />
+										<span style={{ marginLeft: "0.5rem" }}>Recherche de salles…</span>
 									</div>
-								</div>
-
+								) : visibleRooms.length === 0 ? (
+									<div className={styles.emptyRooms}>
+										<span>Aucune salle disponible</span>
+									</div>
+								) : (
+									visibleRooms.map(room => (
+										<div key={room.roomId} className={styles.roomItem}>
+											<span className={styles.roomName}>{room.roomId}</span>
+											<span className={styles.roomMeta}>
+												{room.playerCount}
+												{room.maxPlayers ? `/${room.maxPlayers}` : ""}
+											</span>
+											{room.mode && (
+												<span className="badge">{room.mode}</span>
+											)}
+											<button
+												className="button button-outline"
+												style={{ padding: "0.35rem 0.75rem", fontSize: "0.82rem", flexShrink: 0 }}
+												onClick={() => handleJoinRoom(room.roomId)}
+											>
+												Rejoindre
+											</button>
+										</div>
+									))
+								)}
 							</div>
-						)}
-					</>
+						</div>
+					</div>
 				)}
 
 			</div>

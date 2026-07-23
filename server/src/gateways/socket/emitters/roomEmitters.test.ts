@@ -96,6 +96,31 @@ describe("roomEmitters", () => {
 			expect(silent.emit).not.toHaveBeenCalled();
 		});
 
+		it("exclut les rooms privees de la liste publique", () => {
+			const publique = new Room("salle1");
+			const host = makePlayer("luffy", "s1");
+			publique.addPlayer(host.player);
+			roomSocketStore.set("salle1", publique);
+
+			const privee = new Room("secret");
+			const host2 = makePlayer("zoro", "s2");
+			privee.addPlayer(host2.player);
+			privee.setPrivate(true, host2.socket);
+			roomSocketStore.set("secret", privee);
+
+			const solo = new Room("sologame_x");
+			solo.addPlayer(makePlayer("nami", "s3").player);
+			roomSocketStore.set("sologame_x", solo);
+
+			const subscribed = makeSocket("watcher");
+			userSocketStore.set("watcher", { username: "watcher", subscribe: true, socket: subscribed });
+
+			emitSubscrib();
+
+			const list = subscribed.emit.mock.calls[0]![1] as { roomId: string }[];
+			expect(list.map((r) => r.roomId)).toEqual(["salle1"]);
+		});
+
 		it("sends an empty list when no room exists", () => {
 			const subscribed = makeSocket("watcher");
 			userSocketStore.set("watcher", { username: "watcher", subscribe: true, socket: subscribed });
@@ -109,7 +134,7 @@ describe("roomEmitters", () => {
 			const room = new Room("salle1");
 			const host = makePlayer("luffy", "s1");
 			room.addPlayer(host.player);
-			room.setMode("sprint", host.socket);
+			room.setMode("classique", host.socket);
 			roomSocketStore.set("salle1", room);
 
 			const subscribed = makeSocket("watcher");
@@ -117,7 +142,7 @@ describe("roomEmitters", () => {
 
 			emitSubscrib();
 
-			expect(subscribed.emit.mock.calls[0]![1][0].mode).toBe("sprint");
+			expect(subscribed.emit.mock.calls[0]![1][0].mode).toBe("classique");
 		});
 	});
 
@@ -148,13 +173,13 @@ describe("roomEmitters", () => {
 			const guest = makePlayer("zoro", "s2");
 			room.addPlayer(host.player);
 			room.addPlayer(guest.player);
-			room.setMode("ultra", host.socket);
+			room.setMode("classique", host.socket);
 			room.setPrivate(true, host.socket);
 
 			emitRoomSettings(room);
 
-			expect(host.socket.emit).toHaveBeenCalledWith("room:settings", { mode: "ultra", private: true });
-			expect(guest.socket.emit).toHaveBeenCalledWith("room:settings", { mode: "ultra", private: true });
+			expect(host.socket.emit).toHaveBeenCalledWith("room:settings", { mode: "classique", private: true });
+			expect(guest.socket.emit).toHaveBeenCalledWith("room:settings", { mode: "classique", private: true });
 		});
 	});
 

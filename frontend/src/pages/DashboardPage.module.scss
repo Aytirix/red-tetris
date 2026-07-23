@@ -38,27 +38,6 @@
 	-webkit-backdrop-filter: blur(10px);
 }
 
-.backBtn {
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	width: 2rem;
-	height: 2rem;
-	margin-top: -1rem;
-	margin-bottom: 1rem;
-	background: none;
-	border: none;
-	cursor: pointer;
-	color: var(--color-text-on-dark);
-	font-size: 1.75rem;
-	opacity: 0.7;
-	transition: opacity 0.15s;
-
-	&:hover {
-		opacity: 1;
-	}
-}
-
 // ── Glass panel (same for both themes, positioned differently) ────────────────
 
 .panel {
@@ -101,57 +80,75 @@
 	margin-top: 1.25rem;
 }
 
-// ── Multiplayer section ───────────────────────────────────────────────────────
+// ── Écran multijoueur (plein écran centré, façon boutique) ────────────────────
 
-.roomListSection {
-	margin-top: 1.25rem;
-	padding-top: 1.25rem;
-	border-top: 1px solid var(--color-glass-divider);
-}
-
-.sectionLabel {
-	margin: 0 0 0.5rem;
-	font-size: 0.76rem;
-	font-weight: 700;
-	letter-spacing: 0.2em;
-	text-transform: uppercase;
-	color: var(--color-text-muted-on-dark);
-}
-
-.createRow {
+.mpScreen {
+	position: absolute;
+	inset: 0;
+	z-index: 5;
+	overflow-y: auto;
 	display: flex;
-	gap: 0.5rem;
+	flex-direction: column;
+	padding: 5.75rem clamp(1rem, 4vw, 3rem) 2.5rem;
+	// Voile léger pour la lisibilité; le parallax reste visible derrière.
+	background: linear-gradient(rgba(4, 6, 16, 0.32), rgba(4, 6, 16, 0.5));
 }
 
-.input {
-	flex: 1;
-	min-width: 0;
-	background: rgba(255, 255, 255, 0.07);
-	border: 1px solid var(--color-glass-border);
-	border-radius: 6px;
-	padding: 0.6rem 0.75rem;
+.mpInner {
+	width: 100%;
+	max-width: 560px;
+	margin: 0 auto;
+	display: flex;
+	flex-direction: column;
+	gap: 1rem;
+}
+
+// Dans le flux (pas en absolu) pour ne jamais chevaucher le bouton Boutique
+// (coin haut-gauche) sur mobile: la flèche se place en tête de la colonne centrée.
+.mpBack {
+	align-self: flex-start;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 2.25rem;
+	height: 2.25rem;
+	margin-bottom: -0.5rem;
+	background: none;
+	border: none;
+	cursor: pointer;
 	color: var(--color-text-on-dark);
-	font-family: var(--font-body);
-	font-size: 0.9rem;
+	font-size: 1.75rem;
+	opacity: 0.75;
+	transition: opacity 0.15s;
 
-	&::placeholder {
-		color: var(--color-text-muted-on-dark);
-	}
-
-	&:focus {
-		outline: none;
-		border-color: var(--color-secondary);
-		box-shadow: 0 0 0 2px rgba(61, 231, 255, 0.15);
+	&:hover {
+		opacity: 1;
 	}
 }
 
-// ── Room list ─────────────────────────────────────────────────────────────────
+.mpHead {
+	margin-bottom: 0.25rem;
+}
 
-.roomList {
+.mpTitle {
+	margin: 0.15rem 0 0.35rem;
+	color: var(--color-text-on-dark);
+	font-size: clamp(1.5rem, 3.5vw, 2.1rem);
+	text-shadow: 0 0 20px rgba(61, 231, 255, 0.3);
+}
+
+.mpHint {
+	margin: 0;
+	color: var(--color-text-on-dark);
+	font-size: 0.9rem;
+	text-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+}
+
+.mpRoomList {
 	display: flex;
 	flex-direction: column;
 	gap: 0.5rem;
-	max-height: 220px;
+	max-height: 62vh;
 	overflow-y: auto;
 
 	&::-webkit-scrollbar { width: 4px; }
@@ -161,6 +158,8 @@
 		border-radius: 4px;
 	}
 }
+
+// ── Room list ─────────────────────────────────────────────────────────────────
 
 .roomItem {
 	display: flex;
