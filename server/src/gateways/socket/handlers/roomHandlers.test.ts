@@ -10,6 +10,7 @@ import {
 	handleMove,
 	handleRoomKick,
 	handleRoomMode,
+	handleRoomRestart,
 	handleRoomSetPrivate,
 	handleRoomStart,
 	handleRotate,
@@ -599,6 +600,68 @@ describe("roomHandlers", () => {
 			handleRoomStart(sockets.get("luffy")!, undefined);
 
 			expect(room.getStatus()).toBe("playing");
+		});
+	});
+
+	describe("handleRoomRestart", () => {
+		it("relance une NOUVELLE partie dans la meme room (stoppe l'ancienne)", () => {
+			const { room, sockets } = seedRoom("solo", ["luffy"]);
+			handleRoomStart(sockets.get("luffy")!, undefined);
+			vi.advanceTimersByTime(3000);
+			const firstGame = room.getGame();
+			expect(firstGame).toBeInstanceOf(Game);
+
+			handleRoomRestart(sockets.get("luffy")!, undefined);
+			// Décompte 3-2-1 relancé, puis une nouvelle Game (instance différente).
+			vi.advanceTimersByTime(3000);
+			const secondGame = room.getGame();
+			expect(secondGame).toBeInstanceOf(Game);
+			expect(secondGame).not.toBe(firstGame);
+			expect(room.getStatus()).toBe("playing");
+		});
+
+		it("relance aussi une partie deja terminee (room en attente)", () => {
+			const { room, sockets } = seedRoom("solo", ["luffy"]);
+			expect(room.getStatus()).toBe("waiting");
+
+			handleRoomRestart(sockets.get("luffy")!, undefined);
+			vi.advanceTimersByTime(3000);
+
+			expect(room.getGame()).toBeInstanceOf(Game);
+			expect(room.getStatus()).toBe("playing");
+		});
+
+		it("ignore un non-hote", () => {
+			const { room, sockets } = seedRoom("salle1", ["luffy", "zoro"]);
+			handleRoomStart(sockets.get("luffy")!, undefined);
+			vi.advanceTimersByTime(3000);
+			const game = room.getGame();
+
+			handleRoomRestart(sockets.get("zoro")!, undefined);
+			vi.advanceTimersByTime(3000);
+
+			// La partie n'a pas ete relancee par le non-hote.
+			expect(room.getGame()).toBe(game);
+		});
+
+		it("refuse de relancer Sprint a moins de 2 joueurs", () => {
+			const { room, sockets } = seedRoom("solo", ["luffy"]);
+			handleRoomMode(sockets.get("luffy")!, { mode: "sprint" });
+
+			handleRoomRestart(sockets.get("luffy")!, undefined);
+			vi.advanceTimersByTime(3000);
+
+			expect(room.getGame()).toBeNull();
+			expect(lastEmit(sockets.get("luffy")!, "system:Error")![1]).toMatchObject({
+				message: "Le mode Sprint nécessite au moins 2 joueurs",
+			});
+		});
+
+		it("ignore un payload non vide", () => {
+			const { room, sockets } = seedRoom("solo", ["luffy"]);
+			handleRoomRestart(sockets.get("luffy")!, { anything: true });
+			vi.advanceTimersByTime(3000);
+			expect(room.getGame()).toBeNull();
 		});
 	});
 

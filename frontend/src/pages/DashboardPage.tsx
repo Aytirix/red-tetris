@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useCloudNavigate } from "../transition/TransitionContext";
 import { ClipLoader } from "react-spinners";
-import { useWsSession } from "../contexts/WsStateContext";
+import { useWsSession, useClearCurrentUserFaction } from "../contexts/WsStateContext";
 import { useSocket } from "../contexts/SocketContext";
 import { useShop } from "../contexts/ShopContext";
 import DashboardParallaxScene from "../components/DashboardParallaxScene";
@@ -117,6 +117,7 @@ export default function DashboardPage() {
 	const { socket } = useSocket();
 	const { berrys } = useShop();
 	const navigate = useCloudNavigate();
+	const clearCurrentUserFaction = useClearCurrentUserFaction();
 	const theme = faction ?? "pirate";
 
 	// screen = dashboard | shop → on switch les composants SANS quitter la page
@@ -125,8 +126,27 @@ export default function DashboardPage() {
 	const [view, setView] = useState<View>("home");
 	const [rooms, setRooms] = useState<RoomInfo[]>([]);
 	const [roomsLoading, setRoomsLoading] = useState(true);
+	// Menu de l'engrenage (coin haut-droite).
+	const [menuOpen, setMenuOpen] = useState(false);
 
 	const username = localStorage.getItem("username") ?? "";
+
+	// Ferme le menu engrenage au clic en dehors.
+	useEffect(() => {
+		if (!menuOpen) return;
+		const close = () => setMenuOpen(false);
+		window.addEventListener("click", close);
+		return () => window.removeEventListener("click", close);
+	}, [menuOpen]);
+
+	// Déconnexion : oublie le pseudo + la faction et revient à l'accueil (écran de
+	// connexion). Le prochain arrivant devra re-saisir pseudo et camp.
+	function handleLogout() {
+		setMenuOpen(false);
+		clearCurrentUserFaction();
+		localStorage.removeItem("username");
+		navigate("/");
+	}
 
 	useEffect(() => {
 		if (screen !== "dashboard" || view !== "multiplayer") return;
@@ -206,18 +226,22 @@ export default function DashboardPage() {
 		<DashboardParallaxScene theme={theme}>
 			<div className={styles.wrapper}>
 
-				{/* ── Coin haut-gauche : sur un écran secondaire (Boutique / Touches / Stats /
-				     Multijoueur) un unique bouton « Retour » ramène à l'accueil. Sur l'accueil,
-				     c'est l'entrée Boutique + le solde. ── */}
+				{/* ── Coin haut-gauche : sur un écran secondaire, un unique bouton « Retour ».
+				     Sur l'accueil : Boutique + Stats côte à côte, et le solde en dessous. ── */}
 				<div className={styles.topLeft}>
 					{inSecondary ? (
 						<button className="button button-outline" onClick={goHome}>
 							← Retour
 						</button>
 					) : (
-						<button className="button button-outline" onClick={() => setScreen("shop")}>
-							🛒 Boutique
-						</button>
+						<div className={styles.navGroup}>
+							<button className="button button-outline" onClick={() => setScreen("shop")}>
+								🛒 Boutique
+							</button>
+							<button className="button button-outline" onClick={() => setScreen("stats")}>
+								📊 Stats
+							</button>
+						</div>
 					)}
 					{(screen === "shop" || (screen === "dashboard" && view === "home")) && (
 						<span className={styles.balance} title="Cumul de tes scores de fin de partie">
@@ -226,16 +250,38 @@ export default function DashboardPage() {
 					)}
 				</div>
 
-				{/* ── Coin haut-droite : entrées Touches + Stats, uniquement sur l'accueil
-				     (sur un écran secondaire, seul le bouton « Retour » subsiste). ── */}
+				{/* ── Coin haut-droite : engrenage ⚙ → menu (configurer les touches / se
+				     déconnecter). Masqué sur les écrans secondaires (seul « Retour » subsiste). ── */}
 				{!inSecondary && (
-					<div className={styles.topRight} style={{ display: "flex", flexDirection: "column", gap: "0.5rem", alignItems: "flex-end" }}>
-						<button className="button button-outline" onClick={() => setScreen("keys")}>
-							⌨ Touches
+					<div className={`${styles.topRight} ${styles.gear}`}>
+						<button
+							className="button button-outline"
+							onClick={(e) => { e.stopPropagation(); setMenuOpen((o) => !o); }}
+							aria-haspopup="menu"
+							aria-expanded={menuOpen}
+							aria-label="Options"
+							title="Options"
+						>
+							⚙
 						</button>
-						<button className="button button-outline" onClick={() => setScreen("stats")}>
-							📊 Stats
-						</button>
+						{menuOpen && (
+							<div className={styles.gearMenu} role="menu">
+								<button
+									className={styles.gearItem}
+									role="menuitem"
+									onClick={() => { setMenuOpen(false); setScreen("keys"); }}
+								>
+									⌨ Configurer les touches
+								</button>
+								<button
+									className={styles.gearItem}
+									role="menuitem"
+									onClick={handleLogout}
+								>
+									🚪 Se déconnecter
+								</button>
+							</div>
+						)}
 					</div>
 				)}
 

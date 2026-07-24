@@ -481,6 +481,16 @@ export class Game {
 		emitGameStart(this.state, this)
 		this.restartTickInterval()
 	}
+	// Arrêt propre d'une partie EN COURS pour la relancer (restart): stoppe la gravité
+	// sans émettre game:over ni créditer/enregistrer quoi que ce soit — on repart de zéro
+	// avec une nouvelle Game juste après.
+	stop() : void {
+		this.isOver = true
+		if (this.intervalId) {
+			clearInterval(this.intervalId)
+			this.intervalId = null
+		}
+	}
 	spawnPiece(playerStat: PlayerGameState) : void {
 		const currentType = this.getPieceQueue(playerStat.pieceIndex)
 		const nextType = this.getPieceQueue((playerStat.pieceIndex + 1))

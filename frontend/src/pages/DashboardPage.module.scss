@@ -188,3 +188,47 @@
 		width: 92vw;
 	}
 }
+
+// Groupe de boutons de nav (Boutique + Stats côte à côte).
+.navGroup {
+	display: flex;
+	gap: 0.5rem;
+}
+
+// Conteneur de l'engrenage : le menu se déploie en dessous, aligné à droite.
+.gear {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-end;
+}
+
+.gearMenu {
+	position: absolute;
+	top: calc(100% + 0.5rem);
+	right: 0;
+	z-index: 20;
+	display: flex;
+	flex-direction: column;
+	min-width: 220px;
+	padding: 0.4rem;
+	border: 1px solid var(--color-glass-border);
+	border-radius: 12px;
+	background: var(--color-glass);
+	backdrop-filter: blur(20px);
+	box-shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
+}
+
+.gearItem {
+	text-align: left;
+	padding: 0.6rem 0.75rem;
+	border: none;
+	border-radius: 8px;
+	background: transparent;
+	color: var(--color-text-on-dark);
+	cursor: pointer;
+	font: inherit;
+
+	&:hover {
+		background: rgba(255, 255, 255, 0.08);
+	}
+}

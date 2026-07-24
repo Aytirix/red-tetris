@@ -7,6 +7,7 @@ import { useShop } from "../../contexts/ShopContext";
 import { getPieceTheme, themeCssVars } from "../../config/pieceThemes";
 import GameBoard from "./GameBoard";
 import GameHud from "./GameHud";
+import ControlsLegend from "./ControlsLegend";
 import NextPiecePreview from "./NextPiecePreview";
 import OpponentsColumn from "./OpponentsColumn";
 
@@ -23,9 +24,10 @@ type Props = {
 	eliminated?: boolean;
 	onEliminationDone?: () => void;
 	onLeave?: () => void;
+	onRestart?: () => void;
 };
 
-export default function GameView({ state, roomName, playerName, eliminated = false, onEliminationDone, onLeave }: Props) {
+export default function GameView({ state, roomName, playerName, eliminated = false, onEliminationDone, onLeave, onRestart }: Props) {
 	const isSpectator = state.spectator !== false;
 	const spectatorOf = isSpectator ? (state.spectator as string) : null;
 	const isSolo = roomName.startsWith("sologame_");
@@ -98,14 +100,44 @@ export default function GameView({ state, roomName, playerName, eliminated = fal
 	useEffect(() => {
 		if (isSpectator) return;
 		const bindings = loadKeyBindings();
+
+		// Auto-répétition RAPIDE de la rotation tant que la touche est maintenue. Le jeu
+		// ne s'appuie plus sur l'auto-repeat lent de l'OS (délai initial ~500 ms) : on
+		// peut donc « spammer » la rotation en gardant la touche enfoncée. Un simple
+		// tapotement ne déclenche qu'UNE rotation (le keyup annule le timer avant le délai).
+		const ROTATE_REPEAT_DELAY = 130;
+		const ROTATE_REPEAT_RATE = 45;
+		let rotateDelay = 0;
+		let rotateInterval = 0;
+		function stopRotateRepeat() {
+			if (rotateDelay) { window.clearTimeout(rotateDelay); rotateDelay = 0; }
+			if (rotateInterval) { window.clearInterval(rotateInterval); rotateInterval = 0; }
+		}
+		// Alias historique imposé par le sujet: KeyX pivote aussi, tant que la touche
+		// n'a pas été réassignée à une autre action par le joueur.
+		function actionFor(code: string) {
+			return actionForCode(bindings, code) ?? (code === "KeyX" ? "rotate" : null);
+		}
+
 		function onKey(e: KeyboardEvent) {
 			// Un évènement sans code physique (IME, clavier virtuel) ne doit jamais
 			// être rattaché à une action.
 			if (!e.code) return;
-			// Alias historique imposé par le sujet: KeyX pivote aussi, tant que cette
-			// touche n'a pas été réassignée à une autre action par le joueur.
-			const action = actionForCode(bindings, e.code) ?? (e.code === "KeyX" ? "rotate" : null);
+			const action = actionFor(e.code);
 			if (!action) return;
+
+			if (action === "rotate") {
+				// On pilote nous-mêmes la répétition → on ignore l'auto-repeat de l'OS.
+				e.preventDefault();
+				if (e.repeat) return;
+				emitGameRotate();
+				stopRotateRepeat();
+				rotateDelay = window.setTimeout(() => {
+					rotateInterval = window.setInterval(() => emitGameRotate(), ROTATE_REPEAT_RATE);
+				}, ROTATE_REPEAT_DELAY);
+				return;
+			}
+
 			// Chute rapide et joker ne doivent pas se répéter si la touche reste enfoncée.
 			if (e.repeat && (action === "hardDrop" || action === "joker")) return;
 			e.preventDefault();
@@ -113,13 +145,23 @@ export default function GameView({ state, roomName, playerName, eliminated = fal
 				case "moveLeft": emitGameMove("left"); break;
 				case "moveRight": emitGameMove("right"); break;
 				case "softDrop": emitGameMove("down"); break;
-				case "rotate": emitGameRotate(); break;
 				case "hardDrop": emitGameDrop(); break;
 				case "joker": emitGameJoker(); break;
 			}
 		}
+
+		// Relâcher la touche de rotation stoppe la répétition rapide.
+		function onKeyUp(e: KeyboardEvent) {
+			if (e.code && actionFor(e.code) === "rotate") stopRotateRepeat();
+		}
+
 		window.addEventListener("keydown", onKey);
-		return () => window.removeEventListener("keydown", onKey);
+		window.addEventListener("keyup", onKeyUp);
+		return () => {
+			window.removeEventListener("keydown", onKey);
+			window.removeEventListener("keyup", onKeyUp);
+			stopRotateRepeat();
+		};
 	}, [isSpectator]);
 
 	function handleSpectatorSelect(username: string) {
@@ -129,10 +171,21 @@ export default function GameView({ state, roomName, playerName, eliminated = fal
 
 	return (
 		<div className="tetris-stage" data-recipe={pieceTheme.recipe} style={themeCssVars(pieceTheme) as CSSProperties}>
-			{onLeave && (
-				<button type="button" className="button button-ghost tetris-stage__leave" onClick={onLeave}>
-					Quitter la partie
-				</button>
+			{(onLeave || (isSolo && onRestart)) && (
+				<div className="tetris-stage__topbtns">
+					{/* Rejouer: solo uniquement — relance directement une nouvelle partie
+					    (même mode) sans repasser par le lobby. */}
+					{isSolo && onRestart && (
+						<button type="button" className="button button-secondary" onClick={onRestart}>
+							🔄 Rejouer
+						</button>
+					)}
+					{onLeave && (
+						<button type="button" className="button button-ghost tetris-stage__leave" onClick={onLeave}>
+							Quitter la partie
+						</button>
+					)}
+				</div>
 			)}
 			<div className="tetris-stage__inner">
 				{/* Left column — first opponents */}
@@ -182,6 +235,9 @@ export default function GameView({ state, roomName, playerName, eliminated = fal
 					style={{ maxHeight: mainBoardHeightPx }}
 				>
 					<NextPiecePreview piece={state.nextPiece} />
+					{/* Résumé des touches: uniquement pour le joueur actif (pas les
+					    spectateurs, ni les éliminés qui basculent en spectateur). */}
+					{!isSpectator && <ControlsLegend />}
 					<OpponentsColumn
 						opponents={right}
 						clickable={isSpectator}

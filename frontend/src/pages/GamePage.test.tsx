@@ -283,6 +283,17 @@ describe("GamePage — lobby", () => {
 		expect(screen.getByRole("button", { name: "▶ Lancer" })).not.toBeDisabled();
 	});
 
+	it("masque le mode Sprint en solo (injouable seul)", () => {
+		ctx.params = { roomName: "sologame_abc", playerName: "luffy" };
+		renderGamePage();
+		joinLobby([{ username: "luffy", faction: "pirate" }]);
+
+		expect(screen.queryByRole("button", { name: "Sprint" })).toBeNull();
+		// Les modes solo restent proposés.
+		expect(screen.getByRole("button", { name: "Classique" })).toBeInTheDocument();
+		expect(screen.getByRole("button", { name: "Ultra" })).toBeInTheDocument();
+	});
+
 	it("ignore un mode inconnu envoye par le serveur", () => {
 		const { container } = renderGamePage();
 		joinLobby([{ username: "luffy", faction: "pirate" }]);
@@ -526,6 +537,24 @@ describe("GamePage — fin de partie", () => {
 
 		expect(screen.getByRole("heading", { name: "Victoire" })).toBeInTheDocument();
 		expect(screen.getByRole("heading", { name: "room-42" })).toBeInTheDocument();
+	});
+
+	it("changer de mode remplace le récap de fin de partie par les règles du mode", () => {
+		const { container } = renderGamePage();
+		joinLobby([{ username: "luffy", faction: "pirate" }, { username: "zoro", faction: "pirate" }]);
+		receive("game:update", { board: emptyBoard(), score: 10, level: 1, spectator: false });
+		receive("game:over", {
+			winner: "luffy",
+			scores: [{ username: "luffy", score: 900 }, { username: "zoro", score: 400 }],
+		});
+		endGameOverZoom(container);
+		expect(screen.getByRole("heading", { name: "Victoire" })).toBeInTheDocument();
+
+		// Un changement de mode efface le récap et réaffiche les règles du mode choisi.
+		receive("room:settings", { mode: "ultra", private: false });
+
+		expect(screen.queryByRole("heading", { name: "Victoire" })).toBeNull();
+		expect(screen.getByLabelText("Règles du mode Ultra")).toBeInTheDocument();
 	});
 
 	it("joue le zoom GAME OVER a un spectateur pur puis affiche le classement", () => {

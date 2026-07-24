@@ -10,6 +10,7 @@ import {
 	emitLeaveRoom,
 	emitKickPlayer,
 	emitStartGame,
+	emitRestartGame,
 	emitSetGameMode,
 	emitSetPrivate,
 } from "../socket/events/room";
@@ -195,17 +196,21 @@ function LobbyView({
 						<div className="game-lobby__setting">
 							<span className="game-lobby__setting-label">Mode de jeu</span>
 							<div className="game-lobby__mode-list">
-								{GAME_MODES.map((mode) => (
-									<button
-										key={mode}
-										className={`game-lobby__mode-btn${gameMode === mode ? " game-lobby__mode-btn--active" : ""}`}
-										onClick={() => isAdmin && emitSetGameMode(mode)}
-										disabled={controlsDisabled}
-										title={GAME_MODE_HINTS[mode]}
-									>
-										{GAME_MODE_LABELS[mode]}
-									</button>
-								))}
+								{GAME_MODES
+									// En solo, on masque les modes qui exigent au moins 2 joueurs
+									// (Sprint) : ils seraient de toute façon injouables seul.
+									.filter((mode) => !isSolo || GAME_MODE_MIN_PLAYERS[mode] <= 1)
+									.map((mode) => (
+										<button
+											key={mode}
+											className={`game-lobby__mode-btn${gameMode === mode ? " game-lobby__mode-btn--active" : ""}`}
+											onClick={() => isAdmin && emitSetGameMode(mode)}
+											disabled={controlsDisabled}
+											title={GAME_MODE_HINTS[mode]}
+										>
+											{GAME_MODE_LABELS[mode]}
+										</button>
+									))}
 							</div>
 						</div>
 
@@ -470,6 +475,12 @@ export default function GamePage() {
 		return () => { socket.off("room:settings", handleSettings); };
 	}, [socket]);
 
+	// Changer de mode de jeu efface le récap de fin de partie : le lobby réaffiche alors
+	// les règles du mode choisi (à la place du résumé de la partie précédente).
+	useEffect(() => {
+		setGameOver(null);
+	}, [gameMode]);
+
 	useEffect(() => {
 		function handleKicked() {
 			hasLeftRoomRef.current = true;
@@ -648,6 +659,12 @@ export default function GamePage() {
 		cloudNavigate("/dashboard");
 	}
 
+	// Bouton « Rejouer » (solo): relance une partie dans la même room, même mode, sans
+	// repasser par le lobby. Le serveur arrête la partie en cours puis en relance une.
+	function handleRestart() {
+		emitRestartGame();
+	}
+
 	// Fin de l'animation "GAME OVER": on s'abonne comme spectateur d'un joueur
 	// encore vivant (nom fourni par le backend) et on retire l'overlay.
 	function handleEliminationDone() {
@@ -701,6 +718,7 @@ export default function GamePage() {
 					eliminated={eliminated}
 					onEliminationDone={handleEliminationDone}
 					onLeave={handleLeave}
+					onRestart={handleRestart}
 				/>
 			)}
 			{view === "game" && !gameState && (

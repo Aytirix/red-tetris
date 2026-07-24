@@ -2005,7 +2005,7 @@ a:hover {
 	transform: scale(0.06);
 	transform-origin: center;
 	will-change: transform, opacity;
-	animation: tetris-gameover-zoom 5s linear forwards;
+	animation: tetris-gameover-zoom 3s linear forwards;
 }
 
 /* Motion réduit: on garde une animation (sinon l'événement animationend, qui
@@ -3025,13 +3025,15 @@ a:hover {
 	opacity: 0.55;
 }
 
-/* Bouton "quitter la partie" — même rendu joueur ET spectateur, coin haut-droit
-   de la scène (sous l'overlay GAME OVER z-index:30). */
-.tetris-stage__leave {
+/* Boutons du coin haut-droit de la scène (Rejouer solo + Quitter), sous l'overlay
+   GAME OVER (z-index:30). */
+.tetris-stage__topbtns {
 	position: absolute;
 	top: 1rem;
 	right: 1rem;
 	z-index: 20;
+	display: flex;
+	gap: 0.5rem;
 }
 
 /* ─── Écran STATISTIQUES (dans le dashboard) ────────────────────────────────────
@@ -3444,4 +3446,60 @@ a:hover {
 
 ::-webkit-scrollbar-corner {
 	background: transparent;
+}
+
+/* ─── Résumé des touches (à droite du plateau, joueur actif) ─────────────────── */
+.tetris-controls {
+	width: 100%;
+	padding: 0.6rem 0.7rem;
+	border: 1px solid var(--color-glass-border);
+	border-radius: 12px;
+	background: rgba(255, 255, 255, 0.05);
+	backdrop-filter: blur(8px);
+}
+
+.tetris-controls__title {
+	margin: 0 0 0.45rem;
+	font-size: 0.7rem;
+	text-transform: uppercase;
+	letter-spacing: 0.08em;
+	color: var(--color-text-on-dark);
+	opacity: 0.75;
+}
+
+.tetris-controls__list {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 0.3rem;
+}
+
+.tetris-controls__row {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.5rem;
+}
+
+.tetris-controls__label {
+	color: var(--color-text-on-dark);
+	font-size: 0.75rem;
+	opacity: 0.9;
+}
+
+.tetris-controls__key {
+	flex-shrink: 0;
+	min-width: 1.5rem;
+	padding: 0.1rem 0.4rem;
+	border: 1px solid var(--color-glass-border);
+	border-radius: 6px;
+	background: rgba(255, 255, 255, 0.08);
+	color: var(--color-text-on-dark);
+	font-family: var(--font-body);
+	font-size: 0.72rem;
+	font-weight: 600;
+	text-align: center;
+	white-space: nowrap;
 }

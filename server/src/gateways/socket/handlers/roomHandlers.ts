@@ -274,6 +274,33 @@ export function handleRoomStart(socket: Socket, payload: unknown) : void {
 	}
 }
 
+// Relance une nouvelle partie dans la MEME room (bouton "Rejouer" du solo). Contrairement
+// a room:start, fonctionne meme si une partie tourne deja: on l'arrete proprement (sans
+// game:over) puis on redemarre avec le meme mode. Reserve a l'hote (le joueur solo l'est).
+export function handleRoomRestart(socket: Socket, payload: unknown) : void {
+	if (payload)
+		return
+	const room = getRoom(socket)
+	if (!room)
+		return
+	if (socket.id !== room.getHostId())
+		return
+	if (room.countPlayer() === 0)
+		return
+	if (room.getMode() === "sprint" && room.countPlayer() < 2) {
+		emitError(socket, "room:restart", "Le mode Sprint nécessite au moins 2 joueurs")
+		return
+	}
+	// Stoppe proprement le decompte et/ou la partie en cours avant de relancer.
+	room.clearCountdown()
+	const running = room.getGame()
+	if (running)
+		running.stop()
+	room.setGame(null)
+	room.setStatus("playing")
+	startGameWithCountdown(room)
+}
+
 export function handleMove(socket: Socket, payload: unknown) : void {
 	if (spectatorSocketStore.has(socket.id))
 		return

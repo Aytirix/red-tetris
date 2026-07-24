@@ -8,6 +8,7 @@ const ctx = vi.hoisted(() => ({
 	navigate: null as unknown as ReturnType<typeof vi.fn>,
 	faction: null as string | null,
 	berrys: 0,
+	clearFaction: null as unknown as ReturnType<typeof vi.fn>,
 }));
 
 const roomEvents = vi.hoisted(() => ({
@@ -27,6 +28,7 @@ vi.mock("../contexts/SocketContext", () => ({
 }));
 vi.mock("../contexts/WsStateContext", () => ({
 	useWsSession: () => ({ faction: ctx.faction, lastUsernameAvailability: null }),
+	useClearCurrentUserFaction: () => ctx.clearFaction,
 }));
 vi.mock("../contexts/ShopContext", () => ({
 	useShop: () => ({
@@ -63,6 +65,7 @@ beforeEach(() => {
 	ctx.navigate = vi.fn();
 	ctx.faction = null;
 	ctx.berrys = 0;
+	ctx.clearFaction = vi.fn();
 	localStorage.clear();
 	localStorage.setItem("username", "luffy");
 	for (const fn of Object.values(roomEvents)) fn.mockClear();
@@ -96,13 +99,15 @@ describe("DashboardPage — vue d'accueil", () => {
 		);
 	});
 
-	it("affiche le solde et les acces boutique/touches", () => {
+	it("affiche le solde et les acces boutique/stats/engrenage", () => {
 		renderDashboard();
 
 		expect(screen.getByRole("button", { name: "🛒 Boutique" })).toBeInTheDocument();
-		expect(screen.getByRole("button", { name: "⌨ Touches" })).toBeInTheDocument();
 		expect(screen.getByRole("button", { name: "📊 Stats" })).toBeInTheDocument();
+		expect(screen.getByRole("button", { name: "Options" })).toBeInTheDocument();
 		expect(screen.getByTitle("Cumul de tes scores de fin de partie")).toBeInTheDocument();
+		// Les touches passent désormais par le menu engrenage: pas de bouton direct.
+		expect(screen.queryByRole("button", { name: "⌨ Touches" })).toBeNull();
 	});
 
 	it("lance une partie solo dans une room dediee", () => {
@@ -244,32 +249,50 @@ describe("DashboardPage — multijoueur", () => {
 	});
 });
 
-describe("DashboardPage — ecran Touches", () => {
-	it("ouvre l'ecran des touches depuis le coin haut-droite", () => {
+describe("DashboardPage — engrenage (touches / déconnexion)", () => {
+	// Ouvre le menu engrenage puis clique l'entrée « Configurer les touches ».
+	function openKeysViaGear() {
+		fireEvent.click(screen.getByRole("button", { name: "Options" }));
+		fireEvent.click(screen.getByRole("menuitem", { name: "⌨ Configurer les touches" }));
+	}
+
+	it("ouvre l'ecran des touches via le menu engrenage", () => {
 		renderDashboard();
 
-		fireEvent.click(screen.getByRole("button", { name: "⌨ Touches" }));
+		openKeysViaGear();
 
 		expect(screen.getByText("Touches du jeu")).toBeInTheDocument();
 		expect(screen.getByRole("button", { name: "← Retour" })).toBeInTheDocument();
 	});
 
-	it("epure l'ecran: ni boutique ni solde", () => {
+	it("epure l'ecran des touches: ni boutique ni solde ni engrenage", () => {
 		renderDashboard();
 
-		fireEvent.click(screen.getByRole("button", { name: "⌨ Touches" }));
+		openKeysViaGear();
 
 		expect(screen.queryByRole("button", { name: "🛒 Boutique" })).toBeNull();
+		expect(screen.queryByRole("button", { name: "Options" })).toBeNull();
 		expect(screen.queryByTitle("Cumul de tes scores de fin de partie")).toBeNull();
 	});
 
 	it("revient au jeu depuis les touches", () => {
 		renderDashboard();
-		fireEvent.click(screen.getByRole("button", { name: "⌨ Touches" }));
+		openKeysViaGear();
 
 		fireEvent.click(screen.getByRole("button", { name: "← Retour" }));
 
 		expect(screen.getByRole("button", { name: "Solo" })).toBeInTheDocument();
+	});
+
+	it("se déconnecte: oublie pseudo + faction et revient à l'accueil", () => {
+		renderDashboard();
+
+		fireEvent.click(screen.getByRole("button", { name: "Options" }));
+		fireEvent.click(screen.getByRole("menuitem", { name: "🚪 Se déconnecter" }));
+
+		expect(ctx.clearFaction).toHaveBeenCalledTimes(1);
+		expect(localStorage.getItem("username")).toBeNull();
+		expect(ctx.navigate).toHaveBeenCalledWith("/");
 	});
 });
 

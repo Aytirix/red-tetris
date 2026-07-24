@@ -35,6 +35,11 @@ export function emitStartGame() {
 	socket.emit("room:start");
 }
 
+// Relance une nouvelle partie dans la même room (bouton « Rejouer » du solo).
+export function emitRestartGame() {
+	socket.emit("room:restart");
+}
+
 export function emitSetGameMode(mode: string) {
 	socket.emit("room:setMode", { mode });
 }

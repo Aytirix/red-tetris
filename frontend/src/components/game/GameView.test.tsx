@@ -105,6 +105,35 @@ describe("GameView — mapping clavier (exigence du sujet)", () => {
 		expect(gameEvents.emitGameRotate).toHaveBeenCalledTimes(1);
 	});
 
+	it("maintenir la rotation la repete rapidement (spam), un tapotement = 1 rotation", () => {
+		vi.useFakeTimers();
+		try {
+			renderGameView();
+
+			// Tapotement: keydown puis keyup avant le delai -> une seule rotation.
+			fireEvent.keyDown(window, { code: "ArrowUp" });
+			fireEvent.keyUp(window, { code: "ArrowUp" });
+			vi.advanceTimersByTime(500);
+			expect(gameEvents.emitGameRotate).toHaveBeenCalledTimes(1);
+
+			gameEvents.emitGameRotate.mockClear();
+
+			// Maintien: keydown sans keyup -> rotation immediate puis repetitions rapides.
+			fireEvent.keyDown(window, { code: "ArrowUp" });
+			expect(gameEvents.emitGameRotate).toHaveBeenCalledTimes(1);
+			vi.advanceTimersByTime(130 + 45 * 4);
+			expect(gameEvents.emitGameRotate.mock.calls.length).toBeGreaterThanOrEqual(5);
+
+			// Relacher stoppe la repetition.
+			fireEvent.keyUp(window, { code: "ArrowUp" });
+			const stopped = gameEvents.emitGameRotate.mock.calls.length;
+			vi.advanceTimersByTime(300);
+			expect(gameEvents.emitGameRotate.mock.calls.length).toBe(stopped);
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
 	it("Espace declenche le hard drop", () => {
 		renderGameView();
 		fireEvent.keyDown(window, { code: "Space" });
@@ -266,6 +295,34 @@ describe("GameView — mode spectateur", () => {
 
 		expect(container.querySelectorAll("button.tetris-mini")).toHaveLength(0);
 		expect(gameEvents.emitSubscribeSpectator).not.toHaveBeenCalled();
+	});
+});
+
+describe("GameView — résumé des touches", () => {
+	it("affiche le résumé des touches pour le joueur actif", () => {
+		renderGameView();
+		expect(screen.getByLabelText("Touches configurées")).toBeInTheDocument();
+	});
+
+	it("ne l'affiche pas pour un spectateur", () => {
+		renderGameView({ state: makeState({ spectator: "zoro", opponents: makeOpponents(2) }) });
+		expect(screen.queryByLabelText("Touches configurées")).toBeNull();
+	});
+});
+
+describe("GameView — bouton Rejouer (solo)", () => {
+	it("affiche Rejouer en solo et appelle onRestart au clic", () => {
+		const onRestart = vi.fn();
+		renderGameView({ roomName: "sologame_abc", onRestart });
+
+		const btn = screen.getByRole("button", { name: "🔄 Rejouer" });
+		btn.click();
+		expect(onRestart).toHaveBeenCalledTimes(1);
+	});
+
+	it("ne montre pas Rejouer hors solo", () => {
+		renderGameView({ roomName: "room-42", onRestart: vi.fn() });
+		expect(screen.queryByRole("button", { name: "🔄 Rejouer" })).toBeNull();
 	});
 });
 
