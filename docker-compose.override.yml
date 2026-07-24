@@ -1,0 +1,13 @@
+# Override AUTO-CHARGÉ par `docker compose` EN LOCAL uniquement (quand aucun `-f` n'est
+# passé, ce qui est le cas de `make prod` / `make dev`).
+#
+# But : republier le port hôte de backend-prod pour pouvoir lancer la PROD sur ta
+# machine (pas de reverse proxy en local, il faut donc un port publié pour y accéder).
+#
+# Coolify lance `docker compose -f docker-compose.yml … up` avec un `-f` EXPLICITE :
+# dans ce cas Docker Compose NE charge PAS l'override → aucun port hôte biné sur le
+# serveur partagé, donc aucune collision. Cet override ne s'applique donc qu'en local.
+services:
+  backend-prod:
+    ports:
+      - "${PORT:?PORT is required}:${PORT:?PORT is required}"
