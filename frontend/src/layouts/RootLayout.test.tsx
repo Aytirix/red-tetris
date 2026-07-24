@@ -6,6 +6,14 @@ vi.mock("../hooks/useAuthGuard", () => ({ useAuthGuard: vi.fn() }));
 vi.mock("../components/DevToolsMenu", () => ({
 	default: () => <span data-testid="dev-tools" />,
 }));
+// jsdom ne déclenche pas le chargement des <img> : on simule un préchargement qui
+// pousse la progression puis se termine, pour tester l'ouverture des nuages.
+vi.mock("../preload/bootPreload", () => ({
+	preloadBootImages: vi.fn((onProgress?: (r: number) => void) => {
+		onProgress?.(1);
+		return Promise.resolve();
+	}),
+}));
 
 import RootLayout from "./RootLayout";
 import { useAuthGuard } from "../hooks/useAuthGuard";
@@ -69,13 +77,18 @@ describe("RootLayout", () => {
 		expect(container.querySelector("main")?.className).toBe("page page-wide");
 	});
 
-	it("ouvre les nuages de démarrage après le premier paint", async () => {
+	it("précharge les images puis ouvre les nuages de démarrage", async () => {
 		const open = vi.fn();
+		const setProgress = vi.fn();
 		window.__openBootClouds = open;
+		window.__setBootProgress = setProgress;
 
 		renderAt("/");
 
 		await vi.waitFor(() => expect(open).toHaveBeenCalledTimes(1));
+		// La progression a été poussée sur les nuages avant l'ouverture.
+		expect(setProgress).toHaveBeenCalledWith(1);
 		delete window.__openBootClouds;
+		delete window.__setBootProgress;
 	});
 });

@@ -55,12 +55,46 @@
 				background: radial-gradient(circle at 50% 50%, rgba(248, 251, 255, 0.92), rgba(226, 236, 252, 0.78));
 				transition: opacity 800ms ease-out;
 			}
+			/* Indicateur de chargement (préchargement des images), centré sur les nuages. */
+			#boot-clouds .bc-progress {
+				position: absolute;
+				left: 50%;
+				top: 57%;
+				transform: translateX(-50%);
+				z-index: 1;
+				display: flex;
+				flex-direction: column;
+				align-items: center;
+				gap: 10px;
+				transition: opacity 400ms ease-out;
+			}
+			#boot-clouds .bc-progress__track {
+				width: 220px;
+				max-width: 62vw;
+				height: 6px;
+				border-radius: 999px;
+				background: rgba(120, 150, 190, 0.35);
+				overflow: hidden;
+			}
+			#boot-clouds .bc-progress__bar {
+				height: 100%;
+				width: 0%;
+				border-radius: 999px;
+				background: linear-gradient(90deg, #3de7ff, #1c78c0);
+				transition: width 220ms ease-out;
+			}
+			#boot-clouds .bc-progress__pct {
+				font: 600 13px/1 system-ui, -apple-system, sans-serif;
+				color: #37506e;
+				letter-spacing: 0.06em;
+			}
 			/* Ouverture : le fond de repli disparaît puis les bancs s'écartent et le
 			   voile se dissipe, révélant la page déjà peinte derrière. */
 			#boot-clouds.is-open { pointer-events: none; background-color: transparent; }
 			#boot-clouds.is-open .bc-bank--top { transform: translateY(-102%); }
 			#boot-clouds.is-open .bc-bank--bottom { transform: translateY(102%); }
 			#boot-clouds.is-open .bc-veil { opacity: 0; }
+			#boot-clouds.is-open .bc-progress { opacity: 0; }
 			@media (prefers-reduced-motion: reduce) {
 				#boot-clouds .bc-bank,
 				#boot-clouds .bc-veil { transition-duration: 150ms; }
@@ -74,6 +108,10 @@
 			<div class="bc-bank bc-bank--top"></div>
 			<div class="bc-bank bc-bank--bottom"></div>
 			<div class="bc-veil"></div>
+			<div class="bc-progress">
+				<div class="bc-progress__track"><div class="bc-progress__bar"></div></div>
+				<span class="bc-progress__pct">0%</span>
+			</div>
 		</div>
 
 		<div id="root"></div>
@@ -86,6 +124,8 @@
 			(function () {
 				var clouds = document.getElementById("boot-clouds");
 				if (!clouds) return;
+				var bar = clouds.querySelector(".bc-progress__bar");
+				var pct = clouds.querySelector(".bc-progress__pct");
 				var opened = false;
 				function open() {
 					if (opened) return;
@@ -95,8 +135,17 @@
 						if (clouds.parentNode) clouds.parentNode.removeChild(clouds);
 					}, 900);
 				}
+				// Progression du préchargement des images (0 → 1), pilotée par React.
+				window.__setBootProgress = function (ratio) {
+					var p = Math.max(0, Math.min(1, ratio || 0));
+					var v = Math.round(p * 100);
+					if (bar) bar.style.width = v + "%";
+					if (pct) pct.textContent = v + "%";
+				};
 				window.__openBootClouds = open;
-				window.setTimeout(open, 8000); // filet de sécurité si React ne signale jamais
+				// Filet de sécurité: on révèle le site même si le préchargement ne signale
+				// jamais sa fin (erreur JS, requêtes bloquées). Aligné sur le timeout côté React.
+				window.setTimeout(open, 30000);
 			})();
 		</script>
 	</body>
