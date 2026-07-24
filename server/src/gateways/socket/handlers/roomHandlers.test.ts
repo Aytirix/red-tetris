@@ -577,6 +577,29 @@ describe("roomHandlers", () => {
 			handleRoomStart(sockets.get("luffy")!, { anything: true });
 			expect(room.getStatus()).toBe("waiting");
 		});
+
+		it("refuse de lancer Sprint a moins de 2 joueurs et signale l'erreur", () => {
+			const { room, sockets } = seedRoom("salle1", ["luffy"]);
+			handleRoomMode(sockets.get("luffy")!, { mode: "sprint" });
+
+			handleRoomStart(sockets.get("luffy")!, undefined);
+			vi.advanceTimersByTime(3000);
+
+			expect(room.getStatus()).toBe("waiting");
+			expect(room.getGame()).toBeNull();
+			expect(lastEmit(sockets.get("luffy")!, "system:Error")![1]).toMatchObject({
+				message: "Le mode Sprint nécessite au moins 2 joueurs",
+			});
+		});
+
+		it("autorise Sprint des 2 joueurs", () => {
+			const { room, sockets } = seedRoom("salle1", ["luffy", "zoro"]);
+			handleRoomMode(sockets.get("luffy")!, { mode: "sprint" });
+
+			handleRoomStart(sockets.get("luffy")!, undefined);
+
+			expect(room.getStatus()).toBe("playing");
+		});
 	});
 
 	describe("handleMove / handleRotate / handleDrop", () => {

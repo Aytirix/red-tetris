@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { createFakeSocket, type FakeSocket } from "../../test/fakeSocket";
 import { AlertProvider } from "../components/Alert";
 import type { NormalizedUsernameAvailability } from "../socket/userState";
@@ -243,6 +243,44 @@ describe("GamePage — lobby", () => {
 		receive("room:settings", { mode: "sprint", private: false });
 
 		expect(container.querySelector(".game-lobby__mode-btn--active")?.textContent).toBe("Sprint");
+	});
+
+	it("affiche les regles du mode selectionne dans une card dediee", () => {
+		renderGamePage();
+		joinLobby([{ username: "luffy", faction: "pirate" }]);
+
+		// Classique par defaut.
+		const classiqueCard = screen.getByLabelText("Règles du mode Classique");
+		expect(within(classiqueCard).getByText(/dernier joueur encore en vie/i)).toBeInTheDocument();
+
+		// La card suit le mode choisi.
+		receive("room:settings", { mode: "ultra", private: false });
+		const ultraCard = screen.getByLabelText("Règles du mode Ultra");
+		expect(within(ultraCard).getByText(/2 minutes/i)).toBeInTheDocument();
+	});
+
+	it("empeche de lancer Sprint a moins de 2 joueurs", () => {
+		renderGamePage();
+		joinLobby([{ username: "luffy", faction: "pirate" }]);
+		receive("room:settings", { mode: "sprint", private: false });
+
+		const launch = screen.getByRole("button", { name: "▶ Lancer" });
+		expect(launch).toBeDisabled();
+		expect(screen.getByText(/Sprint nécessite au moins 2 joueurs/i)).toBeInTheDocument();
+
+		fireEvent.click(launch);
+		expect(roomEvents.emitStartGame).not.toHaveBeenCalled();
+	});
+
+	it("autorise le lancement de Sprint des 2 joueurs", () => {
+		renderGamePage();
+		joinLobby([
+			{ username: "luffy", faction: "pirate" },
+			{ username: "zoro", faction: "pirate" },
+		]);
+		receive("room:settings", { mode: "sprint", private: false });
+
+		expect(screen.getByRole("button", { name: "▶ Lancer" })).not.toBeDisabled();
 	});
 
 	it("ignore un mode inconnu envoye par le serveur", () => {

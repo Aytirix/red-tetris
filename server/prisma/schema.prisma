@@ -25,6 +25,16 @@ model User {
   wins          Int      @default(0)
   losses        Int      @default(0)
   berrys        Int      @default(0)
+  // Agregats de stats (cache d'affichage). La source de verite reste GameRecord :
+  // ces colonnes ne sont qu'un resume recalcule a chaque fin de partie pour eviter
+  // un GROUP BY sur tout l'historique a chaque lecture.
+  totalGames    Int      @default(0)
+  totalLines    Int      @default(0)
+  totalTetris   Int      @default(0)
+  bestScore     Int      @default(0)
+  // Temps de jeu cumule en millisecondes. Int suffit (~24 jours de jeu cumule avant
+  // debordement), ce qui evite les affres de serialisation JSON de BigInt.
+  playtimeMs    Int      @default(0)
   ownedThemes   String[] @default([])
   equippedTheme String   @default("neon-gem")
   createdAt DateTime @default(now())
@@ -36,5 +46,30 @@ model FactionStats {
   faction   Faction  @unique
   wins      Int      @default(0)
   losses    Int      @default(0)
+  tetris    Int      @default(0)
+  lines     Int      @default(0)
+  bestScore Int      @default(0)
   updatedAt DateTime @updatedAt
+}
+
+// Une ligne par partie terminee et par joueur : la source de verite dont toutes les
+// stats (individuelles, classements, factions, par mode) se recalculent. Les colonnes
+// agregees sur User/FactionStats n'en sont qu'un cache.
+model GameRecord {
+  id         Int      @id @default(autoincrement())
+  username   String
+  faction    Faction?
+  mode       String
+  score      Int
+  lines      Int
+  tetris     Int
+  level      Int
+  won        Boolean
+  durationMs Int
+  playedAt   DateTime @default(now())
+
+  @@index([username])
+  @@index([faction])
+  @@index([mode])
+  @@index([score])
 }

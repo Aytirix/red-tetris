@@ -5,13 +5,18 @@ import {
 	DEFAULT_KEY_BINDINGS,
 	formatKeyCode,
 	GAME_ACTIONS,
+	getLearnedKeyLabel,
 	loadKeyBindings,
 	loadKeyboardLayout,
+	recordKeyLabel,
+	resetLearnedLayout,
 	saveKeyBindings,
+	subscribeKeyLayout,
 } from "./keyBindings";
 
 beforeEach(() => {
 	localStorage.clear();
+	resetLearnedLayout();
 	vi.restoreAllMocks();
 });
 
@@ -143,6 +148,63 @@ describe("formatKeyCode — disposition clavier reelle", () => {
 describe("loadKeyboardLayout", () => {
 	it("renvoie null quand le navigateur n'expose pas l'API", async () => {
 		await expect(loadKeyboardLayout()).resolves.toBeNull();
+	});
+});
+
+describe("disposition APPRISE des frappes (sans API Keyboard Map)", () => {
+	it("affiche la vraie touche apprise d'une frappe reelle (AZERTY: KeyA -> Q)", () => {
+		// Sans rien appris, on retombe sur le libelle QWERTY generique.
+		expect(formatKeyCode("KeyA")).toBe("A");
+		// L'utilisateur presse la touche PHYSIQUE "KeyA" de son AZERTY: elle imprime "q".
+		recordKeyLabel("KeyA", "q");
+		expect(getLearnedKeyLabel("KeyA")).toBe("Q");
+		expect(formatKeyCode("KeyA")).toBe("Q");
+	});
+
+	it("la disposition apprise PRIME sur l'API Keyboard Map", () => {
+		recordKeyLabel("KeyW", "z");
+		// Meme si une API renvoyait autre chose, l'appris (clavier reel) l'emporte.
+		const menteur = { get: () => "x" };
+		expect(formatKeyCode("KeyW", menteur)).toBe("Z");
+	});
+
+	it("persiste dans localStorage et se recharge", () => {
+		recordKeyLabel("KeyA", "q");
+		resetLearnedLayout(); // vide le cache memoire, force une relecture du storage
+		expect(getLearnedKeyLabel("KeyA")).toBe("Q");
+	});
+
+	it("ignore les touches non imprimables et les codes non alphanumeriques", () => {
+		recordKeyLabel("KeyA", "Shift"); // pas un caractere unique
+		recordKeyLabel("ShiftLeft", "A"); // pas une touche Key*/Digit*
+		recordKeyLabel("KeyA", "Dead");
+		expect(getLearnedKeyLabel("KeyA")).toBeUndefined();
+		expect(getLearnedKeyLabel("ShiftLeft")).toBeUndefined();
+	});
+
+	it("apprend aussi les chiffres (rangee du haut)", () => {
+		recordKeyLabel("Digit1", "&"); // AZERTY: le "1" physique imprime "&" sans Shift
+		expect(formatKeyCode("Digit1")).toBe("&");
+	});
+
+	it("notifie les abonnes quand une nouvelle touche est apprise", () => {
+		const seen: string[] = [];
+		const unsubscribe = subscribeKeyLayout(() => seen.push("tick"));
+		recordKeyLabel("KeyA", "q");
+		recordKeyLabel("KeyA", "q"); // meme valeur -> pas de nouvelle notification
+		recordKeyLabel("KeyW", "z");
+		unsubscribe();
+		recordKeyLabel("KeyE", "e"); // plus abonne -> ignore
+		expect(seen).toHaveLength(2);
+	});
+
+	it("survit a un localStorage indisponible sans planter", () => {
+		vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+			throw new Error("quota");
+		});
+		expect(() => recordKeyLabel("KeyA", "q")).not.toThrow();
+		// La valeur reste utilisable en memoire pour la session.
+		expect(getLearnedKeyLabel("KeyA")).toBe("Q");
 	});
 });
 

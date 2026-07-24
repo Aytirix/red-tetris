@@ -8,14 +8,34 @@ vi.mock("../repositories/userRepositories.js", () => ({
 	setEquippedTheme: vi.fn(),
 }));
 
-import { buyThemeForUser, equipThemeForUser, getWalletState, resolveEquippedTheme, settleGameRewards } from "./shopService.js";
+// L'enregistrement des stats est testé à part (statsService.test) : ici on le neutralise
+// pour isoler la logique portefeuille et éviter tout accès à Prisma.
+vi.mock("./statsService.js", () => ({ recordGameResults: vi.fn() }));
+
+import { buyThemeForUser, equipThemeForUser, getWalletState, resolveEquippedTheme, settleGameRewards, type GameSettlementEntry } from "./shopService.js";
 import { creditBerrys, getWalletRow, purchaseThemeTx, setEquippedTheme } from "../repositories/userRepositories.js";
+import { recordGameResults } from "./statsService.js";
 import { DEFAULT_THEME_ID, SHOP_THEMES } from "../config/shopThemes.js";
 
 type FakeSocket = Socket & { emit: ReturnType<typeof vi.fn> };
 
 function makeSocket(id = "s1"): FakeSocket {
 	return { id, emit: vi.fn(), on: vi.fn() } as unknown as FakeSocket;
+}
+
+// Entrée de règlement complète (les stats prennent des valeurs neutres par défaut).
+function settleEntry(
+	username: string,
+	score: number,
+	socket: FakeSocket,
+	extra: Partial<GameSettlementEntry> = {},
+): GameSettlementEntry {
+	return {
+		username, score, socket,
+		faction: "pirate", mode: "classique", lines: 0, tetris: 0, level: 1,
+		won: false, hadWinner: false, durationMs: 0,
+		...extra,
+	};
 }
 
 describe("shopService", () => {
@@ -166,21 +186,27 @@ describe("shopService", () => {
 			const zoroSocket = makeSocket("s2");
 
 			await settleGameRewards([
-				{ username: "luffy", score: 900, socket: luffySocket },
-				{ username: "zoro", score: 300, socket: zoroSocket },
+				settleEntry("luffy", 900, luffySocket),
+				settleEntry("zoro", 300, zoroSocket),
 			]);
 
 			expect(creditBerrys).toHaveBeenCalledWith("luffy", 900);
 			expect(creditBerrys).toHaveBeenCalledWith("zoro", 300);
 			expect(luffySocket.emit).toHaveBeenCalledWith("shop:State", expect.objectContaining({ berrys: 900 }));
 			expect(zoroSocket.emit).toHaveBeenCalledWith("shop:State", expect.anything());
+			// Les résultats sont transmis à l'enregistrement des stats (sans le socket exploité).
+			expect(recordGameResults).toHaveBeenCalledTimes(1);
+			expect(vi.mocked(recordGameResults).mock.calls[0]![0]).toEqual([
+				expect.objectContaining({ username: "luffy", score: 900 }),
+				expect.objectContaining({ username: "zoro", score: 300 }),
+			]);
 		});
 
 		it("does not credit a score of 0 but still pushes the wallet", async () => {
 			vi.mocked(getWalletRow).mockResolvedValue(null);
 			const socket = makeSocket("s1");
 
-			await settleGameRewards([{ username: "luffy", score: 0, socket }]);
+			await settleGameRewards([settleEntry("luffy", 0, socket)]);
 
 			expect(creditBerrys).not.toHaveBeenCalled();
 			expect(socket.emit).toHaveBeenCalledWith("shop:State", expect.objectContaining({ berrys: 0 }));
@@ -193,8 +219,8 @@ describe("shopService", () => {
 			const zoroSocket = makeSocket("s2");
 
 			await expect(settleGameRewards([
-				{ username: "luffy", score: 100, socket: luffySocket },
-				{ username: "zoro", score: 200, socket: zoroSocket },
+				settleEntry("luffy", 100, luffySocket),
+				settleEntry("zoro", 200, zoroSocket),
 			])).resolves.toBeUndefined();
 
 			expect(luffySocket.emit).not.toHaveBeenCalled();

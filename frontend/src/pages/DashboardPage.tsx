@@ -7,6 +7,7 @@ import { useShop } from "../contexts/ShopContext";
 import DashboardParallaxScene from "../components/DashboardParallaxScene";
 import ShopScreen from "../components/ShopScreen";
 import KeyBindingsScreen from "../components/KeyBindingsScreen";
+import StatsScreen from "../components/StatsScreen";
 import { emitSubscribeRooms, emitUnsubscribeRooms } from "../socket/events/room";
 import styles from "./DashboardPage.module.scss";
 
@@ -18,7 +19,7 @@ type RoomInfo = {
 };
 
 type View = "home" | "multiplayer";
-type Screen = "dashboard" | "shop" | "keys";
+type Screen = "dashboard" | "shop" | "keys" | "stats";
 
 // Noms d'équipages de pirates One Piece pour nommer les salles automatiquement.
 // (≤ 10 car. pour laisser la place au suffixe _N sans dépasser 15.)
@@ -190,19 +191,32 @@ export default function DashboardPage() {
 	// Les parties solo ne doivent pas apparaître dans les salles disponibles.
 	const visibleRooms = rooms.filter((r) => !r.roomId.startsWith(SOLO_PREFIX));
 
+	// « Écrans secondaires » = tout sauf l'accueil : Boutique, Touches, Stats, Multijoueur.
+	// Ils partagent un unique bouton « Retour » en haut à gauche qui ramène à l'accueil.
+	const inSecondary =
+		screen === "shop" || screen === "keys" || screen === "stats" ||
+		(screen === "dashboard" && view === "multiplayer");
+
+	function goHome() {
+		setScreen("dashboard");
+		setView("home");
+	}
+
 	return (
 		<DashboardParallaxScene theme={theme}>
 			<div className={styles.wrapper}>
 
-				{/* ── Coin haut-gauche : Boutique + solde. L'écran Touches se veut épuré:
-				     ni boutique ni berrys. Le solde n'a de sens qu'à l'accueil et en boutique. ── */}
+				{/* ── Coin haut-gauche : sur un écran secondaire (Boutique / Touches / Stats /
+				     Multijoueur) un unique bouton « Retour » ramène à l'accueil. Sur l'accueil,
+				     c'est l'entrée Boutique + le solde. ── */}
 				<div className={styles.topLeft}>
-					{screen !== "keys" && (
-						<button
-							className="button button-outline"
-							onClick={() => setScreen((s) => (s === "shop" ? "dashboard" : "shop"))}
-						>
-							{screen === "shop" ? "← Jouer" : "🛒 Boutique"}
+					{inSecondary ? (
+						<button className="button button-outline" onClick={goHome}>
+							← Retour
+						</button>
+					) : (
+						<button className="button button-outline" onClick={() => setScreen("shop")}>
+							🛒 Boutique
 						</button>
 					)}
 					{(screen === "shop" || (screen === "dashboard" && view === "home")) && (
@@ -212,14 +226,17 @@ export default function DashboardPage() {
 					)}
 				</div>
 
-				{/* ── Coin haut-droite : Touches (masque en boutique, qui a son propre retour) ── */}
-				{screen !== "shop" && (
-					<button
-						className={`button button-outline ${styles.topRight}`}
-						onClick={() => setScreen((s) => (s === "keys" ? "dashboard" : "keys"))}
-					>
-						{screen === "keys" ? "← Jouer" : "⌨ Touches"}
-					</button>
+				{/* ── Coin haut-droite : entrées Touches + Stats, uniquement sur l'accueil
+				     (sur un écran secondaire, seul le bouton « Retour » subsiste). ── */}
+				{!inSecondary && (
+					<div className={styles.topRight} style={{ display: "flex", flexDirection: "column", gap: "0.5rem", alignItems: "flex-end" }}>
+						<button className="button button-outline" onClick={() => setScreen("keys")}>
+							⌨ Touches
+						</button>
+						<button className="button button-outline" onClick={() => setScreen("stats")}>
+							📊 Stats
+						</button>
+					</div>
 				)}
 
 				{/* ── Écran BOUTIQUE ── */}
@@ -227,6 +244,9 @@ export default function DashboardPage() {
 
 				{/* ── Écran TOUCHES ── */}
 				{screen === "keys" && <KeyBindingsScreen />}
+
+				{/* ── Écran STATISTIQUES ── */}
+				{screen === "stats" && <StatsScreen />}
 
 				{/* ── Accueil : panneau Solo / Multijoueur ── */}
 				{screen === "dashboard" && view === "home" && (
@@ -254,14 +274,6 @@ export default function DashboardPage() {
 				{screen === "dashboard" && view === "multiplayer" && (
 					<div className={styles.mpScreen}>
 						<div className={styles.mpInner}>
-							<button
-								className={styles.mpBack}
-								onClick={() => setView("home")}
-								title="Retour"
-							>
-								&#8592;
-							</button>
-
 							<div className={styles.mpHead}>
 								<p className="eyebrow">Multijoueur</p>
 								<h2 className={styles.mpTitle}>Salles disponibles</h2>

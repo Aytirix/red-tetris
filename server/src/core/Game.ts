@@ -44,6 +44,8 @@ export class Game {
 	private isOver: boolean;
 	// Mode ultra: instant (ms) de fin de la partie. null pour les autres modes.
 	private deadline: number | null;
+	// Horodatage de création de la partie : sert à calculer la durée jouée (stats).
+	private readonly startedAt: number;
 	constructor (mode: GameMode, players: Player[], room: Room) {
 		this.mode = mode;
 		this.players = players;
@@ -53,12 +55,14 @@ export class Game {
 		this.intervalId = null
 		this.isOver = false
 		this.deadline = null
+		this.startedAt = Date.now()
 		for (const player of players) {
 			this.state.set(player.getSocketId(), {
 					board: this.createBoard(),//fonction create board,
 					score: 0,
 					level: 1,
 					lines: 0,
+					tetris: 0,
 					lockedAt: this.createLockGrid(),
 					jokersLeft: INVISIBLE_JOKER_COUNT,
 					revealUntil: 0,
@@ -321,6 +325,10 @@ export class Game {
 		playerState.lockedAt = [...emptyLocks, ...keptLocks]
 		playerState.score += clearedLines * 100
 		playerState.lines += clearedLines
+		// Un « Tetris » = 4 lignes nettoyées d'un seul coup (le maximum). On compte
+		// l'événement, pas les lignes, pour la statistique dédiée.
+		if (clearedLines === 4)
+			playerState.tetris++
 		// Mode invisible: chaque ligne completee redonne 2s de visibilite totale, qui
 		// s'estompe ensuite progressivement comme une brique posee.
 		if (clearedLines > 0)
@@ -555,12 +563,24 @@ export class Game {
 		const winner = endedByMode
 			? modeWinner
 			: (!isSolo && alivePlayers[0] ? alivePlayers[0].player.getName() : null)
-		// Crédit du butin: chaque joueur gagne son score final en berrys (persisté DB).
+		// Règlement de fin de partie: chaque joueur gagne son score en berrys ET son
+		// résultat est enregistré pour les statistiques. `hadWinner` vaut false en solo
+		// ou partie sans vainqueur -> ne compte pas comme une défaite dans le ratio.
 		// Appelé une seule fois par partie (interval nettoyé + break dans tick()).
+		const hadWinner = winner !== null
+		const durationMs = Math.max(0, Date.now() - this.startedAt)
 		const rewardEntries = [...this.state.values()].map((playerState) => ({
 			username: playerState.player.getName(),
 			score: playerState.score,
 			socket: playerState.player.getSocket(),
+			faction: playerState.player.getFaction(),
+			mode: this.mode,
+			lines: playerState.lines,
+			tetris: playerState.tetris,
+			level: playerState.level,
+			won: hadWinner && playerState.player.getName() === winner,
+			hadWinner,
+			durationMs,
 		}))
 		void settleGameRewards(rewardEntries)
 		// emitGameOver notifie AUSSI les spectateurs purs (jamais presents dans state):

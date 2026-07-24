@@ -9,7 +9,9 @@ GID := $(shell id -g)
 export UID
 export GID
 
-.PHONY: help dev dev-build dev-down dev-logs prod prod-build prod-down prod-logs down clean test test-server test-front test-watch-server test-watch-front node_modules-server node_modules-front
+BACKEND_DEV := backend-dev
+
+.PHONY: help dev dev-build dev-down dev-logs prod prod-build prod-down prod-logs down clean test test-server test-front test-watch-server test-watch-front node_modules-server node_modules-front db-reset db-seed
 
 help: ## Affiche cette aide
 	@printf "\n"
@@ -33,6 +35,10 @@ help: ## Affiche cette aide
 	@printf "  \033[36m%-18s\033[0m %s\n" "test-front" "Tests + couverture du frontend uniquement"
 	@printf "  \033[36m%-18s\033[0m %s\n" "test-watch-server" "Tests du serveur en mode watch"
 	@printf "  \033[36m%-18s\033[0m %s\n" "test-watch-front" "Tests du frontend en mode watch"
+	@printf "\n"
+	@printf "\033[1mBase de donnees\033[0m\n"
+	@printf "  \033[36m%-12s\033[0m %s\n" "db-reset" "Reset la base (migrations) puis la repeuple avec le seed"
+	@printf "  \033[36m%-12s\033[0m %s\n" "db-seed" "Repeuple la base avec le seed (sans reset)"
 	@printf "\n"
 	@printf "\033[1mMaintenance\033[0m\n"
 	@printf "  \033[36m%-12s\033[0m %s\n" "down" "Stoppe les stacks dev et prod sans supprimer les volumes"
@@ -89,6 +95,14 @@ node_modules-server:
 
 node_modules-front:
 	@[ -d frontend/node_modules ] || (printf "Installation des dependances frontend...\n" && cd frontend && npm ci)
+
+db-reset: ## Reset la base (drop + rejoue les migrations) puis la repeuple avec le seed
+	@printf "\n\033[1;38;5;216m>>> Reset de la base + seed\033[0m\n"
+	$(COMPOSE) $(DEV_PROFILE) run --rm $(BACKEND_DEV) sh -c "npx prisma migrate reset --force && npm run seed"
+
+db-seed: ## Repeuple la base avec le seed (personnages One Piece + fausses stats)
+	@printf "\n\033[1;38;5;216m>>> Seed de la base\033[0m\n"
+	$(COMPOSE) $(DEV_PROFILE) run --rm $(BACKEND_DEV) npm run seed
 
 down: ## Stoppe les stacks dev et prod sans supprimer les volumes
 	$(COMPOSE) $(ALL_PROFILES) down --remove-orphans

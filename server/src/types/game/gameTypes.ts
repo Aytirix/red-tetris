@@ -53,6 +53,8 @@ export type PlayerGameState = {
 	level: number;
 	// Total de lignes nettoyees (objectif du mode sprint).
 	lines: number;
+	// Nombre de « Tetris » realises (4 lignes nettoyees d'un coup). Statistiques.
+	tetris: number;
 	// Instant de verrouillage (ms) de chaque cellule, aligne sur `board`. 0 = pas de
 	// verrouillage horodate (case vide ou ligne de penalite). Sert au fondu du mode
 	// invisible; decale en meme temps que le plateau (lignes completees / penalites).

@@ -60,6 +60,72 @@ export async function loadKeyboardLayout(): Promise<KeyboardLayoutMap | null> {
 	}
 }
 
+// --- Disposition APPRISE ------------------------------------------------------
+// L'API Keyboard Map (navigator.keyboard) n'est pas exposée par tous les navigateurs
+// (absente sur Chrome/Linux ici). Sans elle, "KeyA" s'affichait "A" alors qu'un clavier
+// AZERTY imprime un "Q" sur cette touche physique.
+// Parade indépendante de l'API: `KeyboardEvent.key` donne le caractère RÉELLEMENT imprimé
+// (« q » pour la touche physique "KeyA" en AZERTY). On mémorise `code → caractère` à chaque
+// frappe et on le persiste, pour afficher la vraie touche du clavier du joueur.
+const LAYOUT_STORAGE_KEY = "keyLayout";
+let learnedLayout: Record<string, string> | null = null;
+const layoutSubscribers = new Set<() => void>();
+
+function loadLearnedLayout(): Record<string, string> {
+	if (learnedLayout) return learnedLayout;
+	learnedLayout = {};
+	try {
+		const raw = localStorage.getItem(LAYOUT_STORAGE_KEY);
+		if (raw) {
+			const parsed: unknown = JSON.parse(raw);
+			if (parsed && typeof parsed === "object") {
+				for (const [code, value] of Object.entries(parsed as Record<string, unknown>))
+					if (typeof value === "string" && value.length > 0) learnedLayout[code] = value;
+			}
+		}
+	} catch {
+		// localStorage indisponible / JSON corrompu : on repart d'une carte vide.
+	}
+	return learnedLayout;
+}
+
+/**
+ * Mémorise le caractère imprimé d'une touche physique, appris d'une frappe réelle.
+ * Seules les touches alphanumériques bénéficient de la disposition (AZERTY/QWERTY) ;
+ * les touches spéciales (Espace, flèches, Shift…) ont un libellé fixe.
+ */
+export function recordKeyLabel(code: string, key: string): void {
+	if (!code.startsWith("Key") && !code.startsWith("Digit")) return;
+	// `key` doit être un unique caractère imprimable ("q", "1"…), pas "Shift"/"Dead"/etc.
+	if (typeof key !== "string" || key.length !== 1) return;
+	const normalized = key.toUpperCase();
+	const map = loadLearnedLayout();
+	if (map[code] === normalized) return;
+	map[code] = normalized;
+	try {
+		localStorage.setItem(LAYOUT_STORAGE_KEY, JSON.stringify(map));
+	} catch {
+		// Persistance impossible : la carte reste valable pour la session en cours.
+	}
+	for (const notify of layoutSubscribers) notify();
+}
+
+/** Caractère appris pour une touche physique, ou undefined si jamais frappée. */
+export function getLearnedKeyLabel(code: string): string | undefined {
+	return loadLearnedLayout()[code];
+}
+
+/** Vide le cache mémoire de la disposition apprise (isolation des tests). */
+export function resetLearnedLayout(): void {
+	learnedLayout = null;
+}
+
+/** S'abonne aux mises à jour de la disposition apprise (pour re-render). */
+export function subscribeKeyLayout(callback: () => void): () => void {
+	layoutSubscribers.add(callback);
+	return () => layoutSubscribers.delete(callback);
+}
+
 /**
  * Libellé lisible d'un `KeyboardEvent.code`, dans la disposition du joueur quand
  * elle est connue (AZERTY : "KeyW" → « Z »).
@@ -72,6 +138,12 @@ export function formatKeyCode(code: string, layout?: KeyboardLayoutMap | null): 
 	if (code === "ArrowUp") return "↑";
 	if (code === "ArrowDown") return "↓";
 
+	// 1) Disposition APPRISE des frappes réelles : la plus fiable (reflète le vrai
+	//    clavier du joueur même quand l'API Keyboard Map est absente du navigateur).
+	const learned = getLearnedKeyLabel(code);
+	if (learned) return learned;
+
+	// 2) API Keyboard Map, quand le navigateur l'expose.
 	const printed = layout?.get(code);
 	if (printed && printed.trim().length > 0 && printed.trim().length <= 2)
 		return printed.trim().toUpperCase();
