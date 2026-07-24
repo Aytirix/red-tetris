@@ -25,8 +25,12 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.prod
-    ports:
-      - "0.0.0.0:${PORT:?PORT is required}:${PORT:?PORT is required}"
+    # Pas de publication de port HÔTE : sur un serveur Coolify partagé, binder un port
+    # fixe (3000) collisionne avec les autres stacks. Le reverse proxy de Coolify route
+    # le domaine vers ce port INTERNE. `expose` = joignable via le réseau Docker / le
+    # proxy uniquement, sans binding hôte.
+    expose:
+      - "${PORT:?PORT is required}"
     environment:
       HOST: ${HOST:?HOST is required}
       PORT: ${PORT:?PORT is required}
