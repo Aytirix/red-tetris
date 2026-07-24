@@ -7,9 +7,11 @@ type Props = {
 	cellSize?: number;
 	ghost?: GhostCell[];
 	ghostPiece?: PieceType | null;
+	/** Mode invisible : opacité par cellule, alignée sur `board`. */
+	fade?: number[][] | null;
 };
 
-export default function GameBoard({ board, cellSize = 30, ghost, ghostPiece }: Props) {
+export default function GameBoard({ board, cellSize = 30, ghost, ghostPiece, fade }: Props) {
 	const rows = board.length;
 	const cols = board[0]?.length ?? 0;
 
@@ -29,12 +31,14 @@ export default function GameBoard({ board, cellSize = 30, ghost, ghostPiece }: P
 			{board.map((row, y) =>
 				row.map((cell, x) => {
 					const isGhost = cell === 0 && ghostPiece != null && ghostSet.has(`${y}-${x}`);
+					const cellOpacity = fade?.[y]?.[x];
 					return (
 						<Cell
 							key={`${y}-${x}`}
 							cell={cell}
 							size={cellSize}
 							ghost={isGhost ? ghostPiece : undefined}
+							opacity={cellOpacity}
 						/>
 					);
 				}),

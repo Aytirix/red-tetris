@@ -1,3 +1,5 @@
+# Dependances (toutes profondeurs, y compris la racine)
+node_modules/
 # Frontend
 frontend/node_modules
 frontend/dist

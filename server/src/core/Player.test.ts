@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import type { Socket } from "socket.io";
 import { Player } from "./Player.js";
 import type { Game } from "./Game.js";
+import { DEFAULT_THEME_ID } from "../config/shopThemes.js";
 
 function makeSocket(id: string): Socket {
 	return {
@@ -49,5 +50,17 @@ describe("Player", () => {
 		expect(player.getInGame()).toBe(true);
 		player.setInGame(false);
 		expect(player.getInGame()).toBe(false);
+	});
+});
+
+describe("Player — cosmetique", () => {
+	it("retombe sur le theme par defaut sans precision", () => {
+		const player = new Player("luffy", makeSocket("s1"), "luffy", "pirate");
+		expect(player.getTheme()).toBe(DEFAULT_THEME_ID);
+	});
+
+	it("porte le theme equipe, vu par les spectateurs de son plateau", () => {
+		const player = new Player("luffy", makeSocket("s1"), "luffy", "pirate", "synthwave");
+		expect(player.getTheme()).toBe("synthwave");
 	});
 });

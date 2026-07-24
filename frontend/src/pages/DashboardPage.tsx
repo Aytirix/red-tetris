@@ -6,6 +6,7 @@ import { useSocket } from "../contexts/SocketContext";
 import { useShop } from "../contexts/ShopContext";
 import DashboardParallaxScene from "../components/DashboardParallaxScene";
 import ShopScreen from "../components/ShopScreen";
+import KeyBindingsScreen from "../components/KeyBindingsScreen";
 import { emitSubscribeRooms, emitUnsubscribeRooms } from "../socket/events/room";
 import styles from "./DashboardPage.module.scss";
 
@@ -17,7 +18,7 @@ type RoomInfo = {
 };
 
 type View = "home" | "multiplayer";
-type Screen = "dashboard" | "shop";
+type Screen = "dashboard" | "shop" | "keys";
 
 // Noms d'équipages de pirates One Piece pour nommer les salles automatiquement.
 // (≤ 10 car. pour laisser la place au suffixe _N sans dépasser 15.)
@@ -105,6 +106,11 @@ const CREW_NAMES = [
 
 const SOLO_PREFIX = "sologame_";
 
+// Identifiant de salle accepté par le serveur: [a-zA-Z0-9_], 15 caractères max.
+export function toRoomId(name: string): string {
+	return name.replace(/[^a-zA-Z0-9_]/g, "_").slice(0, 15);
+}
+
 export default function DashboardPage() {
 	const { faction } = useWsSession();
 	const { socket } = useSocket();
@@ -115,7 +121,6 @@ export default function DashboardPage() {
 	// screen = dashboard | shop → on switch les composants SANS quitter la page
 	// (le fond parallax reste monté). view = sous-vue du dashboard.
 	const [screen, setScreen] = useState<Screen>("dashboard");
-	const [hideUI, setHideUI] = useState(false);
 	const [view, setView] = useState<View>("home");
 	const [rooms, setRooms] = useState<RoomInfo[]>([]);
 	const [roomsLoading, setRoomsLoading] = useState(true);
@@ -157,12 +162,18 @@ export default function DashboardPage() {
 	}
 
 	// Choisit un nom d'équipage libre (aléatoire); si tous pris, ajoute _1, _2, …
+	// Les noms d'équipage contenant une espace (« Straw Hat ») doivent être
+	// normalisés: le serveur n'accepte que [a-zA-Z0-9_] (15 max) et refuserait le
+	// join, laissant la page tourner indéfiniment sur « Connexion à la room… ».
+	// La normalisation est faite AVANT la comparaison aux salles existantes, sinon
+	// l'unicité serait testée sur des noms qui ne sont pas ceux envoyés au serveur.
 	function pickRoomName(): string {
 		const taken = new Set(rooms.map((r) => r.roomId));
-		const free = CREW_NAMES.filter((n) => !taken.has(n));
+		const candidates = CREW_NAMES.map(toRoomId);
+		const free = candidates.filter((n) => !taken.has(n));
 		if (free.length > 0) return free[Math.floor(Math.random() * free.length)];
 		for (let i = 1; i < 1000; i++) {
-			const freeSuffixed = CREW_NAMES.map((n) => `${n}_${i}`).filter((c) => !taken.has(c));
+			const freeSuffixed = candidates.map((n) => toRoomId(`${n}_${i}`)).filter((c) => !taken.has(c));
 			if (freeSuffixed.length > 0) return freeSuffixed[Math.floor(Math.random() * freeSuffixed.length)];
 		}
 		return `Crew_${Math.random().toString(36).slice(2, 7)}`;
@@ -183,34 +194,42 @@ export default function DashboardPage() {
 		<DashboardParallaxScene theme={theme}>
 			<div className={styles.wrapper}>
 
-				{/* ── Coin haut-gauche : Boutique (switch d'écran) + solde ── */}
+				{/* ── Coin haut-gauche : Boutique + solde. L'écran Touches se veut épuré:
+				     ni boutique ni berrys. Le solde n'a de sens qu'à l'accueil et en boutique. ── */}
 				<div className={styles.topLeft}>
-					<button
-						className="button button-outline"
-						onClick={() => setScreen((s) => (s === "shop" ? "dashboard" : "shop"))}
-					>
-						{screen === "shop" ? "← Jouer" : "🛒 Boutique"}
-					</button>
-					<span className={styles.balance} title="Cumul de tes scores de fin de partie">
-						{berrys.toLocaleString()} ฿
-					</span>
+					{screen !== "keys" && (
+						<button
+							className="button button-outline"
+							onClick={() => setScreen((s) => (s === "shop" ? "dashboard" : "shop"))}
+						>
+							{screen === "shop" ? "← Jouer" : "🛒 Boutique"}
+						</button>
+					)}
+					{(screen === "shop" || (screen === "dashboard" && view === "home")) && (
+						<span className={styles.balance} title="Cumul de tes scores de fin de partie">
+							{berrys.toLocaleString()} ฿
+						</span>
+					)}
 				</div>
 
-				{/* ── Cacher : haut-droite, uniquement sur l'accueil du dashboard ── */}
-				{screen === "dashboard" && view === "home" && (
+				{/* ── Coin haut-droite : Touches (masque en boutique, qui a son propre retour) ── */}
+				{screen !== "shop" && (
 					<button
-						className={`button button-ghost ${styles.hideBtn}`}
-						onClick={() => setHideUI((h) => !h)}
+						className={`button button-outline ${styles.topRight}`}
+						onClick={() => setScreen((s) => (s === "keys" ? "dashboard" : "keys"))}
 					>
-						{hideUI ? "Afficher" : "Cacher"}
+						{screen === "keys" ? "← Jouer" : "⌨ Touches"}
 					</button>
 				)}
 
 				{/* ── Écran BOUTIQUE ── */}
 				{screen === "shop" && <ShopScreen />}
 
+				{/* ── Écran TOUCHES ── */}
+				{screen === "keys" && <KeyBindingsScreen />}
+
 				{/* ── Accueil : panneau Solo / Multijoueur ── */}
-				{screen === "dashboard" && view === "home" && !hideUI && (
+				{screen === "dashboard" && view === "home" && (
 					<div className={`${styles.panel} ${theme === "marine" ? styles.panelMarine : ""}`}>
 						<p className="eyebrow">
 							{theme === "pirate" ? "Pirates" : "Marines"}
@@ -249,11 +268,14 @@ export default function DashboardPage() {
 								<p className={styles.mpHint}>Rejoins une salle existante ou crée la tienne.</p>
 							</div>
 
-							{/* Créer une salle — nom d'équipage One Piece attribué automatiquement */}
+							{/* Créer une salle — nom d'équipage One Piece attribué automatiquement.
+							    Désactivé tant que la liste n'est pas arrivée: sans elle `taken` est
+							    vide et le tirage pourrait viser une salle déjà occupée. */}
 							<button
 								className="button button-primary"
 								style={{ width: "100%" }}
 								onClick={handleCreateRoom}
+								disabled={roomsLoading}
 							>
 								+ Créer une salle
 							</button>

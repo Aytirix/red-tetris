@@ -1,11 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { GameBoardCell, GameStatePayload, OpponentBoard } from "../../types/game";
+import { DEFAULT_KEY_BINDINGS } from "../../config/keyBindings";
 
 const gameEvents = vi.hoisted(() => ({
 	emitGameMove: vi.fn(),
 	emitGameRotate: vi.fn(),
 	emitGameDrop: vi.fn(),
+	emitGameJoker: vi.fn(),
 	emitSubscribeSpectator: vi.fn(),
 	emitUnsubscribeSpectator: vi.fn(),
 }));
@@ -44,6 +46,13 @@ function makeState(overrides: Partial<GameStatePayload> = {}): GameStatePayload 
 		level: 3,
 		spectator: false,
 		ghost: [],
+		mode: "classique",
+		lines: 0,
+		linesTarget: null,
+		timeLeftMs: null,
+		fade: null,
+		jokersLeft: 0,
+		theme: null,
 		...overrides,
 	};
 }
@@ -366,5 +375,81 @@ describe("GameView — secousse à la réception de lignes de pénalité", () =>
 
 		fireEvent.animationEnd(wrapOf(container));
 		expect(wrapOf(container).className).not.toContain("--shake");
+	});
+});
+
+describe("GameView — touches personnalisables et joker", () => {
+	beforeEach(() => localStorage.clear());
+
+	it("declenche le joker sur la touche par defaut", () => {
+		render(<GameView state={makeState({ mode: "invisible", jokersLeft: 3 })} roomName="salle" playerName="luffy" />);
+
+		fireEvent.keyDown(window, { code: "KeyJ" });
+
+		expect(gameEvents.emitGameJoker).toHaveBeenCalledTimes(1);
+	});
+
+	it("ne repete pas le joker si la touche reste enfoncee", () => {
+		render(<GameView state={makeState({ mode: "invisible" })} roomName="salle" playerName="luffy" />);
+
+		fireEvent.keyDown(window, { code: "KeyJ" });
+		fireEvent.keyDown(window, { code: "KeyJ", repeat: true });
+
+		expect(gameEvents.emitGameJoker).toHaveBeenCalledTimes(1);
+	});
+
+	it("respecte une touche reassignee par le joueur", () => {
+		localStorage.setItem("keyBindings", JSON.stringify({ ...DEFAULT_KEY_BINDINGS, rotate: "KeyW" }));
+		render(<GameView state={makeState()} roomName="salle" playerName="luffy" />);
+
+		fireEvent.keyDown(window, { code: "KeyW" });
+		expect(gameEvents.emitGameRotate).toHaveBeenCalledTimes(1);
+
+		// L'ancienne touche n'agit plus.
+		fireEvent.keyDown(window, { code: "ArrowUp" });
+		expect(gameEvents.emitGameRotate).toHaveBeenCalledTimes(1);
+	});
+
+	it("affiche les jokers restants et la touche associee en mode invisible", () => {
+		render(<GameView state={makeState({ mode: "invisible", jokersLeft: 2 })} roomName="salle" playerName="luffy" />);
+
+		expect(screen.getByText("Jokers · J")).toBeInTheDocument();
+		expect(screen.getByText("★★☆")).toBeInTheDocument();
+	});
+
+	it("n'affiche pas les jokers hors mode invisible", () => {
+		const { container } = render(<GameView state={makeState()} roomName="salle" playerName="luffy" />);
+		expect(container.querySelector(".tetris-hud__jokers")).toBeNull();
+	});
+});
+
+describe("GameView — cosmetique en spectateur", () => {
+	it("affiche le theme DU JOUEUR OBSERVE, pas le sien", () => {
+		const { container } = render(
+			<GameView
+				state={makeState({ spectator: "zoro", theme: "synthwave" })}
+				roomName="salle"
+				playerName="luffy"
+			/>,
+		);
+
+		// Le contexte boutique local est "neon-gem" (mock) -> on doit voir "synth".
+		expect((container.querySelector(".tetris-stage") as HTMLElement).getAttribute("data-recipe")).toBe("synth");
+	});
+
+	it("retombe sur son propre theme si le serveur n'en fournit pas", () => {
+		const { container } = render(
+			<GameView state={makeState({ spectator: "zoro", theme: null })} roomName="salle" playerName="luffy" />,
+		);
+
+		expect((container.querySelector(".tetris-stage") as HTMLElement).getAttribute("data-recipe")).toBe("neon");
+	});
+
+	it("garde son propre theme sur son propre plateau", () => {
+		const { container } = render(
+			<GameView state={makeState({ theme: "synthwave" })} roomName="salle" playerName="luffy" />,
+		);
+
+		expect((container.querySelector(".tetris-stage") as HTMLElement).getAttribute("data-recipe")).toBe("neon");
 	});
 });

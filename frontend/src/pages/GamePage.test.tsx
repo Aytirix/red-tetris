@@ -225,13 +225,40 @@ describe("GamePage — lobby", () => {
 		expect(roomEvents.emitStartGame).toHaveBeenCalledTimes(1);
 	});
 
-	it("n'affiche plus de selecteur de mode de jeu", () => {
+	it("propose les cinq modes de jeu et laisse l'admin en choisir un", () => {
 		const { container } = renderGamePage();
 		joinLobby([{ username: "luffy", faction: "pirate" }]);
 
-		expect(container.querySelector(".game-lobby__mode-list")).toBeNull();
-		expect(screen.queryByRole("button", { name: "Sprint" })).toBeNull();
-		expect(screen.queryByRole("button", { name: "Ultra" })).toBeNull();
+		expect(container.querySelectorAll(".game-lobby__mode-btn")).toHaveLength(5);
+		for (const label of ["Classique", "Sprint", "Ultra", "Sudden Death", "Invisible"])
+			expect(screen.getByRole("button", { name: label })).toBeInTheDocument();
+
+		fireEvent.click(screen.getByRole("button", { name: "Invisible" }));
+		expect(roomEvents.emitSetGameMode).toHaveBeenCalledWith("invisible");
+	});
+
+	it("reflete le mode recu du serveur", () => {
+		const { container } = renderGamePage();
+		joinLobby([{ username: "luffy", faction: "pirate" }]);
+		receive("room:settings", { mode: "sprint", private: false });
+
+		expect(container.querySelector(".game-lobby__mode-btn--active")?.textContent).toBe("Sprint");
+	});
+
+	it("ignore un mode inconnu envoye par le serveur", () => {
+		const { container } = renderGamePage();
+		joinLobby([{ username: "luffy", faction: "pirate" }]);
+		receive("room:settings", { mode: "hardcore", private: false });
+
+		expect(container.querySelector(".game-lobby__mode-btn--active")?.textContent).toBe("Classique");
+	});
+
+	it("n'emet pas de changement de mode pour un joueur non admin", () => {
+		renderGamePage();
+		joinLobby([{ username: "zoro", faction: "pirate" }, { username: "luffy", faction: "pirate" }]);
+
+		fireEvent.click(screen.getByRole("button", { name: "Sprint" }));
+		expect(roomEvents.emitSetGameMode).not.toHaveBeenCalled();
 	});
 
 	it("reflete la visibilite recue du serveur", () => {
@@ -651,5 +678,26 @@ describe("GamePage — sortie de room", () => {
 
 		expect(ctx.navigate).toHaveBeenCalledWith("/dashboard");
 		expect(await screen.findByText("Partie privée")).toBeInTheDocument();
+	});
+});
+
+describe("GamePage — join refuse", () => {
+	it("redirige au lieu de charger indefiniment quand le serveur refuse le join", async () => {
+		renderGamePage();
+		expect(screen.getByText("Connexion à la room…")).toBeInTheDocument();
+
+		receive("system:Error", { event: "room:join", message: "Invalid roomId" });
+
+		expect(ctx.navigate).toHaveBeenCalledWith("/dashboard");
+		expect(await screen.findByText("Salle inaccessible")).toBeInTheDocument();
+	});
+
+	it("ignore les erreurs qui ne concernent pas le join", () => {
+		renderGamePage();
+
+		receive("system:Error", { event: "room:setMode", message: "Invalid Mode or Not Host" });
+
+		expect(ctx.navigate).not.toHaveBeenCalled();
+		expect(screen.getByText("Connexion à la room…")).toBeInTheDocument();
 	});
 });

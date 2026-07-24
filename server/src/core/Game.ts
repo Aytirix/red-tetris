@@ -1,4 +1,20 @@
-import { BOARD_HEIGHT, BOARD_WIDTH, type Board, type Cell, type PieceType, type PlayerGameState } from "../types/game/gameTypes.js";
+import {
+	BOARD_HEIGHT,
+	BOARD_WIDTH,
+	INVISIBLE_FADE_MS,
+	INVISIBLE_JOKER_COUNT,
+	INVISIBLE_JOKER_REVEAL_MS,
+	INVISIBLE_REVEAL_CAP_MS,
+	INVISIBLE_REVEAL_PER_LINE_MS,
+	SPRINT_TARGET_LINES,
+	SUDDEN_DEATH_TICK_MS,
+	ULTRA_DURATION_MS,
+	type Board,
+	type Cell,
+	type GameMode,
+	type PieceType,
+	type PlayerGameState,
+} from "../types/game/gameTypes.js";
 import type { Player } from "./Player.js";
 import { pieces, PIECES_TYPES, type PieceCell, type PieceShape } from "../types/game/piecesGameTypes.js";
 import { emitGameOver, emitGameStart, emitGameUpdate, emitPlayerEliminated, emitSpectatorForPlayer, getRenderedBoard } from "../gateways/socket/emitters/gameEmitters.js";
@@ -16,7 +32,7 @@ export class Game {
 	private static readonly ROTATION_KICKS: ReadonlyArray<readonly [number, number]> = [
 		[0, 0], [-1, 0], [1, 0], [-2, 0], [2, 0], [-3, 0], [3, 0],
 	]
-	public mode: "classique"
+	public mode: GameMode
 	public players: Player[];
 	private room: Room;
 	private state: Map<string, PlayerGameState>;
@@ -26,7 +42,9 @@ export class Game {
 	// depart d'un joueur): ce drapeau garantit qu'une partie ne se termine qu'une fois,
 	// donc pas de double game:over ni de double credit de berrys.
 	private isOver: boolean;
-	constructor (mode: "classique", players: Player[], room: Room) {
+	// Mode ultra: instant (ms) de fin de la partie. null pour les autres modes.
+	private deadline: number | null;
+	constructor (mode: GameMode, players: Player[], room: Room) {
 		this.mode = mode;
 		this.players = players;
 		this.room = room;
@@ -34,14 +52,20 @@ export class Game {
 		this.pieceQueue = this.randomPiece()
 		this.intervalId = null
 		this.isOver = false
+		this.deadline = null
 		for (const player of players) {
 			this.state.set(player.getSocketId(), {
 					board: this.createBoard(),//fonction create board,
 					score: 0,
 					level: 1,
+					lines: 0,
+					lockedAt: this.createLockGrid(),
+					jokersLeft: INVISIBLE_JOKER_COUNT,
+					revealUntil: 0,
 					pieceIndex: 0,
 				player: player,
 				isAlive: true,
+				hasAbandoned: false,
 				spectator: false,
 			});
 			player.setGame(this)
@@ -51,6 +75,89 @@ export class Game {
 	createBoard() : Board {
 		const board: Board = Array.from({length: BOARD_HEIGHT}, () => Array.from({length: BOARD_WIDTH}, () => 0))
 		return board;
+	}
+	// Grille d'horodatage alignee sur le plateau (0 = aucun verrouillage horodate).
+	createLockGrid() : number[][] {
+		return Array.from({ length: BOARD_HEIGHT }, () => Array.from({ length: BOARD_WIDTH }, () => 0))
+	}
+	createEmptyLockRow() : number[] {
+		return Array.from({ length: BOARD_WIDTH }, () => 0)
+	}
+	getMode() : GameMode {
+		return this.mode
+	}
+	// Temps restant (ms) en mode ultra, null sinon. Envoye au client pour le chrono.
+	getTimeLeftMs() : number | null {
+		if (this.deadline === null)
+			return null
+		return Math.max(0, this.deadline - Date.now())
+	}
+	// Objectif de lignes du mode sprint, null pour les autres modes.
+	getLinesTarget() : number | null {
+		return this.mode === "sprint" ? SPRINT_TARGET_LINES : null
+	}
+	/**
+	 * Mode invisible: opacite de chaque cellule deja verrouillee. Une piece posee
+	 * s'efface progressivement et devient invisible au bout de INVISIBLE_FADE_MS,
+	 * tout en restant solide. Les cases sans horodatage (vides, lignes de penalite)
+	 * et la piece en chute restent pleinement visibles.
+	 */
+	getFadeGrid(playerState: PlayerGameState) : number[][] | null {
+		if (this.mode !== "invisible")
+			return null
+		const now = Date.now()
+		return playerState.lockedAt.map((row) => row.map((lockedAt) => {
+			if (lockedAt === 0)
+				return 1
+			// Un horodatage dans le FUTUR = revelation en cours: opacite plafonnee a 1
+			// jusqu'a cet instant, puis fondu normal. C'est ce qui rend la disparition
+			// progressive apres une revelation, au lieu d'une coupure nette.
+			return Math.min(1, Math.max(0, 1 - (now - lockedAt) / INVISIBLE_FADE_MS))
+		}))
+	}
+
+	/**
+	 * Rend visibles toutes les pieces deja posees pendant `durationMs`, puis les laisse
+	 * s'estomper progressivement EXACTEMENT comme une brique fraichement posee: on
+	 * repousse simplement le depart du fondu. Les cases vides et les lignes de penalite
+	 * (horodatage 0) ne sont pas concernees, elles restent toujours visibles.
+	 */
+	grantReveal(playerState: PlayerGameState, durationMs: number) : void {
+		if (this.mode !== "invisible" || durationMs <= 0)
+			return
+		const now = Date.now()
+		// Une revelation en cours est PROLONGEE (et non ecrasee), mais la banque est
+		// PLAFONNEE: sans cap, enchainer les lignes garderait le plateau visible en
+		// continu et neutraliserait le mode.
+		const extended = Math.max(playerState.revealUntil, now) + durationMs
+		const fadeStart = Math.min(extended, now + INVISIBLE_REVEAL_CAP_MS)
+		playerState.revealUntil = fadeStart
+		for (const row of playerState.lockedAt) {
+			for (let x = 0; x < row.length; x++) {
+				if (row[x] !== 0)
+					row[x] = fadeStart
+			}
+		}
+	}
+
+	/** Joker: revelation a la demande, en nombre limite par partie. */
+	useJoker(socketId: string) : boolean {
+		const playerState = this.state.get(socketId)
+		if (!playerState || !playerState.isAlive)
+			return false
+		if (this.mode !== "invisible" || playerState.jokersLeft <= 0)
+			return false
+		// Ne pas gaspiller un joker dont le gain serait rogne par le plafond: on compare
+		// ce que grantReveal produirait a la banque actuelle. Un simple test "banque au
+		// plafond" serait inerte, la banque se vidant en continu.
+		const now = Date.now()
+		const current = Math.max(playerState.revealUntil, now)
+		const granted = Math.min(current + INVISIBLE_JOKER_REVEAL_MS, now + INVISIBLE_REVEAL_CAP_MS)
+		if (granted - current < INVISIBLE_JOKER_REVEAL_MS / 2)
+			return false
+		playerState.jokersLeft--
+		this.grantReveal(playerState, INVISIBLE_JOKER_REVEAL_MS)
+		return true
 	}
 	getPieceQueue(index: number) : PieceType {
 		this.ensurePieceQueue(index)
@@ -147,6 +254,10 @@ export class Game {
 		return this.players.length === 1
 	}
 	updateLevel(playerState: PlayerGameState) : void {
+		// Sudden death: vitesse constante au maximum, la progression de niveau ne doit
+		// pas relancer l'interval avec une autre cadence.
+		if (this.mode === "suddendeath")
+			return
 		if (!this.isSolo())
 			return
 		const nextLevel = Math.floor(playerState.score / 500) + 1
@@ -156,6 +267,9 @@ export class Game {
 		this.restartTickInterval()
 	}
 	getTickSpeed() : number {
+		// Sudden death: vitesse maximale des la premiere piece, pour tout le monde.
+		if (this.mode === "suddendeath")
+			return SUDDEN_DEATH_TICK_MS
 		if (!this.isSolo())
 			return 400
 		const playerState = [...this.state.values()][0]
@@ -177,20 +291,40 @@ export class Game {
 	}
 	clearLines(playerState: PlayerGameState) : number {
 		let clearedLines = 0
-
-		const newBoard = playerState.board.filter(row => {
+		// Parcours indexe (et non filter) pour decaler la grille d'horodatage EXACTEMENT
+		// comme le plateau: sinon les opacites du mode invisible se desynchroniseraient
+		// des cellules apres chaque ligne completee.
+		const keptRows: Cell[][] = []
+		const keptLocks: number[][] = []
+		for (let y = 0; y < playerState.board.length; y++) {
+			const row = playerState.board[y]
+			if (!row)
+				continue
 			const hasPenalty = row.some(cell => cell === "penalty")
 			const isFull = !hasPenalty && row.every(cell => cell !== 0)
-			if (isFull)
+			if (isFull) {
 				clearedLines++
-			return !isFull
-		})
+				continue
+			}
+			keptRows.push(row)
+			keptLocks.push(playerState.lockedAt[y] ?? this.createEmptyLockRow())
+		}
 		const emptyRows: Cell[][] = Array.from(
 			{ length: clearedLines },
 			() => Array.from({ length: BOARD_WIDTH }, () => 0)
 		)
-		playerState.board = [...emptyRows, ...newBoard]
+		const emptyLocks: number[][] = Array.from(
+			{ length: clearedLines },
+			() => this.createEmptyLockRow()
+		)
+		playerState.board = [...emptyRows, ...keptRows]
+		playerState.lockedAt = [...emptyLocks, ...keptLocks]
 		playerState.score += clearedLines * 100
+		playerState.lines += clearedLines
+		// Mode invisible: chaque ligne completee redonne 2s de visibilite totale, qui
+		// s'estompe ensuite progressivement comme une brique posee.
+		if (clearedLines > 0)
+			this.grantReveal(playerState, clearedLines * INVISIBLE_REVEAL_PER_LINE_MS)
 		this.updateLevel(playerState)
 		return clearedLines
 	}
@@ -218,6 +352,12 @@ export class Game {
 		playerState.board = [
 			...playerState.board.slice(penaltyCount),
 			...penaltyLines,
+		]
+		// Meme decalage sur les horodatages. Les lignes de penalite n'en portent pas
+		// (0) : elles restent donc toujours visibles, meme en mode invisible.
+		playerState.lockedAt = [
+			...playerState.lockedAt.slice(penaltyCount),
+			...Array.from({ length: penaltyCount }, () => this.createEmptyLockRow()),
 		]
 		if (toppedOut) {
 			playerState.isAlive = false
@@ -324,9 +464,11 @@ export class Game {
 		}
 	} 
 	start() : void {
+		// Ultra: le chrono demarre avec la partie (2 minutes, meilleur score).
+		if (this.mode === "ultra")
+			this.deadline = Date.now() + ULTRA_DURATION_MS
 		for (const [, playerStat] of this.state) {
 			this.spawnPiece(playerStat)
-			console.log("test")
 		}
 		emitGameStart(this.state, this)
 		this.restartTickInterval()
@@ -349,14 +491,52 @@ export class Game {
 		if (!playerState || !playerState.isAlive)
 			return
 		playerState.isAlive = false
+		playerState.hasAbandoned = true
 		this.checkGameOver()
+	}
+	// Vainqueur au score (mode ultra a l'expiration du chrono). null si personne.
+	private getBestScorer(states: PlayerGameState[]) : string | null {
+		let best: PlayerGameState | null = null
+		// Un joueur qui a QUITTE la partie est hors classement: sinon, en ultra, il
+		// suffirait de marquer puis de partir pour etre sacre vainqueur.
+		for (const playerState of states.filter((s) => !s.hasAbandoned)) {
+			if (!best || playerState.score > best.score)
+				best = playerState
+		}
+		return best ? best.player.getName() : null
 	}
 	checkGameOver() : boolean {
 		if (this.isOver)
 			return true
-		const alivePlayers = [...this.state.values()].filter((playerState) => playerState.isAlive)
+		const states = [...this.state.values()]
+		const alivePlayers = states.filter((playerState) => playerState.isAlive)
 		const isSolo = this.players.length <= 1
-		if ((isSolo && alivePlayers.length > 0) || (!isSolo && alivePlayers.length > 1))
+		let modeWinner: string | null = null
+		let endedByMode = false
+
+		// Sprint: le premier a atteindre l'objectif termine la partie. Un joueur MORT
+		// ne peut pas gagner, meme s'il a franchi l'objectif en topant-out.
+		if (this.mode === "sprint") {
+			const finisher = states.find((playerState) =>
+				playerState.isAlive && playerState.lines >= SPRINT_TARGET_LINES)
+			if (finisher) {
+				endedByMode = true
+				modeWinner = finisher.player.getName()
+			}
+		}
+		// Ultra: c'est le CHRONO qui fait foi. La regle de survie ne doit pas cloturer
+		// la partie avant l'expiration, sinon la premiere elimination sacrerait le
+		// survivant au lieu du meilleur score. On termine uniquement a l'expiration,
+		// ou s'il ne reste plus personne pour jouer.
+		if (!endedByMode && this.deadline !== null) {
+			const expired = Date.now() >= this.deadline
+			if (!expired && alivePlayers.length > 0)
+				return false
+			endedByMode = true
+			modeWinner = isSolo ? null : this.getBestScorer(states)
+		}
+
+		if (!endedByMode && ((isSolo && alivePlayers.length > 0) || (!isSolo && alivePlayers.length > 1)))
 			return false
 		this.isOver = true
 
@@ -371,7 +551,10 @@ export class Game {
 		this.room.setStatus("waiting")
 		this.room.setGame(null)
 
-		const winner = !isSolo && alivePlayers[0] ? alivePlayers[0].player.getName() : null
+		// Un mode a decide du vainqueur (sprint/ultra); sinon regle de survie habituelle.
+		const winner = endedByMode
+			? modeWinner
+			: (!isSolo && alivePlayers[0] ? alivePlayers[0].player.getName() : null)
 		// Crédit du butin: chaque joueur gagne son score final en berrys (persisté DB).
 		// Appelé une seule fois par partie (interval nettoyé + break dans tick()).
 		const rewardEntries = [...this.state.values()].map((playerState) => ({
@@ -396,7 +579,25 @@ export class Game {
 		return true
 	}
 	lockPiece(playerState: PlayerGameState) : void {
+		const previousBoard = playerState.board
 		playerState.board = getRenderedBoard(playerState)
+		// Horodate UNIQUEMENT les cellules que ce verrouillage vient de remplir: c'est
+		// le point de depart du fondu du mode invisible ("elle disparait 3s apres avoir
+		// touche le sol"). Les cellules deja posees gardent leur horodatage.
+		// Plancher a `revealUntil`: une piece posee PENDANT une revelation doit
+		// s'effacer avec les autres, pas avant elles.
+		const now = Math.max(Date.now(), playerState.revealUntil)
+		for (let y = 0; y < playerState.board.length; y++) {
+			const row = playerState.board[y]
+			const previousRow = previousBoard[y]
+			const lockRow = playerState.lockedAt[y]
+			if (!row || !previousRow || !lockRow)
+				continue
+			for (let x = 0; x < row.length; x++) {
+				if (previousRow[x] === 0 && row[x] !== 0)
+					lockRow[x] = now
+			}
+		}
 	}
 	lockAndSpawnNext(playerState: PlayerGameState) : boolean {
 		this.lockPiece(playerState)
@@ -416,6 +617,11 @@ export class Game {
 		return isGameOver
 	}
 	tick() : void {
+		// Chrono ultra: seul mode dont la fin ne depend pas d'un evenement de jeu, il faut
+		// donc l'evaluer a chaque tick. Restreint aux modes chronometres pour ne rien
+		// changer au deroulement des autres (la survie reste geree par lockAndSpawnNext).
+		if (this.deadline !== null && this.checkGameOver())
+			return
 		for (const [, playerState] of this.state) {
 			let isGameOver: boolean = false
 			if (!playerState.isAlive)

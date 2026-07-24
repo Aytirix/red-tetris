@@ -296,3 +296,76 @@ describe("normalizeGameOver", () => {
 		expect(normalizeGameOver({ winner: "luffy", scores: "nope" })!.scores).toEqual([]);
 	});
 });
+
+describe("normalizeGameState — champs de mode", () => {
+	const base = { board: [[0, 0], [0, 0]], score: 0, level: 1 };
+
+	it("retombe sur classique quand le mode est absent ou inconnu", () => {
+		expect(normalizeGameState(base)!.mode).toBe("classique");
+		expect(normalizeGameState({ ...base, mode: "hardcore" })!.mode).toBe("classique");
+	});
+
+	it("lit mode, lignes, objectif et chrono", () => {
+		const state = normalizeGameState({
+			...base,
+			mode: "sprint",
+			lines: 12,
+			linesTarget: 40,
+			timeLeftMs: 5000,
+		})!;
+
+		expect(state.mode).toBe("sprint");
+		expect(state.lines).toBe(12);
+		expect(state.linesTarget).toBe(40);
+		expect(state.timeLeftMs).toBe(5000);
+	});
+
+	it("met des valeurs neutres quand les champs de mode manquent", () => {
+		const state = normalizeGameState(base)!;
+		expect(state.lines).toBe(0);
+		expect(state.linesTarget).toBeNull();
+		expect(state.timeLeftMs).toBeNull();
+		expect(state.fade).toBeNull();
+	});
+
+	it("accepte une grille fade alignee sur le plateau et borne les valeurs", () => {
+		const state = normalizeGameState({ ...base, mode: "invisible", fade: [[0.5, 2], [-1, "x"]] })!;
+		expect(state.fade).toEqual([[0.5, 1], [0, 1]]);
+	});
+
+	it("rejette une grille fade de mauvaise taille", () => {
+		expect(normalizeGameState({ ...base, fade: [[1, 1]] })!.fade).toBeNull();
+		expect(normalizeGameState({ ...base, fade: [[1], [1]] })!.fade).toBeNull();
+		expect(normalizeGameState({ ...base, fade: "nope" })!.fade).toBeNull();
+	});
+});
+
+describe("normalizeGameState — jokers", () => {
+	const base = { board: [[0, 0], [0, 0]], score: 0, level: 1 };
+
+	it("lit le nombre de jokers restants", () => {
+		expect(normalizeGameState({ ...base, mode: "invisible", jokersLeft: 2 })!.jokersLeft).toBe(2);
+	});
+
+	it("retombe a 0 si absent ou invalide", () => {
+		expect(normalizeGameState(base)!.jokersLeft).toBe(0);
+		expect(normalizeGameState({ ...base, jokersLeft: "trois" })!.jokersLeft).toBe(0);
+	});
+});
+
+describe("normalizeGameState — valeurs hostiles (audit)", () => {
+	const base = { board: [[0, 0], [0, 0]], score: 0, level: 1 };
+
+	it("borne jokersLeft (un negatif ferait planter le rendu du HUD)", () => {
+		expect(normalizeGameState({ ...base, jokersLeft: -1 })!.jokersLeft).toBe(0);
+		expect(normalizeGameState({ ...base, jokersLeft: 1e9 })!.jokersLeft).toBe(3);
+		expect(normalizeGameState({ ...base, jokersLeft: 2.7 })!.jokersLeft).toBe(2);
+		expect(normalizeGameState({ ...base, jokersLeft: NaN })!.jokersLeft).toBe(0);
+	});
+
+	it("neutralise NaN dans la grille de fondu (sinon la case redevient visible)", () => {
+		const state = normalizeGameState({ ...base, fade: [[NaN, 1], [1, 1]] })!;
+		expect(state.fade![0][0]).toBe(1);
+		expect(Number.isNaN(state.fade![0][0])).toBe(false);
+	});
+});

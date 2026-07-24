@@ -14,6 +14,7 @@ vi.mock("./roomHandlers.js", () => ({
 	handleMove: vi.fn(),
 	handleRotate: vi.fn(),
 	handleDrop: vi.fn(),
+	handleJoker: vi.fn(),
 	handleSubscribeSpectator: vi.fn(),
 	handleUnsubscribeSpectator: vi.fn(),
 }));
@@ -48,6 +49,7 @@ const ROUTES: [string, keyof typeof handlers][] = [
 	["game:move", "handleMove"],
 	["game:rotate", "handleRotate"],
 	["game:drop", "handleDrop"],
+	["game:joker", "handleJoker"],
 	["game:subscribeSpectatorGame", "handleSubscribeSpectator"],
 	["game:unsubscribeSpectatorGame", "handleUnsubscribeSpectator"],
 ];

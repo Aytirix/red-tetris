@@ -370,15 +370,13 @@ describe("roomHandlers", () => {
 			expect(lastEmit(sockets.get("zoro")!, "room:settings")![1]).toEqual({ mode: "classique", private: false });
 		});
 
-		it("refuses the removed sprint/ultra modes", () => {
-			const { room, sockets } = seedRoom("salle1", ["luffy"]);
+		it("applique un mode alternatif et le diffuse", () => {
+			const { room, sockets } = seedRoom("salle1", ["luffy", "zoro"]);
 
-			handleRoomMode(sockets.get("luffy")!, { mode: "ultra" });
+			handleRoomMode(sockets.get("luffy")!, { mode: "invisible" });
 
-			expect(room.getMode()).toBe("classique");
-			expect(lastEmit(sockets.get("luffy")!, "system:Error")![1]).toMatchObject({
-				message: "Invalid Mode or Not Host",
-			});
+			expect(room.getMode()).toBe("invisible");
+			expect(lastEmit(sockets.get("zoro")!, "room:settings")![1]).toEqual({ mode: "invisible", private: false });
 		});
 
 		it("refuses an invalid payload", () => {

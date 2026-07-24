@@ -1,8 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { Socket } from "socket.io";
-import type { Game } from "../../../core/Game.js";
+
 import { Piece } from "../../../core/Piece.js";
 import { Player } from "../../../core/Player.js";
+import { Game } from "../../../core/Game.js";
+import { Room } from "../../../core/room.js";
 import { BOARD_HEIGHT, BOARD_WIDTH, type Board, type Cell, type PlayerGameState } from "../../../types/game/gameTypes.js";
 import { I, O, T } from "../../../types/game/piecesGameTypes.js";
 import { spectatorSocketStore } from "../spectatorSocketStore.js";
@@ -447,5 +449,130 @@ describe("gameEmitters", () => {
 				level: 1,
 			});
 		});
+	});
+});
+
+// ─── Mode invisible : ce qui part sur le reseau (findings d'audit) ────────────
+
+describe("gameEmitters — etancheite du mode invisible", () => {
+	function invisibleSetup() {
+		const { state, socket } = makeState("luffy");
+		const room = new Room("salle");
+		room.addPlayer(state.player);
+		const game = new Game("invisible", [state.player], room);
+		// On travaille sur l'etat porte par la Game (celui que lisent les emetteurs).
+		const gameState = game.getPlayerStateBySocketId(state.player.getSocketId())!;
+		gameState.currentPiece = new Piece(O, "O");
+		gameState.nextPiece = new Piece(I, "I");
+		return { game, gameState, socket: state.player.getSocket() as FakeSocket };
+	}
+
+	it("n'envoie PAS le type d'une piece totalement effacee", () => {
+		vi.useFakeTimers();
+		const { game, gameState, socket } = invisibleSetup();
+		// Pose une piece puis laisse le fondu aller jusqu'au bout.
+		gameState.board[BOARD_HEIGHT - 1]![0] = "T";
+		gameState.lockedAt[BOARD_HEIGHT - 1]![0] = Date.now();
+		vi.advanceTimersByTime(4000);
+
+		emitGameUpdate(gameState, game.getState());
+
+		const payload = socket.emit.mock.calls.at(-1)![1] as { board: Board; fade: number[][] };
+		// La cellule est masquee dans le plateau envoye: rien a lire dans le DOM.
+		expect(payload.board[BOARD_HEIGHT - 1]![0]).toBe(0);
+		// ...et son opacite est ramenee a 1, sinon un fade a 0 trahirait "case occupee
+		// mais cachee" et permettrait de reconstruire la pile depuis les frames reseau.
+		expect(payload.fade[BOARD_HEIGHT - 1]![0]).toBe(1);
+		expect(payload.fade[BOARD_HEIGHT - 1]![1]).toBe(1);
+		vi.useRealTimers();
+	});
+
+	it("garde le type d'une piece encore partiellement visible", () => {
+		vi.useFakeTimers();
+		const { game, gameState, socket } = invisibleSetup();
+		gameState.board[BOARD_HEIGHT - 1]![0] = "T";
+		gameState.lockedAt[BOARD_HEIGHT - 1]![0] = Date.now();
+		vi.advanceTimersByTime(1000);
+
+		emitGameUpdate(gameState, game.getState());
+
+		const payload = socket.emit.mock.calls.at(-1)![1] as { board: Board };
+		expect(payload.board[BOARD_HEIGHT - 1]![0]).toBe("T");
+		vi.useRealTimers();
+	});
+
+	it("n'envoie AUCUNE projection en mode invisible (elle revelerait la pile)", () => {
+		const { game, gameState, socket } = invisibleSetup();
+
+		emitGameUpdate(gameState, game.getState());
+
+		const payload = socket.emit.mock.calls.at(-1)![1] as { ghost: unknown[] };
+		expect(payload.ghost).toEqual([]);
+	});
+
+	it("envoie normalement la projection dans les autres modes", () => {
+		const { state } = makeState("zoro");
+		const room = new Room("salle2");
+		room.addPlayer(state.player);
+		const game = new Game("classique", [state.player], room);
+		const gameState = game.getPlayerStateBySocketId(state.player.getSocketId())!;
+		gameState.currentPiece = new Piece(O, "O");
+		gameState.nextPiece = new Piece(I, "I");
+
+		emitGameUpdate(gameState, game.getState());
+
+		const socket = state.player.getSocket() as FakeSocket;
+		const payload = socket.emit.mock.calls.at(-1)![1] as { ghost: unknown[]; fade: unknown };
+		expect(payload.ghost.length).toBeGreaterThan(0);
+		expect(payload.fade).toBeNull();
+	});
+});
+
+describe("gameEmitters — le spectre ne trahit pas la pile invisible", () => {
+	it("calcule le spectre adverse sur le plateau MASQUE en mode invisible", () => {
+		vi.useFakeTimers();
+		const alice = makeState("alice");
+		const bob = makeState("bob");
+		const room = new Room("salle-inv");
+		room.addPlayer(alice.state.player);
+		room.addPlayer(bob.state.player);
+		const game = new Game("invisible", [alice.state.player, bob.state.player], room);
+		const aliceState = game.getPlayerStateBySocketId(alice.state.player.getSocketId())!;
+		const bobState = game.getPlayerStateBySocketId(bob.state.player.getSocketId())!;
+		bobState.currentPiece = new Piece(O, "O");
+		bobState.nextPiece = new Piece(I, "I");
+
+		// Pile d'alice totalement effacee pour elle-meme.
+		aliceState.board[BOARD_HEIGHT - 1]![7] = "I";
+		aliceState.lockedAt[BOARD_HEIGHT - 1]![7] = Date.now();
+		vi.advanceTimersByTime(5000);
+
+		emitGameUpdate(bobState, game.getState());
+
+		const payload = bob.socket.emit.mock.calls.at(-1)![1] as { opponents: { username: string; board: Board }[] };
+		const spectre = payload.opponents.find((o) => o.username === "alice")!.board;
+		// Aucune colonne ne doit trahir la hauteur de la pile cachee.
+		expect(spectre.every((row) => row.every((cell) => cell === 0))).toBe(true);
+		vi.useRealTimers();
+	});
+
+	it("laisse le spectre normal dans les autres modes", () => {
+		const alice = makeState("alice2");
+		const bob = makeState("bob2");
+		const room = new Room("salle-cla");
+		room.addPlayer(alice.state.player);
+		room.addPlayer(bob.state.player);
+		const game = new Game("classique", [alice.state.player, bob.state.player], room);
+		const aliceState = game.getPlayerStateBySocketId(alice.state.player.getSocketId())!;
+		const bobState = game.getPlayerStateBySocketId(bob.state.player.getSocketId())!;
+		bobState.currentPiece = new Piece(O, "O");
+		bobState.nextPiece = new Piece(I, "I");
+		aliceState.board[BOARD_HEIGHT - 1]![7] = "I";
+
+		emitGameUpdate(bobState, game.getState());
+
+		const payload = bob.socket.emit.mock.calls.at(-1)![1] as { opponents: { username: string; board: Board }[] };
+		const spectre = payload.opponents.find((o) => o.username === "alice2")!.board;
+		expect(spectre[BOARD_HEIGHT - 1]![7]).toBe("spectrum");
 	});
 });

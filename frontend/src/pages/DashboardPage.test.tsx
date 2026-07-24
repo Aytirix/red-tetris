@@ -44,7 +44,7 @@ vi.mock("react-router-dom", () => ({
 	useNavigate: () => ctx.navigate,
 }));
 
-import DashboardPage from "./DashboardPage";
+import DashboardPage, { toRoomId } from "./DashboardPage";
 
 function renderDashboard() {
 	return render(<AlertProvider><DashboardPage /></AlertProvider>);
@@ -96,14 +96,12 @@ describe("DashboardPage — vue d'accueil", () => {
 		);
 	});
 
-	it("cache puis reaffiche le panneau", () => {
+	it("affiche le solde et les acces boutique/touches", () => {
 		renderDashboard();
 
-		fireEvent.click(screen.getByRole("button", { name: "Cacher" }));
-		expect(screen.queryByRole("button", { name: "Solo" })).toBeNull();
-
-		fireEvent.click(screen.getByRole("button", { name: "Afficher" }));
-		expect(screen.getByRole("button", { name: "Solo" })).toBeInTheDocument();
+		expect(screen.getByRole("button", { name: "🛒 Boutique" })).toBeInTheDocument();
+		expect(screen.getByRole("button", { name: "⌨ Touches" })).toBeInTheDocument();
+		expect(screen.getByTitle("Cumul de tes scores de fin de partie")).toBeInTheDocument();
 	});
 
 	it("lance une partie solo dans une room dediee", () => {
@@ -123,7 +121,8 @@ describe("DashboardPage — boutique", () => {
 		fireEvent.click(screen.getByRole("button", { name: "🛒 Boutique" }));
 
 		expect(screen.getByText("Thèmes de pièces")).toBeInTheDocument();
-		expect(screen.queryByRole("button", { name: "Cacher" })).toBeNull();
+		// Le solde reste visible en boutique (necessaire pour acheter).
+		expect(screen.getByTitle("Cumul de tes scores de fin de partie")).toBeInTheDocument();
 	});
 
 	it("revient au jeu depuis la boutique", () => {
@@ -239,5 +238,74 @@ describe("DashboardPage — multijoueur", () => {
 
 		expect(roomEvents.emitSubscribeRooms).not.toHaveBeenCalled();
 		expect(ctx.socket.listenerCount("room:list")).toBe(0);
+	});
+});
+
+describe("DashboardPage — ecran Touches", () => {
+	it("ouvre l'ecran des touches depuis le coin haut-droite", () => {
+		renderDashboard();
+
+		fireEvent.click(screen.getByRole("button", { name: "⌨ Touches" }));
+
+		expect(screen.getByText("Touches du jeu")).toBeInTheDocument();
+		expect(screen.getByRole("button", { name: "← Jouer" })).toBeInTheDocument();
+	});
+
+	it("epure l'ecran: ni boutique ni solde", () => {
+		renderDashboard();
+
+		fireEvent.click(screen.getByRole("button", { name: "⌨ Touches" }));
+
+		expect(screen.queryByRole("button", { name: "🛒 Boutique" })).toBeNull();
+		expect(screen.queryByTitle("Cumul de tes scores de fin de partie")).toBeNull();
+	});
+
+	it("revient au jeu depuis les touches", () => {
+		renderDashboard();
+		fireEvent.click(screen.getByRole("button", { name: "⌨ Touches" }));
+
+		fireEvent.click(screen.getByRole("button", { name: "← Jouer" }));
+
+		expect(screen.getByRole("button", { name: "Solo" })).toBeInTheDocument();
+	});
+});
+
+describe("DashboardPage — barre selon l'ecran", () => {
+	it("garde boutique et touches en multijoueur, mais masque le solde", () => {
+		renderDashboard();
+		goToMultiplayer();
+
+		expect(screen.getByRole("button", { name: "🛒 Boutique" })).toBeInTheDocument();
+		expect(screen.getByRole("button", { name: "⌨ Touches" })).toBeInTheDocument();
+		expect(screen.queryByTitle("Cumul de tes scores de fin de partie")).toBeNull();
+	});
+});
+
+describe("DashboardPage — noms de salle valides", () => {
+	it("normalise les espaces des noms d'equipage (sinon le join est refuse)", () => {
+		expect(toRoomId("Straw Hat")).toBe("Straw_Hat");
+		expect(toRoomId("SH Fleet")).toBe("SH_Fleet");
+		expect(toRoomId("Germa 66")).toBe("Germa_66");
+		// Charset serveur: [a-zA-Z0-9_], 15 max.
+		expect(toRoomId("un nom vraiment tres long")).toHaveLength(15);
+		expect(/^[a-zA-Z0-9_]{1,15}$/.test(toRoomId("Big Mom"))).toBe(true);
+	});
+
+	it("ne genere jamais un nom de salle refuse par le serveur", () => {
+		// Balaye les tirages possibles: aucun nom d'equipage ne doit sortir invalide.
+		for (let i = 0; i < 60; i++) {
+			vi.spyOn(Math, "random").mockReturnValue(i / 60);
+			cleanup();
+			renderDashboard();
+			goToMultiplayer();
+			// La liste doit etre arrivee: le bouton est desactive tant qu'elle charge.
+			act(() => { ctx.socket.receive("room:list", []); });
+			ctx.navigate.mockClear();
+			fireEvent.click(screen.getByRole("button", { name: "+ Créer une salle" }));
+
+			const path = ctx.navigate.mock.calls[0][0] as string;
+			const roomId = path.split("/")[1];
+			expect(/^[a-zA-Z0-9_]{1,15}$/.test(roomId)).toBe(true);
+		}
 	});
 });
