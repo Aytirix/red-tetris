@@ -187,12 +187,40 @@ describe("GameView — mapping clavier (exigence du sujet)", () => {
 });
 
 describe("GameView — plateau et HUD", () => {
-	it("rend le plateau principal en 10x20 avec la taille de cellule du jeu", () => {
+	/** Force la taille du viewport jsdom pour tester le dimensionnement responsive. */
+	function setViewport(width: number, height: number) {
+		Object.defineProperty(window, "innerWidth", { value: width, configurable: true, writable: true });
+		Object.defineProperty(window, "innerHeight", { value: height, configurable: true, writable: true });
+	}
+
+	// `window` est global a tout le fichier : sans restauration, la taille forcee
+	// ici fausserait le calcul de repartition des adversaires des autres tests.
+	const defaultViewport = { width: window.innerWidth, height: window.innerHeight };
+	afterEach(() => {
+		setViewport(defaultViewport.width, defaultViewport.height);
+	});
+
+	it("rend le plateau principal en 10x20 a la taille max sur un grand ecran", () => {
+		setViewport(1920, 1200);
 		const { container } = renderGameView();
 		const grid = container.querySelector(".tetris-board") as HTMLElement;
 
 		expect(grid.style.gridTemplateColumns).toBe("repeat(10, 38px)");
 		expect(container.querySelectorAll(".tetris-board .tetris-cell")).toHaveLength(200);
+	});
+
+	// Regression: a 38 px figes, le plateau depassait le bas des ecrans de PC
+	// portable peu hauts. La cellule doit se reduire pour tenir a l'ecran.
+	it("reduit la cellule sur un ecran peu haut pour que le plateau tienne", () => {
+		setViewport(1366, 700);
+		const { container } = renderGameView();
+		const grid = container.querySelector(".tetris-board") as HTMLElement;
+
+		const cell = Number(/repeat\(10, (\d+)px\)/.exec(grid.style.gridTemplateColumns)?.[1]);
+		expect(cell).toBeGreaterThan(0);
+		expect(cell).toBeLessThan(38);
+		// 20 lignes + gouttieres + cadre doivent tenir sous le HUD et les marges.
+		expect(20 * cell + 19 * 2 + 22).toBeLessThanOrEqual(700 - 132);
 	});
 
 	it("transmet la projection fantome de la piece courante", () => {

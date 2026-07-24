@@ -1608,7 +1608,13 @@ a:hover {
 	gap: 0.85rem;
 	min-width: 0;
 	width: 100%;
-	max-width: 320px;
+	/* Doit rester aligné sur `sideColumnWidth()` (config/boardSizing.ts), qui
+	   réserve cette largeur au moment de calculer la taille des cellules. */
+	max-width: clamp(170px, 22vw, 320px);
+	/* Sur un écran peu haut la colonne est bornée à la hauteur du plateau : son
+	   contenu (pièce suivante + touches + adversaires) doit défiler, pas déborder. */
+	overflow-y: auto;
+	overflow-x: hidden;
 }
 
 .tetris-stage__side--left {
@@ -1621,6 +1627,89 @@ a:hover {
 
 .tetris-stage--waiting {
 	color: var(--color-text-on-dark);
+}
+
+/* ── Scène de jeu : adaptation aux écrans de PC ──────────────────────────────
+   La taille des cellules est calculée en JS (config/boardSizing.ts) ; ces règles
+   récupèrent en plus la place perdue dans le « chrome » autour du plateau, pour
+   que le plateau reste le plus grand possible sur les écrans peu hauts. */
+
+/* Écrans larges mais peu hauts : typiquement 1366×768 / 1440×900. */
+@media (max-height: 900px) {
+	.tetris-stage {
+		padding: 0.75rem 1rem;
+	}
+
+	.tetris-stage__inner {
+		gap: 0.85rem;
+	}
+
+	.tetris-hud {
+		padding: 0.4rem 0.8rem;
+	}
+
+	.tetris-hud__value {
+		font-size: 1.15rem;
+	}
+
+	.tetris-hud__score .tetris-hud__value,
+	.tetris-hud__spectator .tetris-hud__value {
+		font-size: 1.35rem;
+	}
+
+	.tetris-next__frame {
+		min-height: 84px;
+		padding: 0.8rem 1rem;
+	}
+
+	.tetris-stage__topbtns {
+		top: 0.5rem;
+		right: 0.5rem;
+	}
+}
+
+/* Très peu haut (netbooks, fenêtre réduite) : on comprime encore le HUD et on
+   resserre la liste des touches, qui reste lisible car elle défile. */
+@media (max-height: 720px) {
+	.tetris-stage {
+		padding: 0.5rem 0.75rem;
+	}
+
+	.tetris-stage__center {
+		gap: 0.4rem;
+	}
+
+	.tetris-hud {
+		padding: 0.3rem 0.65rem;
+	}
+
+	.tetris-next__frame {
+		min-height: 64px;
+		padding: 0.5rem 0.7rem;
+	}
+
+	.tetris-controls__row {
+		gap: 0.35rem;
+	}
+
+	.tetris-controls__label,
+	.tetris-controls__key {
+		font-size: 0.68rem;
+	}
+}
+
+/* Écrans peu larges (1024–1280) : les colonnes latérales se resserrent déjà via
+   le `clamp()`, on réduit ici les gouttières et la largeur mini du bloc « pièce
+   suivante » pour laisser le maximum au plateau. */
+@media (max-width: 1280px) {
+	.tetris-stage__inner {
+		gap: 0.75rem;
+	}
+
+	.tetris-next {
+		min-width: 0;
+		width: 100%;
+	}
 }
 
 .tetris-stage__waiting {

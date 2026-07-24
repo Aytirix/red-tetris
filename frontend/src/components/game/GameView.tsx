@@ -5,14 +5,14 @@ import { actionForCode, loadKeyBindings } from "../../config/keyBindings";
 import { useKeyLabel } from "../../hooks/useKeyLabel";
 import { useShop } from "../../contexts/ShopContext";
 import { getPieceTheme, themeCssVars } from "../../config/pieceThemes";
+import { computeMainCellSize, computeMiniCellSize } from "../../config/boardSizing";
+import { useViewportSize } from "../../hooks/useViewportSize";
 import GameBoard from "./GameBoard";
 import GameHud from "./GameHud";
 import ControlsLegend from "./ControlsLegend";
 import NextPiecePreview from "./NextPiecePreview";
 import OpponentsColumn from "./OpponentsColumn";
 
-const MAIN_CELL_SIZE = 38;
-const MINI_CELL_SIZE = 10;
 const MINI_HEADER_PX = 22;
 const MINI_GAP_PX = 12;
 const MINI_PADDING_PX = 18;
@@ -45,7 +45,23 @@ export default function GameView({ state, roomName, playerName, eliminated = fal
 	const jokerKey = keyLabel(jokerBinding);
 
 	const boardRows = state.board.length;
-	const mainBoardHeightPx = boardRows * MAIN_CELL_SIZE;
+	const boardCols = state.board[0]?.length ?? 0;
+	// Le plateau s'adapte à la fenêtre : sur un écran de PC portable peu haut, une
+	// cellule figée à 38 px ferait déborder le plateau sous le bas du viewport.
+	const viewport = useViewportSize();
+	const mainCellSize = useMemo(
+		() => computeMainCellSize({
+			viewportWidth: viewport.width,
+			viewportHeight: viewport.height,
+			rows: boardRows,
+			cols: boardCols,
+		}),
+		[viewport.width, viewport.height, boardRows, boardCols],
+	);
+	const miniCellSize = computeMiniCellSize(mainCellSize);
+	// Hauteur réellement occupée par le plateau (cellules + gouttières), qui borne
+	// la hauteur des colonnes latérales.
+	const mainBoardHeightPx = boardRows * mainCellSize + Math.max(0, boardRows - 1) * 2;
 
 	// Secousse du plateau quand le joueur encaisse des lignes de pénalité.
 	// Une ligne de pénalité est une rangée entièrement composée de cellules "penalty"
@@ -82,7 +98,7 @@ export default function GameView({ state, roomName, playerName, eliminated = fal
 	const { left, right } = useMemo(() => {
 		if (state.opponents.length === 0) return { left: [], right: [] };
 		const oppRows = state.opponents[0].board.length;
-		const miniHeight = oppRows * MINI_CELL_SIZE + MINI_HEADER_PX + MINI_PADDING_PX;
+		const miniHeight = oppRows * miniCellSize + MINI_HEADER_PX + MINI_PADDING_PX;
 		const rowsAvail = Math.max(
 			1,
 			Math.floor((mainBoardHeightPx + MINI_GAP_PX) / (miniHeight + MINI_GAP_PX))
@@ -92,7 +108,7 @@ export default function GameView({ state, roomName, playerName, eliminated = fal
 			left: state.opponents.slice(0, fitLeft),
 			right: state.opponents.slice(fitLeft),
 		};
-	}, [state.opponents, mainBoardHeightPx]);
+	}, [state.opponents, mainBoardHeightPx, miniCellSize]);
 
 	// Keyboard input — only for player (non-spectator).
 	// Les touches sont personnalisables (menu « Touches » du dashboard) ; on les lit
@@ -195,6 +211,7 @@ export default function GameView({ state, roomName, playerName, eliminated = fal
 				>
 					<OpponentsColumn
 						opponents={left}
+						cellSize={miniCellSize}
 						clickable={isSpectator}
 						currentSpectatorTarget={spectatorOf}
 						onSelect={handleSpectatorSelect}
@@ -221,7 +238,7 @@ export default function GameView({ state, roomName, playerName, eliminated = fal
 					>
 						<GameBoard
 							board={state.board}
-							cellSize={MAIN_CELL_SIZE}
+							cellSize={mainCellSize}
 							ghost={state.ghost}
 							ghostPiece={state.currentPiece?.type ?? null}
 							fade={state.fade}
@@ -240,6 +257,7 @@ export default function GameView({ state, roomName, playerName, eliminated = fal
 					{!isSpectator && <ControlsLegend />}
 					<OpponentsColumn
 						opponents={right}
+						cellSize={miniCellSize}
 						clickable={isSpectator}
 						currentSpectatorTarget={spectatorOf}
 						onSelect={handleSpectatorSelect}
