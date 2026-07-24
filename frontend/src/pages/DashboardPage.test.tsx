@@ -101,6 +101,7 @@ describe("DashboardPage — vue d'accueil", () => {
 
 		expect(screen.getByRole("button", { name: "🛒 Boutique" })).toBeInTheDocument();
 		expect(screen.getByRole("button", { name: "⌨ Touches" })).toBeInTheDocument();
+		expect(screen.getByRole("button", { name: "📊 Stats" })).toBeInTheDocument();
 		expect(screen.getByTitle("Cumul de tes scores de fin de partie")).toBeInTheDocument();
 	});
 
@@ -125,11 +126,11 @@ describe("DashboardPage — boutique", () => {
 		expect(screen.getByTitle("Cumul de tes scores de fin de partie")).toBeInTheDocument();
 	});
 
-	it("revient au jeu depuis la boutique", () => {
+	it("revient au jeu depuis la boutique via le bouton Retour", () => {
 		renderDashboard();
 		fireEvent.click(screen.getByRole("button", { name: "🛒 Boutique" }));
 
-		fireEvent.click(screen.getByRole("button", { name: "← Jouer" }));
+		fireEvent.click(screen.getByRole("button", { name: "← Retour" }));
 
 		expect(screen.getByRole("button", { name: "Solo" })).toBeInTheDocument();
 	});
@@ -205,7 +206,7 @@ describe("DashboardPage — multijoueur", () => {
 		renderDashboard();
 		goToMultiplayer();
 
-		fireEvent.click(screen.getByTitle("Retour"));
+		fireEvent.click(screen.getByRole("button", { name: "← Retour" }));
 
 		expect(roomEvents.emitUnsubscribeRooms).toHaveBeenCalledTimes(1);
 		expect(screen.getByRole("button", { name: "Solo" })).toBeInTheDocument();
@@ -229,11 +230,13 @@ describe("DashboardPage — multijoueur", () => {
 		expect(ctx.socket.listenerCount("room:list")).toBe(0);
 	});
 
-	it("n'ecoute pas la liste des salles depuis la boutique", () => {
+	it("n'ecoute plus la liste des salles apres retour puis boutique", () => {
 		renderDashboard();
 		goToMultiplayer();
 		roomEvents.emitSubscribeRooms.mockClear();
 
+		// Retour à l'accueil (désabonne), puis boutique — qui n'écoute jamais room:list.
+		fireEvent.click(screen.getByRole("button", { name: "← Retour" }));
 		fireEvent.click(screen.getByRole("button", { name: "🛒 Boutique" }));
 
 		expect(roomEvents.emitSubscribeRooms).not.toHaveBeenCalled();
@@ -248,7 +251,7 @@ describe("DashboardPage — ecran Touches", () => {
 		fireEvent.click(screen.getByRole("button", { name: "⌨ Touches" }));
 
 		expect(screen.getByText("Touches du jeu")).toBeInTheDocument();
-		expect(screen.getByRole("button", { name: "← Jouer" })).toBeInTheDocument();
+		expect(screen.getByRole("button", { name: "← Retour" })).toBeInTheDocument();
 	});
 
 	it("epure l'ecran: ni boutique ni solde", () => {
@@ -264,19 +267,41 @@ describe("DashboardPage — ecran Touches", () => {
 		renderDashboard();
 		fireEvent.click(screen.getByRole("button", { name: "⌨ Touches" }));
 
-		fireEvent.click(screen.getByRole("button", { name: "← Jouer" }));
+		fireEvent.click(screen.getByRole("button", { name: "← Retour" }));
+
+		expect(screen.getByRole("button", { name: "Solo" })).toBeInTheDocument();
+	});
+});
+
+describe("DashboardPage — ecran Stats", () => {
+	it("ouvre l'ecran des stats depuis le coin haut-droite", () => {
+		renderDashboard();
+
+		fireEvent.click(screen.getByRole("button", { name: "📊 Stats" }));
+
+		expect(screen.getByText("Mes statistiques")).toBeInTheDocument();
+		expect(screen.getByRole("button", { name: "← Retour" })).toBeInTheDocument();
+	});
+
+	it("revient au jeu depuis les stats", () => {
+		renderDashboard();
+		fireEvent.click(screen.getByRole("button", { name: "📊 Stats" }));
+
+		fireEvent.click(screen.getByRole("button", { name: "← Retour" }));
 
 		expect(screen.getByRole("button", { name: "Solo" })).toBeInTheDocument();
 	});
 });
 
 describe("DashboardPage — barre selon l'ecran", () => {
-	it("garde boutique et touches en multijoueur, mais masque le solde", () => {
+	it("n'affiche que Retour en multijoueur (ni boutique, ni touches, ni stats, ni solde)", () => {
 		renderDashboard();
 		goToMultiplayer();
 
-		expect(screen.getByRole("button", { name: "🛒 Boutique" })).toBeInTheDocument();
-		expect(screen.getByRole("button", { name: "⌨ Touches" })).toBeInTheDocument();
+		expect(screen.getByRole("button", { name: "← Retour" })).toBeInTheDocument();
+		expect(screen.queryByRole("button", { name: "🛒 Boutique" })).toBeNull();
+		expect(screen.queryByRole("button", { name: "⌨ Touches" })).toBeNull();
+		expect(screen.queryByRole("button", { name: "📊 Stats" })).toBeNull();
 		expect(screen.queryByTitle("Cumul de tes scores de fin de partie")).toBeNull();
 	});
 });

@@ -103,29 +103,6 @@
 	gap: 1rem;
 }
 
-// Dans le flux (pas en absolu) pour ne jamais chevaucher le bouton Boutique
-// (coin haut-gauche) sur mobile: la flèche se place en tête de la colonne centrée.
-.mpBack {
-	align-self: flex-start;
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	width: 2.25rem;
-	height: 2.25rem;
-	margin-bottom: -0.5rem;
-	background: none;
-	border: none;
-	cursor: pointer;
-	color: var(--color-text-on-dark);
-	font-size: 1.75rem;
-	opacity: 0.75;
-	transition: opacity 0.15s;
-
-	&:hover {
-		opacity: 1;
-	}
-}
-
 .mpHead {
 	margin-bottom: 0.25rem;
 }

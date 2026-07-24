@@ -5,6 +5,7 @@ import {
 	GAME_ACTIONS,
 	GAME_ACTION_LABELS,
 	loadKeyBindings,
+	recordKeyLabel,
 	saveKeyBindings,
 	type GameAction,
 	type KeyBindings,
@@ -34,6 +35,9 @@ export default function KeyBindingsScreen() {
 			// Certains claviers virtuels/IME n'exposent pas de code: on ignore, sinon
 			// l'action se retrouverait liee a une touche vide (bouton blanc, injouable).
 			if (!event.code || event.code === "Unidentified") return;
+			// `event.key` = caractère réellement imprimé sur CE clavier (AZERTY : "q" pour
+			// la touche physique "KeyA") → on apprend la disposition pour l'afficher juste.
+			recordKeyLabel(event.code, event.key);
 			setBindings((current) => {
 				const next = assignKey(current, capturing as GameAction, event.code);
 				saveKeyBindings(next);

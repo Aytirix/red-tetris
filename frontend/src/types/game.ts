@@ -20,9 +20,49 @@ export const GAME_MODE_LABELS: Record<GameMode, string> = {
 export const GAME_MODE_HINTS: Record<GameMode, string> = {
 	classique: "Règles de base : le dernier debout gagne.",
 	sprint: "Premier à 40 lignes.",
-	ultra: "2 minutes, meilleur score.",
+	ultra: "2 minutes, meilleur scorssse.",
 	suddendeath: "Vitesse maximale dès la première pièce.",
 	invisible: "Une pièce posée s'efface en 3 s… mais reste solide.",
+};
+
+// Nombre minimum de joueurs pour lancer un mode. Sprint est une COURSE : il n'a de sens
+// qu'à plusieurs. Le serveur applique la même règle (autoritatif) ; ceci ne fait que
+// désactiver le bouton côté client. DOIT rester aligné sur le serveur.
+export const GAME_MODE_MIN_PLAYERS: Record<GameMode, number> = {
+	classique: 1,
+	sprint: 2,
+	ultra: 1,
+	suddendeath: 1,
+	invisible: 1,
+};
+
+// Règles détaillées affichées dans le lobby (une puce par ligne).
+export const GAME_MODE_RULES: Record<GameMode, string[]> = {
+	classique: [
+		"Nettoie des lignes pour marquer des points.",
+		"Chaque ligne que tu nettoies envoie des lignes de pénalité aux adversaires.",
+		"Le dernier joueur encore en vie remporte la partie.",
+	],
+	sprint: [
+		"Objectif : être le premier à nettoyer 40 lignes.",
+		"⚠ Nécessite au moins 2 joueurs (c'est une course).",
+		"La vitesse de chute augmente avec le niveau.",
+	],
+	ultra: [
+		"Partie chronométrée : 2 minutes.",
+		"Le meilleur score à la fin du temps l'emporte.",
+		"Enchaîne les lignes pour maximiser ton score.",
+	],
+	suddendeath: [
+		"Vitesse maximale dès la première pièce.",
+		"Une seule vie : le plus endurant gagne.",
+		"Réflexes indispensables.",
+	],
+	invisible: [
+		"Une pièce posée s'efface après 3 s… mais reste solide.",
+		"Chaque ligne complétée redonne 2 s de visibilité (cumulables).",
+		"3 jokers pour révéler le plateau à la demande.",
+	],
 };
 
 export function isGameMode(value: string): value is GameMode {

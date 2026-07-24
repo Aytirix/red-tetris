@@ -261,6 +261,12 @@ export function handleRoomStart(socket: Socket, payload: unknown) : void {
 			return
 		if (room.countPlayer() === 0)
 			return
+		// Sprint est une COURSE: interdit a moins de 2 joueurs (regle autoritative,
+		// le client ne fait que desactiver le bouton). Alignee sur GAME_MODE_MIN_PLAYERS.
+		if (room.getMode() === "sprint" && room.countPlayer() < 2) {
+			emitError(socket, "room:start", "Le mode Sprint nécessite au moins 2 joueurs")
+			return
+		}
 		// Verrou immediat: empeche l'arrivee de nouveaux joueurs et un second start
 		// pendant le decompte, avant meme que la Game n'existe.
 		room.setStatus("playing")

@@ -132,18 +132,15 @@ export function AlertProvider({ children }: { children: React.ReactNode }) {
 							marginTop: "1.25rem",
 						}}>
 							{state.showCancel && (
-								<button className="button button-outline" onClick={handleCancel}>
+								<button className="button button-ghost" onClick={handleCancel}>
 									{state.cancelLabel}
 								</button>
 							)}
+							{/* Le bouton de confirmation est COLORÉ selon l'intention pour se
+							    distinguer nettement du « Annuler » neutre : rouge pour une action
+							    destructive, cyan pour une action normale (ex. « Acheter »). */}
 							<button
-								className="button"
-								style={{
-									background: "rgba(255, 255, 255, 0.07)",
-									border: "1px solid var(--color-glass-border)",
-									color: "var(--color-text-on-dark)",
-									boxShadow: "none",
-								}}
+								className={`button ${state.danger ? "button-primary" : "button-secondary"}`}
 								onClick={handleConfirm}
 							>
 								{state.confirmLabel}

@@ -7,6 +7,7 @@ import { registerSocketHandlers } from "./registerSocketHandlers.js";
 import { registerSocketMock } from "./SocketMock.js";
 import { registerRoomSocket } from "./handlers/roomSocket.js";
 import { registerShopSocket } from "./handlers/shopSocket.js";
+import { registerStatsSocket } from "./handlers/statsSocket.js";
 
 const isDev = process.env.NODE_ENV === "development";
 
@@ -20,6 +21,7 @@ export function initSocket(server: HttpServer) : SocketIOServer {
 		registerUserSocket(socket);
 		registerRoomSocket(socket)
 		registerShopSocket(socket)
+		registerStatsSocket(socket)
 		handlerDisconnect(socket);
 	});
 	return io;

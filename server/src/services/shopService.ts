@@ -7,7 +7,9 @@ import {
 } from "../repositories/userRepositories.js";
 import { DEFAULT_THEME_ID, SHOP_THEMES, getShopTheme, isShopThemeId } from "../config/shopThemes.js";
 import { emitShopState } from "../gateways/socket/emitters/shopEmitters.js";
+import { recordGameResults } from "./statsService.js";
 import type { WalletRow, WalletState } from "../types/shopTypes.js";
+import type { GameResultInput } from "../types/statsTypes.js";
 
 // neon-gem est TOUJOURS possédé (défaut gratuit) même s'il n'est pas dans ownedThemes.
 function ownedThemesOf(row: { ownedThemes?: string[] | null } | null): Set<string> {
@@ -62,12 +64,16 @@ export async function equipThemeForUser(username: string, themeId: string): Prom
 	return getWalletState(username);
 }
 
-// Fin de partie: crédite chaque joueur de son score final, puis pousse le
-// portefeuille à jour à son socket (mise à jour live du solde). Best-effort,
-// ne bloque pas la partie. Appelé UNE seule fois par partie (checkGameOver).
-export async function settleGameRewards(
-	entries: { username: string; score: number; socket: Socket }[],
-): Promise<void> {
+// Entrée de règlement de fin de partie : les données de stats (GameResultInput) plus
+// le socket, nécessaire pour repousser le portefeuille à jour au joueur concerné.
+export type GameSettlementEntry = GameResultInput & { socket: Socket };
+
+// Fin de partie: crédite chaque joueur de son score final, pousse le portefeuille à
+// jour à son socket (solde live), PUIS enregistre les statistiques de la partie.
+// Best-effort, ne bloque pas la partie. Appelé UNE seule fois par partie (checkGameOver).
+// Le crédit et les stats sont isolés (try séparés) : un échec de stats ne doit pas
+// priver le joueur de son butin, et inversement.
+export async function settleGameRewards(entries: GameSettlementEntry[]): Promise<void> {
 	for (const entry of entries) {
 		try {
 			if (entry.score > 0) {
@@ -78,4 +84,7 @@ export async function settleGameRewards(
 			console.error(`settleGameRewards failed for ${entry.username}:`, err);
 		}
 	}
+	// GameSettlementEntry contient tous les champs de GameResultInput (+ socket, ignoré
+	// ici) : on passe directement les entrées au record.
+	await recordGameResults(entries);
 }

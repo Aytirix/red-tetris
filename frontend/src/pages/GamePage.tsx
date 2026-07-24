@@ -20,6 +20,8 @@ import {
 	GAME_MODES,
 	GAME_MODE_HINTS,
 	GAME_MODE_LABELS,
+	GAME_MODE_MIN_PLAYERS,
+	GAME_MODE_RULES,
 	isGameMode,
 	type GameMode,
 	type GameOverPayload,
@@ -42,6 +44,21 @@ type RoomPlayer = {
 };
 
 // ─── Lobby ───────────────────────────────────────────────────────────────────
+
+// Card des règles du mode sélectionné, affichée à droite du lobby.
+function LobbyRulesCard({ mode }: { mode: GameMode }) {
+	return (
+		<aside className="game-lobby__rules-card" aria-label={`Règles du mode ${GAME_MODE_LABELS[mode]}`}>
+			<span className="eyebrow">Règles du mode</span>
+			<h2 className="game-lobby__rules-title">{GAME_MODE_LABELS[mode]}</h2>
+			<ul className="game-lobby__rules-list">
+				{GAME_MODE_RULES[mode].map((rule) => (
+					<li key={rule} className="game-lobby__rules-item">{rule}</li>
+				))}
+			</ul>
+		</aside>
+	);
+}
 
 function LobbyView({
 	roomName,
@@ -71,10 +88,18 @@ function LobbyView({
 		? "Chargement"
 		: `${players.length} joueur${players.length > 1 ? "s" : ""}`;
 	const hasGameSummary = !!gameSummary && gameSummary.scores.some((score) => score.username === playerName);
+	// Sprint (course) exige au moins 2 joueurs : on désactive le lancement sinon.
+	const minPlayers = GAME_MODE_MIN_PLAYERS[gameMode];
+	const notEnoughPlayers = !isRoomLoading && players.length < minPlayers;
+
+	// À droite : le récap de fin de partie s'il existe, sinon les règles du mode.
+	const shellModifier = hasGameSummary
+		? " game-lobby__shell--with-summary"
+		: " game-lobby__shell--with-rules";
 
 	return (
 		<div className="game-lobby">
-			<div className={`game-lobby__shell${hasGameSummary ? " game-lobby__shell--with-summary" : ""}`}>
+			<div className={`game-lobby__shell${shellModifier}`}>
 				<div className="game-lobby__card" aria-busy={isRoomLoading}>
 					<header className="game-lobby__header">
 						<div className="game-lobby__header-left">
@@ -182,7 +207,6 @@ function LobbyView({
 									</button>
 								))}
 							</div>
-							<span className="game-lobby__setting-hint">{GAME_MODE_HINTS[gameMode]}</span>
 						</div>
 
 						<div className="game-lobby__setting">
@@ -206,10 +230,14 @@ function LobbyView({
 								<ClipLoader color="var(--color-secondary)" size={13} />
 								<span>Chargement de la room…</span>
 							</div>
-						) : !isAdmin && (
+						) : !isAdmin ? (
 							<div className="game-lobby__waiting-hint">
 								<ClipLoader color="var(--color-secondary)" size={13} />
 								<span>En attente de l'admin…</span>
+							</div>
+						) : notEnoughPlayers && (
+							<div className="game-lobby__waiting-hint">
+								<span>⚠ Le mode {GAME_MODE_LABELS[gameMode]} nécessite au moins {minPlayers} joueurs.</span>
 							</div>
 						)}
 						<div className="game-lobby__footer-actions">
@@ -217,7 +245,12 @@ function LobbyView({
 								Quitter
 							</button>
 							{(isRoomLoading || isAdmin) && (
-								<button className="button button-primary" onClick={emitStartGame} disabled={isRoomLoading}>
+								<button
+									className="button button-primary"
+									onClick={emitStartGame}
+									disabled={isRoomLoading || notEnoughPlayers}
+									title={notEnoughPlayers ? `Le mode ${GAME_MODE_LABELS[gameMode]} nécessite au moins ${minPlayers} joueurs` : undefined}
+								>
 									▶ Lancer
 								</button>
 							)}
@@ -225,11 +258,15 @@ function LobbyView({
 					</footer>
 				</div>
 
-				<GameOverView
-					payload={gameSummary}
-					playerName={playerName}
-					players={players}
-				/>
+				{hasGameSummary ? (
+					<GameOverView
+						payload={gameSummary}
+						playerName={playerName}
+						players={players}
+					/>
+				) : (
+					<LobbyRulesCard mode={gameMode} />
+				)}
 			</div>
 		</div>
 	);
