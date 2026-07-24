@@ -15,23 +15,6 @@ EXPOSE 3000
 ENTRYPOINT ["entrypoint.dev.sh"]
 CMD ["npm", "run", "dev"]
 
-# Image de production: compile le TypeScript et sert la SPA + le socket depuis Node.
-FROM node:24-trixie-slim AS prod
-
-WORKDIR /app
-
-COPY package*.json ./
-# --include=dev FORCE les devDependencies (typescript…) même si le builder injecte
-# NODE_ENV=production : `npm run build` (tsc) échouerait sinon avec "tsc: not found".
-RUN npm install --include=dev
-
-COPY . .
-RUN npx prisma generate && npm run build
-
-COPY docker/entrypoint.prod.sh /usr/local/bin/entrypoint.prod.sh
-RUN chmod +x /usr/local/bin/entrypoint.prod.sh
-
-EXPOSE 3000
-
-ENTRYPOINT ["entrypoint.prod.sh"]
-CMD ["node", "dist/server.js"]
+# NB : l'image de PRODUCTION n'est plus ici. Elle est construite par /Dockerfile.prod
+# (contexte = racine du dépôt) qui embarque la SPA dans l'image backend — un seul
+# service long-running, compatible avec la policy restart de Coolify.

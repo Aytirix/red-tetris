@@ -1,0 +1,15 @@
+# Contexte de build racine (Dockerfile.prod). On EXCLUT tout ce qui est régénéré dans
+# l'image ou qui n'a rien à y faire, sinon on copierait les node_modules de l'hôte
+# (mauvaise plateforme) et d'éventuels secrets.
+**/node_modules
+**/dist
+**/.vite
+.git
+.github
+**/.env
+**/.env.*
+!**/.env.example
+graphify-out
+.claude
+**/coverage
+**/*.log

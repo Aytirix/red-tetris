@@ -17,30 +17,22 @@ services:
       VITE_PORT: ${PORT:?PORT is required}
     command: sh -c 'if [ ! -f node_modules/.package-lock.json ]; then npm ci; fi && npm run dev -- --host 0.0.0.0 --port ${PORT_DEV_FRONTEND:?PORT_DEV_FRONTEND is required}'
 
-  frontend-builder:
-    profiles: [ "prod" ]
-    build:
-      context: ./frontend
-      target: build
-      args:
-        VITE_PORT: ${PORT:?PORT is required}
-    volumes:
-      - frontend_dist:/dist
-    command: sh -c "rm -rf /dist/* && cp -r /app/dist/. /dist/"
-
   backend-prod:
     profiles: [ "prod" ]
     restart: unless-stopped
+    # Image mono-conteneur (front + back) : voir Dockerfile.prod. Contexte = racine du
+    # dépôt pour pouvoir builder à la fois frontend/ et server/.
     build:
-      context: ./server
-      target: prod
+      context: .
+      dockerfile: Dockerfile.prod
     ports:
       - "0.0.0.0:${PORT:?PORT is required}:${PORT:?PORT is required}"
     environment:
       HOST: ${HOST:?HOST is required}
       PORT: ${PORT:?PORT is required}
       NODE_ENV: production
-      STATIC_DIR: /frontend/dist
+      # SPA embarquée dans l'image (COPY --from=frontend), servie par Express.
+      STATIC_DIR: /app/frontend-dist
       FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:-http://localhost:${PORT}}
       POSTGRES_HOST: ${POSTGRES_HOST:?POSTGRES_HOST is required}
       POSTGRES_PORT: ${POSTGRES_PORT:?POSTGRES_PORT is required}
@@ -48,13 +40,9 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
       POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB is required}
       DATABASE_URL: postgresql://${POSTGRES_USER:?POSTGRES_USER is required}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@db:5432/${POSTGRES_DB:?POSTGRES_DB is required}?schema=public
-    volumes:
-      - frontend_dist:/frontend/dist:ro
     depends_on:
       db:
         condition: service_healthy
-      frontend-builder:
-        condition: service_completed_successfully
 
   backend-dev:
     profiles: [ "dev" ]
@@ -121,6 +109,5 @@ services:
 volumes:
   frontend_node_modules:
   backend_node_modules:
-  frontend_dist:
   db_data:
   pgadmin_data:

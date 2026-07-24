@@ -1,0 +1,36 @@
+# Image de PRODUCTION mono-conteneur : build du frontend + du backend, puis UN SEUL
+# service Node long-running qui sert la SPA ET le socket sur la même origine.
+# Contexte de build = racine du dépôt (voir docker-compose: backend-prod).
+#
+# Pourquoi mono-conteneur : Coolify injecte "restart: unless-stopped" sur tous les
+# services. Un ancien service one-shot "frontend-builder" (build puis exit) était alors
+# relancé en boucle et ne satisfaisait jamais "service_completed_successfully", ce qui
+# bloquait le backend en "Created". En embarquant la SPA dans l'image backend, il ne
+# reste que des services long-running (db + backend-prod).
+
+# ---- 1. Build de la SPA ----
+FROM node:22-alpine AS frontend
+WORKDIR /front
+COPY frontend/package*.json ./
+# --include=dev : vite/tsc sont des devDependencies, indispensables au build même si le
+# builder (Coolify) injecte NODE_ENV=production.
+RUN npm ci --include=dev
+COPY frontend/ ./
+RUN npm run build
+
+# ---- 2. Image finale : runtime Node + SPA embarquée ----
+FROM node:24-trixie-slim AS prod
+WORKDIR /app
+COPY server/package*.json ./
+RUN npm install --include=dev
+COPY server/ ./
+RUN npx prisma generate && npm run build
+# SPA buildée, servie par Express via STATIC_DIR (voir docker-compose).
+COPY --from=frontend /front/dist ./frontend-dist
+COPY server/docker/entrypoint.prod.sh /usr/local/bin/entrypoint.prod.sh
+RUN chmod +x /usr/local/bin/entrypoint.prod.sh
+
+EXPOSE 3000
+
+ENTRYPOINT ["entrypoint.prod.sh"]
+CMD ["node", "dist/server.js"]
