@@ -3,7 +3,7 @@ FROM node:24-trixie-slim as dev
 WORKDIR /app
 
 COPY package*.json ./
-RUN npm install
+RUN npm install --include=dev
 
 COPY . .
 
@@ -21,7 +21,9 @@ FROM node:24-trixie-slim AS prod
 WORKDIR /app
 
 COPY package*.json ./
-RUN npm install
+# --include=dev FORCE les devDependencies (typescript…) même si le builder injecte
+# NODE_ENV=production : `npm run build` (tsc) échouerait sinon avec "tsc: not found".
+RUN npm install --include=dev
 
 COPY . .
 RUN npx prisma generate && npm run build

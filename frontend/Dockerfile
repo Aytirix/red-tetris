@@ -2,7 +2,11 @@
 FROM node:22-alpine AS base
 WORKDIR /app
 COPY package*.json ./
-RUN npm ci
+# --include=dev FORCE l'installation des devDependencies (vite, tsc…), même si le
+# builder (ex. Coolify) injecte NODE_ENV=production au build : sans elles, `npm run
+# build` échoue avec "vite: not found" (exit 127). Multi-stage : ces deps ne servent
+# qu'à produire dist/, elles ne se retrouvent pas dans l'artefact final servi.
+RUN npm ci --include=dev
 
 # L'image de développement
 FROM base AS dev
