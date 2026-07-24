@@ -5,7 +5,7 @@ import type { GameBoardCell, PieceType } from "../../types/game";
 
 afterEach(cleanup);
 
-type CellProps = { cell: GameBoardCell; size?: number; ghost?: PieceType };
+type CellProps = { cell: GameBoardCell; size?: number; ghost?: PieceType; opacity?: number };
 
 function renderCell(props: CellProps) {
 	const { container } = render(<Cell {...props} />);
@@ -73,5 +73,48 @@ describe("Cell — dimensions", () => {
 	it("ignore une taille nulle (pas de style inline)", () => {
 		const el = renderCell({ cell: "I", size: 0 });
 		expect(el.getAttribute("style")).toBeNull();
+	});
+});
+
+describe("Cell — mode invisible (opacité)", () => {
+	it("garde le fond/quadrillage d'une case vide et n'efface que la couche colorée", () => {
+		const el = renderCell({ cell: "I", size: 20, opacity: 0.4 });
+
+		// La case elle-meme reste une case VIDE: a opacite 0 elle sera indiscernable.
+		expect(el.className).toContain("tetris-cell--empty");
+		expect(el.className).toContain("tetris-cell--fading");
+		expect(el.style.opacity).toBe("");
+
+		const piece = el.querySelector<HTMLElement>(".tetris-cell__piece")!;
+		expect(piece.className).toContain("tetris-cell--filled");
+		expect(piece.getAttribute("data-piece")).toBe("I");
+		expect(piece.style.opacity).toBe("0.4");
+	});
+
+	it("est totalement identique a une case vide quand la piece a disparu", () => {
+		const faded = renderCell({ cell: "I", size: 20, opacity: 0 });
+		const empty = renderCell({ cell: 0, size: 20 });
+
+		expect(faded.querySelector<HTMLElement>(".tetris-cell__piece")!.style.opacity).toBe("0");
+		// Meme classe de fond que la case vide -> aucun "trou" dans la grille.
+		expect(faded.className).toContain("tetris-cell--empty");
+		expect(empty.className).toContain("tetris-cell--empty");
+	});
+
+	it("conserve la structure en couches meme a pleine visibilite (transition fluide)", () => {
+		const el = renderCell({ cell: "I", size: 20, opacity: 1 });
+		expect(el.querySelector<HTMLElement>(".tetris-cell__piece")!.style.opacity).toBe("1");
+	});
+
+	it("laisse les cases vides intactes", () => {
+		const el = renderCell({ cell: 0, size: 20, opacity: 0.2 });
+		expect(el.querySelector(".tetris-cell__piece")).toBeNull();
+		expect(el.style.opacity).toBe("");
+	});
+
+	it("rend une cellule simple hors mode invisible", () => {
+		const el = renderCell({ cell: "I", size: 20 });
+		expect(el.className).toContain("tetris-cell--filled");
+		expect(el.querySelector(".tetris-cell__piece")).toBeNull();
 	});
 });

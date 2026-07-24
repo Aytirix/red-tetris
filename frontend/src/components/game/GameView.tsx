@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import type { GameStatePayload } from "../../types/game";
-import { emitGameDrop, emitGameMove, emitGameRotate, emitSubscribeSpectator } from "../../socket/events/game";
+import { emitGameDrop, emitGameJoker, emitGameMove, emitGameRotate, emitSubscribeSpectator } from "../../socket/events/game";
+import { actionForCode, loadKeyBindings } from "../../config/keyBindings";
+import { useKeyLabel } from "../../hooks/useKeyLabel";
 import { useShop } from "../../contexts/ShopContext";
 import { getPieceTheme, themeCssVars } from "../../config/pieceThemes";
 import GameBoard from "./GameBoard";
@@ -30,7 +32,15 @@ export default function GameView({ state, roomName, playerName, eliminated = fal
 	const showLevel = isSolo;
 
 	const { equipped } = useShop();
-	const pieceTheme = getPieceTheme(equipped);
+	// En spectateur, on affiche le cosmétique DU JOUEUR OBSERVÉ (envoyé par le serveur),
+	// pas le nôtre. Sur son propre plateau on garde le thème local, qui reflète
+	// immédiatement un changement fait à la boutique en cours de session.
+	const pieceTheme = getPieceTheme(isSpectator ? (state.theme ?? equipped) : equipped);
+	// Touche du joker affichée dans le HUD, dans la disposition réelle du joueur.
+	// La lecture localStorage est mémoïsée: sans ça elle repartirait à CHAQUE frame.
+	const keyLabel = useKeyLabel();
+	const jokerBinding = useMemo(() => loadKeyBindings().joker, []);
+	const jokerKey = keyLabel(jokerBinding);
 
 	const boardRows = state.board.length;
 	const mainBoardHeightPx = boardRows * MAIN_CELL_SIZE;
@@ -82,33 +92,30 @@ export default function GameView({ state, roomName, playerName, eliminated = fal
 		};
 	}, [state.opponents, mainBoardHeightPx]);
 
-	// Keyboard input — only for player (non-spectator)
+	// Keyboard input — only for player (non-spectator).
+	// Les touches sont personnalisables (menu « Touches » du dashboard) ; on les lit
+	// au montage de la partie, la config ne changeant pas en cours de jeu.
 	useEffect(() => {
 		if (isSpectator) return;
+		const bindings = loadKeyBindings();
 		function onKey(e: KeyboardEvent) {
-			if (e.repeat && e.code === "Space") return;
-			switch (e.code) {
-				case "ArrowLeft":
-					e.preventDefault();
-					emitGameMove("left");
-					break;
-				case "ArrowRight":
-					e.preventDefault();
-					emitGameMove("right");
-					break;
-				case "ArrowDown":
-					e.preventDefault();
-					emitGameMove("down");
-					break;
-				case "ArrowUp":
-				case "KeyX":
-					e.preventDefault();
-					emitGameRotate();
-					break;
-				case "Space":
-					e.preventDefault();
-					emitGameDrop();
-					break;
+			// Un évènement sans code physique (IME, clavier virtuel) ne doit jamais
+			// être rattaché à une action.
+			if (!e.code) return;
+			// Alias historique imposé par le sujet: KeyX pivote aussi, tant que cette
+			// touche n'a pas été réassignée à une autre action par le joueur.
+			const action = actionForCode(bindings, e.code) ?? (e.code === "KeyX" ? "rotate" : null);
+			if (!action) return;
+			// Chute rapide et joker ne doivent pas se répéter si la touche reste enfoncée.
+			if (e.repeat && (action === "hardDrop" || action === "joker")) return;
+			e.preventDefault();
+			switch (action) {
+				case "moveLeft": emitGameMove("left"); break;
+				case "moveRight": emitGameMove("right"); break;
+				case "softDrop": emitGameMove("down"); break;
+				case "rotate": emitGameRotate(); break;
+				case "hardDrop": emitGameDrop(); break;
+				case "joker": emitGameJoker(); break;
 			}
 		}
 		window.addEventListener("keydown", onKey);
@@ -148,6 +155,12 @@ export default function GameView({ state, roomName, playerName, eliminated = fal
 						level={state.level}
 						showLevel={showLevel}
 						spectatorOf={spectatorOf}
+						mode={state.mode}
+						lines={state.lines}
+						linesTarget={state.linesTarget}
+						timeLeftMs={state.timeLeftMs}
+						jokersLeft={state.jokersLeft}
+						jokerKey={jokerKey}
 					/>
 					<div
 						className={`tetris-stage__board-wrap${shakePhase ? ` tetris-stage__board-wrap--shake-${shakePhase}` : ""}`}
@@ -158,6 +171,7 @@ export default function GameView({ state, roomName, playerName, eliminated = fal
 							cellSize={MAIN_CELL_SIZE}
 							ghost={state.ghost}
 							ghostPiece={state.currentPiece?.type ?? null}
+							fade={state.fade}
 						/>
 					</div>
 				</div>

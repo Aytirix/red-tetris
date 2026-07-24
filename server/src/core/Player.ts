@@ -1,5 +1,6 @@
 import type { Socket } from "socket.io";
 import type { Game } from "./Game.js";
+import { DEFAULT_THEME_ID } from "../config/shopThemes.js";
 
 export class Player {
 	private readonly name: string;
@@ -7,15 +8,22 @@ export class Player {
 	private readonly socket: Socket;
 	private readonly avatar: string;
 	private readonly faction: string;
+	// Cosmetique equipe au moment de rejoindre: c'est CE theme que voient les
+	// spectateurs du plateau de ce joueur (et non le leur).
+	private readonly theme: string;
 	private game: Game | undefined;
 	private inGame: boolean;
-	constructor (name: string, socket: Socket, avatar: string, faction: string) {
+	constructor (name: string, socket: Socket, avatar: string, faction: string, theme: string = DEFAULT_THEME_ID) {
 		this.name = name
 		this.socketId = socket.id
 		this.socket = socket
 		this.avatar = avatar
 		this.faction = faction
+		this.theme = theme
 		this.inGame = false
+	}
+	getTheme() : string {
+		return this.theme
 	}
 	getName() : string {
 		return this.name

@@ -1,13 +1,16 @@
-import type {
-	GameBoard,
-	GameBoardCell,
-	GameOverPayload,
-	GameOverScore,
-	GamePiece,
-	GameStatePayload,
-	GhostCell,
-	OpponentBoard,
-	PieceType,
+import {
+	isGameMode,
+	MAX_JOKERS,
+	type GameBoard,
+	type GameBoardCell,
+	type GameMode,
+	type GameOverPayload,
+	type GameOverScore,
+	type GamePiece,
+	type GameStatePayload,
+	type GhostCell,
+	type OpponentBoard,
+	type PieceType,
 } from "../types/game";
 
 const PIECE_TYPES: PieceType[] = ["I", "J", "L", "O", "S", "T", "Z"];
@@ -79,6 +82,34 @@ function normalizeGhost(raw: unknown): GhostCell[] {
 	return out;
 }
 
+function normalizeJokers(raw: unknown): number {
+	if (typeof raw !== "number" || !Number.isFinite(raw)) return 0;
+	return Math.max(0, Math.min(MAX_JOKERS, Math.trunc(raw)));
+}
+
+function normalizeMode(raw: unknown): GameMode {
+	// Mode absent ou inconnu (vieux serveur / payload partiel) -> classique.
+	if (typeof raw === "string" && isGameMode(raw)) return raw;
+	return "classique";
+}
+
+/** Grille d'opacite du mode invisible; doit avoir exactement la taille du plateau. */
+function normalizeFade(raw: unknown, board: GameBoard): number[][] | null {
+	if (!Array.isArray(raw) || raw.length !== board.length) return null;
+	const rows: number[][] = [];
+	for (let y = 0; y < raw.length; y++) {
+		const row = raw[y];
+		const width = board[y]?.length ?? 0;
+		if (!Array.isArray(row) || row.length !== width) return null;
+		// Number.isFinite: NaN traverserait Math.min/max et produirait une opacite CSS
+		// invalide -> la cellule redeviendrait VISIBLE alors qu'elle doit etre cachee.
+		rows.push(row.map((value) => (
+			typeof value === "number" && Number.isFinite(value) ? Math.min(1, Math.max(0, value)) : 1
+		)));
+	}
+	return rows;
+}
+
 export function normalizeGameState(raw: unknown): GameStatePayload | null {
 	if (!raw || typeof raw !== "object") return null;
 	const r = raw as Record<string, unknown>;
@@ -95,6 +126,15 @@ export function normalizeGameState(raw: unknown): GameStatePayload | null {
 		level,
 		spectator: normalizeSpectator(r.spectator),
 		ghost: normalizeGhost(r.ghost),
+		mode: normalizeMode(r.mode),
+		lines: typeof r.lines === "number" ? r.lines : 0,
+		linesTarget: typeof r.linesTarget === "number" ? r.linesTarget : null,
+		timeLeftMs: typeof r.timeLeftMs === "number" ? r.timeLeftMs : null,
+		fade: normalizeFade(r.fade, board),
+		// Borne stricte: le HUD fait "★".repeat(jokersLeft), qui LEVE sur une valeur
+		// negative et gele l'onglet sur une valeur enorme.
+		jokersLeft: normalizeJokers(r.jokersLeft),
+		theme: typeof r.theme === "string" && r.theme.length > 0 ? r.theme : null,
 	};
 }
 

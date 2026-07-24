@@ -10,17 +10,32 @@ import { emitShopState } from "../gateways/socket/emitters/shopEmitters.js";
 import type { WalletRow, WalletState } from "../types/shopTypes.js";
 
 // neon-gem est TOUJOURS possédé (défaut gratuit) même s'il n'est pas dans ownedThemes.
-function toWalletState(row: WalletRow | null): WalletState {
+function ownedThemesOf(row: { ownedThemes?: string[] | null } | null): Set<string> {
 	const owned = new Set<string>([DEFAULT_THEME_ID]);
 	if (row?.ownedThemes) {
 		for (const t of row.ownedThemes) owned.add(t);
 	}
-	let equipped = row?.equippedTheme ?? DEFAULT_THEME_ID;
-	if (!owned.has(equipped)) equipped = DEFAULT_THEME_ID;
+	return owned;
+}
+
+/**
+ * Thème réellement équipé: un thème non possédé (retiré du catalogue, données
+ * incohérentes) retombe sur le défaut. Partagé entre l'état boutique et le thème
+ * embarqué sur le Player (cosmétique vu par les spectateurs).
+ */
+export function resolveEquippedTheme(
+	row: { equippedTheme?: string | null; ownedThemes?: string[] | null } | null,
+): string {
+	const owned = ownedThemesOf(row);
+	const equipped = row?.equippedTheme ?? DEFAULT_THEME_ID;
+	return owned.has(equipped) ? equipped : DEFAULT_THEME_ID;
+}
+
+function toWalletState(row: WalletRow | null): WalletState {
 	return {
 		berrys: row?.berrys ?? 0,
-		equipped,
-		owned: [...owned],
+		equipped: resolveEquippedTheme(row),
+		owned: [...ownedThemesOf(row)],
 		catalog: SHOP_THEMES.map((t) => ({ id: t.id, price: t.price })),
 	};
 }

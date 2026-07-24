@@ -24,7 +24,23 @@ import { Game } from "./Game.js";
 import { Piece } from "./Piece.js";
 import { Player } from "./Player.js";
 import { Room } from "./room.js";
-import { BOARD_HEIGHT, BOARD_WIDTH, type Board, type Cell, type PieceType, type PlayerGameState } from "../types/game/gameTypes.js";
+import {
+	BOARD_HEIGHT,
+	BOARD_WIDTH,
+	INVISIBLE_FADE_MS,
+	INVISIBLE_JOKER_COUNT,
+	INVISIBLE_JOKER_REVEAL_MS,
+	INVISIBLE_REVEAL_CAP_MS,
+	INVISIBLE_REVEAL_PER_LINE_MS,
+	SPRINT_TARGET_LINES,
+	SUDDEN_DEATH_TICK_MS,
+	ULTRA_DURATION_MS,
+	type Board,
+	type Cell,
+	type GameMode,
+	type PieceType,
+	type PlayerGameState,
+} from "../types/game/gameTypes.js";
 import { I, O, pieces, T, type PieceShape } from "../types/game/piecesGameTypes.js";
 import {
 	emitGameOver,
@@ -73,7 +89,7 @@ function placedPiece(shape: PieceShape, type: PieceType, x: number, y: number): 
 
 type Setup = { game: Game; room: Room; players: Player[]; states: PlayerGameState[] };
 
-function makeGame(playerCount = 1, mode: "classique" = "classique"): Setup {
+function makeGame(playerCount = 1, mode: GameMode = "classique"): Setup {
 	const room = new Room("salle");
 	const players = Array.from({ length: playerCount }, (_v, i) => makePlayer(`joueur${i}`, `sock${i}`));
 	for (const player of players) room.addPlayer(player);
@@ -1234,5 +1250,431 @@ describe("Game", () => {
 			expect(map.size).toBe(2);
 			expect([...map.values()]).toEqual(states);
 		});
+	});
+
+	// ─── Modes de jeu ────────────────────────────────────────────────────────────
+
+	describe("compteur de lignes", () => {
+		it("cumule les lignes nettoyees (base des objectifs de mode)", () => {
+			const { game, states } = makeGame(1);
+			const state = states[0]!;
+			expect(state.lines).toBe(0);
+
+			state.board[BOARD_HEIGHT - 1] = fullRow();
+			state.board[BOARD_HEIGHT - 2] = fullRow();
+			game.clearLines(state);
+
+			expect(state.lines).toBe(2);
+		});
+	});
+
+	describe("mode sprint", () => {
+		it("expose l'objectif de lignes", () => {
+			expect(makeGame(1, "sprint").game.getLinesTarget()).toBe(SPRINT_TARGET_LINES);
+			expect(makeGame(1, "classique").game.getLinesTarget()).toBeNull();
+		});
+
+		it("termine la partie quand un joueur atteint l'objectif, et le declare vainqueur", () => {
+			const { game, states, players } = makeGame(2, "sprint");
+			states[1]!.lines = SPRINT_TARGET_LINES;
+
+			expect(game.checkGameOver()).toBe(true);
+			expect(vi.mocked(emitGameOver)).toHaveBeenCalledWith(expect.anything(), players[1]!.getName());
+		});
+
+		it("ne termine pas la partie sous l'objectif", () => {
+			const { game, states } = makeGame(2, "sprint");
+			states[1]!.lines = SPRINT_TARGET_LINES - 1;
+
+			expect(game.checkGameOver()).toBe(false);
+		});
+	});
+
+	describe("mode ultra", () => {
+		it("arme le chrono au demarrage et l'expose", () => {
+			const { game } = makeGame(1, "ultra");
+			expect(game.getTimeLeftMs()).toBeNull();
+
+			game.start();
+
+			expect(game.getTimeLeftMs()).toBe(ULTRA_DURATION_MS);
+			expect(makeGame(1, "classique").game.getTimeLeftMs()).toBeNull();
+		});
+
+		// setSystemTime (et non advanceTimersByTime): on veut avancer l'HORLOGE sans
+		// executer les ticks de gravite, qui simuleraient 2 minutes de jeu et
+		// termineraient la partie par top-out avant l'expiration testee.
+		it("termine la partie a l'expiration du chrono, meilleur score vainqueur", () => {
+			const { game, states, players } = makeGame(2, "ultra");
+			game.start();
+			states[0]!.score = 100;
+			states[1]!.score = 900;
+
+			vi.setSystemTime(Date.now() + ULTRA_DURATION_MS);
+
+			expect(game.checkGameOver()).toBe(true);
+			expect(vi.mocked(emitGameOver)).toHaveBeenCalledWith(expect.anything(), players[1]!.getName());
+		});
+
+		it("ne termine pas la partie avant l'expiration", () => {
+			const { game } = makeGame(2, "ultra");
+			game.start();
+
+			vi.setSystemTime(Date.now() + ULTRA_DURATION_MS - 1000);
+
+			expect(game.checkGameOver()).toBe(false);
+			expect(game.getTimeLeftMs()).toBe(1000);
+		});
+	});
+
+	describe("mode sudden death", () => {
+		it("tourne a vitesse maximale, en solo comme en multi", () => {
+			expect(makeGame(1, "suddendeath").game.getTickSpeed()).toBe(SUDDEN_DEATH_TICK_MS);
+			expect(makeGame(3, "suddendeath").game.getTickSpeed()).toBe(SUDDEN_DEATH_TICK_MS);
+		});
+
+		it("garde la vitesse constante malgre la montee de niveau", () => {
+			const { game, states } = makeGame(1, "suddendeath");
+			const state = states[0]!;
+			state.score = 5000;
+			game.updateLevel(state);
+
+			expect(game.getTickSpeed()).toBe(SUDDEN_DEATH_TICK_MS);
+		});
+	});
+
+	describe("mode invisible", () => {
+		it("ne produit aucun fondu hors du mode invisible", () => {
+			const { game, states } = makeGame(1, "classique");
+			expect(game.getFadeGrid(states[0]!)).toBeNull();
+		});
+
+		it("efface progressivement une piece verrouillee puis la rend invisible a 3s", () => {
+			const { game, states } = makeGame(1, "invisible");
+			const state = states[0]!;
+			state.currentPiece = placedPiece(O, "O", 4, BOARD_HEIGHT - 2);
+
+			game.lockPiece(state);
+			const cellY = BOARD_HEIGHT - 1;
+			const cellX = 4;
+			expect(state.board[cellY]![cellX]).toBe("O");
+			expect(game.getFadeGrid(state)![cellY]![cellX]).toBe(1);
+
+			vi.advanceTimersByTime(INVISIBLE_FADE_MS / 2);
+			expect(game.getFadeGrid(state)![cellY]![cellX]).toBeCloseTo(0.5, 2);
+
+			vi.advanceTimersByTime(INVISIBLE_FADE_MS / 2);
+			expect(game.getFadeGrid(state)![cellY]![cellX]).toBe(0);
+			// La cellule reste SOLIDE une fois invisible.
+			expect(state.board[cellY]![cellX]).toBe("O");
+		});
+
+		it("garde les cases vides et les lignes de penalite pleinement visibles", () => {
+			const { game, states } = makeGame(2, "invisible");
+			const state = states[0]!;
+			game.addPenaltyLines(state, 1);
+
+			const fade = game.getFadeGrid(state)!;
+			expect(state.board[BOARD_HEIGHT - 1]!.every((cell) => cell === "penalty")).toBe(true);
+			expect(fade[BOARD_HEIGHT - 1]!.every((opacity) => opacity === 1)).toBe(true);
+			expect(fade[0]!.every((opacity) => opacity === 1)).toBe(true);
+		});
+
+		it("redonne 2s de visibilite totale par ligne completee", () => {
+			const { game, states } = makeGame(1, "invisible");
+			const state = states[0]!;
+			// Piece posee AU-DESSUS des lignes a completer: elle survit au nettoyage et
+			// permet d'observer la reprise du fondu apres la revelation.
+			state.currentPiece = placedPiece(O, "O", 0, BOARD_HEIGHT - 4);
+			game.lockPiece(state);
+			vi.advanceTimersByTime(INVISIBLE_FADE_MS);
+			expect(game.getFadeGrid(state)![BOARD_HEIGHT - 3]![0]).toBe(0);
+
+			// Deux lignes completees => 4s de revelation totale.
+			state.board[BOARD_HEIGHT - 1] = fullRow();
+			state.board[BOARD_HEIGHT - 2] = fullRow();
+			expect(game.clearLines(state)).toBe(2);
+			// La piece est descendue de 2 rangees avec le plateau.
+			expect(state.board[BOARD_HEIGHT - 1]![0]).toBe("O");
+
+			expect(game.getFadeGrid(state)!.every((row) => row.every((o) => o === 1))).toBe(true);
+
+			// Toujours pleinement visible jusqu'au bout des 4s.
+			vi.advanceTimersByTime(2 * INVISIBLE_REVEAL_PER_LINE_MS - 100);
+			expect(game.getFadeGrid(state)![BOARD_HEIGHT - 1]![0]).toBe(1);
+
+			// Puis la disparition est PROGRESSIVE (comme une brique posee), pas nette.
+			vi.advanceTimersByTime(100 + INVISIBLE_FADE_MS / 2);
+			expect(game.getFadeGrid(state)![BOARD_HEIGHT - 1]![0]).toBeCloseTo(0.5, 2);
+
+			vi.advanceTimersByTime(INVISIBLE_FADE_MS / 2);
+			expect(game.getFadeGrid(state)![BOARD_HEIGHT - 1]![0]).toBe(0);
+		});
+
+		it("prolonge une revelation deja en cours au lieu de l'ecraser", () => {
+			const { game, states } = makeGame(1, "invisible");
+			const state = states[0]!;
+			state.currentPiece = placedPiece(O, "O", 0, BOARD_HEIGHT - 4);
+			game.lockPiece(state);
+
+			state.board[BOARD_HEIGHT - 1] = fullRow();
+			game.clearLines(state);
+			const afterFirst = state.lockedAt[BOARD_HEIGHT - 2]![0]!;
+
+			vi.advanceTimersByTime(500);
+			state.board[BOARD_HEIGHT - 1] = fullRow();
+			game.clearLines(state);
+
+			// La seconde ligne AJOUTE 2s a la fin de la revelation en cours (pas de reset).
+			expect(state.lockedAt[BOARD_HEIGHT - 1]![0]).toBe(afterFirst + INVISIBLE_REVEAL_PER_LINE_MS);
+		});
+
+		it("decale les horodatages avec le plateau quand une ligne est completee", () => {
+			const { game, states } = makeGame(1, "invisible");
+			const state = states[0]!;
+			// Une cellule verrouillee juste au-dessus d'une ligne qui va disparaitre.
+			state.currentPiece = placedPiece(O, "O", 0, BOARD_HEIGHT - 3);
+			game.lockPiece(state);
+			state.board[BOARD_HEIGHT - 1] = fullRow();
+
+			vi.advanceTimersByTime(INVISIBLE_FADE_MS / 2);
+			game.clearLines(state);
+
+			// Le O (2 rangees) est descendu d'une ligne, ses horodatages AUSSI: ils
+			// occupent desormais les deux dernieres rangees, et la rangee liberee
+			// au-dessus n'en porte plus.
+			expect(state.board[BOARD_HEIGHT - 1]![0]).toBe("O");
+			expect(state.lockedAt[BOARD_HEIGHT - 1]![0]).not.toBe(0);
+			expect(state.lockedAt[BOARD_HEIGHT - 2]![0]).not.toBe(0);
+			expect(state.lockedAt[BOARD_HEIGHT - 3]![0]).toBe(0);
+			// Les cases restees vides n'ont toujours aucun horodatage.
+			expect(state.lockedAt[BOARD_HEIGHT - 1]![9]).toBe(0);
+		});
+
+		it("offre 3 jokers qui revelent le plateau puis s'epuisent", () => {
+			const { game, states } = makeGame(1, "invisible");
+			const state = states[0]!;
+			state.currentPiece = placedPiece(O, "O", 0, BOARD_HEIGHT - 2);
+			game.lockPiece(state);
+			vi.advanceTimersByTime(INVISIBLE_FADE_MS);
+			expect(state.jokersLeft).toBe(INVISIBLE_JOKER_COUNT);
+			expect(game.getFadeGrid(state)![BOARD_HEIGHT - 1]![0]).toBe(0);
+
+			expect(game.useJoker("sock0")).toBe(true);
+			expect(state.jokersLeft).toBe(2);
+			expect(game.getFadeGrid(state)![BOARD_HEIGHT - 1]![0]).toBe(1);
+
+			// Toujours visible pendant 3s, puis estompage progressif.
+			vi.advanceTimersByTime(INVISIBLE_JOKER_REVEAL_MS);
+			expect(game.getFadeGrid(state)![BOARD_HEIGHT - 1]![0]).toBe(1);
+			vi.advanceTimersByTime(INVISIBLE_FADE_MS / 2);
+			expect(game.getFadeGrid(state)![BOARD_HEIGHT - 1]![0]).toBeCloseTo(0.5, 2);
+
+			// Les jokers s'epuisent et ne sont plus utilisables.
+			expect(game.useJoker("sock0")).toBe(true);
+			expect(game.useJoker("sock0")).toBe(true);
+			expect(state.jokersLeft).toBe(0);
+			expect(game.useJoker("sock0")).toBe(false);
+		});
+
+		it("refuse le joker hors mode invisible, pour un mort ou un socket inconnu", () => {
+			const classique = makeGame(1, "classique");
+			expect(classique.game.useJoker("sock0")).toBe(false);
+
+			const { game, states } = makeGame(1, "invisible");
+			expect(game.useJoker("inconnu")).toBe(false);
+			states[0]!.isAlive = false;
+			expect(game.useJoker("sock0")).toBe(false);
+			expect(states[0]!.jokersLeft).toBe(INVISIBLE_JOKER_COUNT);
+		});
+
+		it("decale aussi les horodatages quand des lignes de penalite arrivent", () => {
+			const { game, states } = makeGame(2, "invisible");
+			const state = states[0]!;
+			state.currentPiece = placedPiece(O, "O", 0, BOARD_HEIGHT - 2);
+			game.lockPiece(state);
+			expect(state.lockedAt[BOARD_HEIGHT - 1]![0]).not.toBe(0);
+
+			game.addPenaltyLines(state, 1);
+
+			// Tout est remonte d'une rangee: l'horodatage suit la piece.
+			expect(state.lockedAt[BOARD_HEIGHT - 2]![0]).not.toBe(0);
+			// La ligne de penalite ajoutee en bas n'a pas d'horodatage (toujours visible).
+			expect(state.lockedAt[BOARD_HEIGHT - 1]!.every((t) => t === 0)).toBe(true);
+		});
+	});
+});
+
+describe("Game — correctifs d'audit", () => {
+	beforeEach(() => {
+		vi.useFakeTimers();
+		vi.clearAllMocks();
+		vi.spyOn(console, "log").mockImplementation(() => undefined);
+	});
+	afterEach(() => {
+		vi.useRealTimers();
+		vi.restoreAllMocks();
+	});
+
+	describe("ultra: le chrono fait foi", () => {
+		it("ne termine PAS la partie a la premiere elimination", () => {
+			const { game, states } = makeGame(2, "ultra");
+			game.start();
+			states[0]!.isAlive = false;
+
+			// Regle de survie neutralisee tant que le chrono tourne.
+			expect(game.checkGameOver()).toBe(false);
+		});
+
+		it("sacre le MEILLEUR SCORE, pas le survivant", () => {
+			const { game, states, players } = makeGame(2, "ultra");
+			game.start();
+			states[0]!.score = 9000;
+			states[0]!.isAlive = false; // gros score mais elimine
+			states[1]!.score = 10;
+
+			vi.setSystemTime(Date.now() + ULTRA_DURATION_MS);
+
+			expect(game.checkGameOver()).toBe(true);
+			expect(vi.mocked(emitGameOver)).toHaveBeenCalledWith(expect.anything(), players[0]!.getName());
+		});
+
+		it("termine avec le meilleur score si tout le monde meurt avant le chrono", () => {
+			const { game, states, players } = makeGame(2, "ultra");
+			game.start();
+			states[0]!.score = 5000;
+			states[1]!.score = 100;
+			states[0]!.isAlive = false;
+			states[1]!.isAlive = false;
+
+			expect(game.checkGameOver()).toBe(true);
+			expect(vi.mocked(emitGameOver)).toHaveBeenCalledWith(expect.anything(), players[0]!.getName());
+		});
+	});
+
+	describe("sprint: un joueur mort ne gagne pas", () => {
+		it("ignore un finisher elimine et laisse gagner le survivant", () => {
+			const { game, states, players } = makeGame(2, "sprint");
+			states[0]!.lines = SPRINT_TARGET_LINES;
+			states[0]!.isAlive = false;
+
+			expect(game.checkGameOver()).toBe(true);
+			expect(vi.mocked(emitGameOver)).toHaveBeenCalledWith(expect.anything(), players[1]!.getName());
+		});
+	});
+
+	describe("invisible: la banque de visibilite est plafonnee", () => {
+		it("ne depasse jamais le plafond meme en enchainant les revelations", () => {
+			const { game, states } = makeGame(1, "invisible");
+			const state = states[0]!;
+			state.currentPiece = placedPiece(O, "O", 0, BOARD_HEIGHT - 2);
+			game.lockPiece(state);
+
+			const start = Date.now();
+			for (let i = 0; i < 50; i++) game.grantReveal(state, INVISIBLE_REVEAL_PER_LINE_MS);
+
+			expect(state.revealUntil).toBe(start + INVISIBLE_REVEAL_CAP_MS);
+			// Au-dela du plafond, le fondu reprend normalement.
+			vi.setSystemTime(start + INVISIBLE_REVEAL_CAP_MS + INVISIBLE_FADE_MS);
+			expect(game.getFadeGrid(state)![BOARD_HEIGHT - 1]![0]).toBe(0);
+		});
+
+		it("fait disparaitre une piece posee PENDANT une revelation avec les autres", () => {
+			const { game, states } = makeGame(1, "invisible");
+			const state = states[0]!;
+			// Ancienne piece + revelation en cours.
+			state.currentPiece = placedPiece(O, "O", 0, BOARD_HEIGHT - 2);
+			game.lockPiece(state);
+			game.grantReveal(state, INVISIBLE_JOKER_REVEAL_MS);
+			// Nouvelle piece posee pendant la revelation.
+			state.currentPiece = placedPiece(O, "O", 4, BOARD_HEIGHT - 2);
+			game.lockPiece(state);
+
+			// Les deux partagent le meme depart de fondu: aucune ne s'efface avant l'autre.
+			expect(state.lockedAt[BOARD_HEIGHT - 1]![4]).toBe(state.lockedAt[BOARD_HEIGHT - 1]![0]);
+			vi.advanceTimersByTime(INVISIBLE_JOKER_REVEAL_MS + INVISIBLE_FADE_MS / 2);
+			const fade = game.getFadeGrid(state)!;
+			expect(fade[BOARD_HEIGHT - 1]![4]).toBeCloseTo(fade[BOARD_HEIGHT - 1]![0]!, 5);
+		});
+	});
+});
+
+describe("Game — correctifs d'audit (iteration 2)", () => {
+	beforeEach(() => {
+		vi.useFakeTimers();
+		vi.clearAllMocks();
+		vi.spyOn(console, "log").mockImplementation(() => undefined);
+	});
+	afterEach(() => {
+		vi.useRealTimers();
+		vi.restoreAllMocks();
+	});
+
+	it("ultra: un joueur qui QUITTE ne peut pas etre sacre vainqueur", () => {
+		const { game, states, players } = makeGame(2, "ultra");
+		game.start();
+		states[0]!.score = 5000;
+		states[1]!.score = 100;
+		game.abandon("sock0"); // depart volontaire, gros score
+
+		vi.setSystemTime(Date.now() + ULTRA_DURATION_MS);
+		expect(game.checkGameOver()).toBe(true);
+
+		expect(states[0]!.hasAbandoned).toBe(true);
+		expect(vi.mocked(emitGameOver)).toHaveBeenCalledWith(expect.anything(), players[1]!.getName());
+	});
+
+	it("un top-out n'est PAS un abandon (le joueur reste classe)", () => {
+		const { game, states, players } = makeGame(2, "ultra");
+		game.start();
+		states[0]!.score = 5000;
+		states[0]!.isAlive = false; // top-out, pas de depart
+		states[1]!.score = 100;
+
+		vi.setSystemTime(Date.now() + ULTRA_DURATION_MS);
+		game.checkGameOver();
+
+		expect(states[0]!.hasAbandoned).toBe(false);
+		expect(vi.mocked(emitGameOver)).toHaveBeenCalledWith(expect.anything(), players[0]!.getName());
+	});
+
+	it("ne consomme pas un joker sans effet (banque deja au plafond)", () => {
+		const { game, states } = makeGame(1, "invisible");
+		const state = states[0]!;
+		state.currentPiece = placedPiece(O, "O", 0, BOARD_HEIGHT - 2);
+		game.lockPiece(state);
+
+		expect(game.useJoker("sock0")).toBe(true);   // 3s
+		expect(game.useJoker("sock0")).toBe(true);   // 6s -> plafond atteint
+		expect(game.useJoker("sock0")).toBe(false);  // refuse: aucun effet possible
+		expect(state.jokersLeft).toBe(1);
+	});
+});
+
+describe("Game — correctifs d'audit (iteration 3)", () => {
+	beforeEach(() => {
+		vi.useFakeTimers();
+		vi.clearAllMocks();
+		vi.spyOn(console, "log").mockImplementation(() => undefined);
+	});
+	afterEach(() => {
+		vi.useRealTimers();
+		vi.restoreAllMocks();
+	});
+
+	it("refuse un joker dont le gain serait rogne par le plafond (garde non inerte)", () => {
+		const { game, states } = makeGame(1, "invisible");
+		const state = states[0]!;
+		game.grantReveal(state, INVISIBLE_REVEAL_CAP_MS); // banque pleine
+
+		// Meme legerement apres, le gain restant est trop faible: joker preserve.
+		vi.advanceTimersByTime(50);
+		expect(game.useJoker("sock0")).toBe(false);
+		expect(state.jokersLeft).toBe(INVISIBLE_JOKER_COUNT);
+
+		// Une fois la banque suffisamment vidée, le joker redevient utile.
+		vi.advanceTimersByTime(INVISIBLE_JOKER_REVEAL_MS);
+		expect(game.useJoker("sock0")).toBe(true);
+		expect(state.jokersLeft).toBe(INVISIBLE_JOKER_COUNT - 1);
 	});
 });

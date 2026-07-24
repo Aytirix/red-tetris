@@ -98,10 +98,17 @@ function getOpponentBoards(
 		// Un spectateur (ex: joueur mort) ne doit pas se voir lui-même sur le côté.
 		if (options.spectatorSocketId && socketId === options.spectatorSocketId)
 			continue;
+		// En mode invisible, le plateau de reference est le plateau MASQUE: sinon un
+		// adversaire (ou un 2e onglet du meme joueur) lirait via le spectre la hauteur
+		// exacte d'une pile que son proprietaire ne voit plus.
+		const visibleBoard = maskFadedCells(
+			playerState.board,
+			playerState.player.getGame()?.getFadeGrid(playerState) ?? null,
+		);
 		opponents.push({
 			username: playerState.player.getName(),
 			// Un joueur en jeu ne recoit que le spectre; un spectateur voit les vrais plateaux.
-			board: options.fullBoards ? playerState.board : getSpectrumBoard(playerState.board),
+			board: options.fullBoards ? visibleBoard : getSpectrumBoard(visibleBoard),
 			alive: playerState.isAlive,
 		});
 	}
@@ -122,8 +129,9 @@ export function emitGameStart(state: Map<string, PlayerGameState>, game: Game) :
 			throw new Error("Missing current piece before game start emit");
 		if (!playerState.nextPiece)
 			throw new Error("Missing next piece before game start emit");
+		const { rawFade, ...modeFields } = getModeFields(playerState)
 		socket.emit("game:start", {
-			"board": playerState.board,
+			"board": maskFadedCells(playerState.board, rawFade),
 			"opponents": getOpponentBoards(state, socketId),
 			"currentPiece": {
 				"type": playerState.currentPiece.type
@@ -134,9 +142,82 @@ export function emitGameStart(state: Map<string, PlayerGameState>, game: Game) :
 				"score": playerState.score,
 				"level": playerState.level,
 				"spectator": playerState.spectator,
-				"ghost": getGhostCells(playerState)
+				"ghost": getVisibleGhostCells(playerState, modeFields.mode),
+				...modeFields
 		})
 	}
+}
+
+/**
+ * Champs specifiques au mode de jeu, ajoutes a chaque frame:
+ * - mode       : le mode courant (le client adapte son HUD)
+ * - lines      : lignes nettoyees par ce joueur
+ * - linesTarget: objectif (sprint) ou null
+ * - timeLeftMs : temps restant (ultra) ou null
+ * - fade       : opacite par cellule (invisible) ou null
+ * La Game est recuperee via le Player: les emetteurs ne la recoivent pas en parametre.
+ */
+function getModeFields(playerState: PlayerGameState) {
+	const game = playerState.player.getGame();
+	if (!game) {
+		return {
+			mode: "classique",
+			lines: playerState.lines,
+			linesTarget: null,
+			timeLeftMs: null,
+			rawFade: null,
+			fade: null,
+			jokersLeft: playerState.jokersLeft,
+			theme: playerState.player.getTheme(),
+		};
+	}
+	const fade = game.getFadeGrid(playerState);
+	return {
+		// Cosmetique du proprietaire du plateau affiche: un spectateur voit le theme
+		// du joueur observe, pas le sien.
+		theme: playerState.player.getTheme(),
+		mode: game.getMode(),
+		lines: playerState.lines,
+		linesTarget: game.getLinesTarget(),
+		timeLeftMs: game.getTimeLeftMs(),
+		// `rawFade` sert au masquage du plateau, `fade` (assaini) part sur le reseau.
+		rawFade: fade,
+		fade: maskFadeGrid(fade),
+		jokersLeft: playerState.jokersLeft,
+	};
+}
+
+/**
+ * Mode invisible: une cellule TOTALEMENT effacee ne doit pas partir sur le reseau.
+ * Sinon l'invisibilite n'est qu'un style CSS, lisible dans le DOM (`data-piece`) ou
+ * dans l'onglet Reseau. Les cellules encore partiellement visibles gardent leur type
+ * puisqu'elles sont de toute facon a l'ecran.
+ */
+function maskFadedCells(board: Board, fade: number[][] | null): Board {
+	if (!fade)
+		return board;
+	return board.map((row, y) => row.map((cell, x) => ((fade[y]?.[x] ?? 1) <= 0 ? 0 : cell)));
+}
+
+/**
+ * Masquer le plateau ne suffit pas: `fade[y][x] === 0` signifie « case occupee mais
+ * cachee », ce qui permet de reconstruire toute la pile invisible depuis les frames
+ * reseau. Une case totalement effacee est deja envoyee VIDE dans le plateau, donc son
+ * opacite n'a plus d'utilite: on la remet a 1 pour qu'elle soit indiscernable d'une
+ * vraie case vide.
+ */
+function maskFadeGrid(fade: number[][] | null): number[][] | null {
+	if (!fade)
+		return null;
+	return fade.map((row) => row.map((opacity) => (opacity <= 0 ? 1 : opacity)));
+}
+
+/**
+ * La projection d'atterrissage est calculee sur le plateau REEL: l'afficher en mode
+ * invisible revelerait la hauteur exacte de la pile cachee, colonne par colonne.
+ */
+function getVisibleGhostCells(playerState: PlayerGameState, mode: string): GhostCell[] {
+	return mode === "invisible" ? [] : getGhostCells(playerState);
 }
 
 export function getRenderedBoard(playerState: PlayerGameState): Board {
@@ -175,8 +256,9 @@ export function emitGameUpdate(playerState: PlayerGameState, state: Map<string, 
 		throw new Error("Missing current piece before game update emit");
 	if (!playerState.nextPiece)
 		throw new Error("Missing next piece before game update emit");
+	const { rawFade, ...modeFields } = getModeFields(playerState)
 	socket.emit("game:update", {
-		"board": getRenderedBoard(playerState),
+		"board": maskFadedCells(getRenderedBoard(playerState), rawFade),
 		"opponents": getOpponentBoards(state, socketId),
 		"currentPiece": {
 			"type": playerState.currentPiece.type
@@ -187,7 +269,8 @@ export function emitGameUpdate(playerState: PlayerGameState, state: Map<string, 
 			"score": playerState.score,
 			"level": playerState.level,
 			"spectator": playerState.spectator,
-			"ghost": getGhostCells(playerState)
+			"ghost": getVisibleGhostCells(playerState, modeFields.mode),
+			...modeFields
 	})
 }
 
@@ -199,8 +282,9 @@ export function emitSpectatorGame(socket: Socket, game: Game, player: Player) : 
 		throw new Error("Missing current piece before spectator game emit");
 	if (!playerState.nextPiece)
 		throw new Error("Missing next piece before spectator game emit");
+	const { rawFade, ...modeFields } = getModeFields(playerState)
 	socket.emit("game:SpectatorGame", {
-		"board": getRenderedBoard(playerState),
+		"board": maskFadedCells(getRenderedBoard(playerState), rawFade),
 		"opponents": getOpponentBoards(game.getState(), player.getSocketId(), {
 			spectatorSocketId: socket.id,
 			fullBoards: true,
@@ -213,7 +297,9 @@ export function emitSpectatorGame(socket: Socket, game: Game, player: Player) : 
 			},
 			"score": playerState.score,
 			"level": playerState.level,
-			"spectator": player.getName()
+			"spectator": player.getName(),
+			"ghost": getVisibleGhostCells(playerState, modeFields.mode),
+			...modeFields
 	})
 }
 
@@ -249,7 +335,10 @@ export function emitPlayerEliminated(playerState: PlayerGameState, state: Map<st
 }
 
 export function emitGameOver(state: Map<string, PlayerGameState>, winner: string | null) : void {
+	// Un joueur qui a QUITTE est hors classement (comme pour la designation du
+	// vainqueur): sinon le podium le placerait 1er alors qu'un autre est sacre.
 	const scores = [...state.values()]
+		.filter((playerState) => !playerState.hasAbandoned)
 		.map((playerState) => ({
 			username: playerState.player.getName(),
 			score: playerState.score,

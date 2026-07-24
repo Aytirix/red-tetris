@@ -5,7 +5,7 @@
 
 // ── Corner buttons ────────────────────────────────────────────────────────────
 
-.hideBtn {
+.topRight {
 	position: absolute;
 	top: 1.25rem;
 	right: 1.25rem;
@@ -44,8 +44,8 @@
 	position: absolute;
 	bottom: 12vh;
 	left: max(3vw, 2rem);
-	width: min(480px, 92vw);
-	padding: 1.25rem;
+	width: min(340px, 88vw);
+	padding: 1.1rem;
 	border-radius: var(--radius-card);
 
 	// ── Liquid glass (façon Apple) : verre dépoli translucide + rim-light ──

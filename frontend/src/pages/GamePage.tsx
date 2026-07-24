@@ -10,12 +10,21 @@ import {
 	emitLeaveRoom,
 	emitKickPlayer,
 	emitStartGame,
+	emitSetGameMode,
 	emitSetPrivate,
 } from "../socket/events/room";
 import { useCloudNavigate } from "../transition/TransitionContext";
 import { emitSubscribeSpectator, emitUnsubscribeSpectator } from "../socket/events/game";
 import { normalizeGameOver, normalizeGameState } from "../socket/gameState";
-import type { GameOverPayload, GameStatePayload } from "../types/game";
+import {
+	GAME_MODES,
+	GAME_MODE_HINTS,
+	GAME_MODE_LABELS,
+	isGameMode,
+	type GameMode,
+	type GameOverPayload,
+	type GameStatePayload,
+} from "../types/game";
 import GameView from "../components/game/GameView";
 import GameOverView from "../components/game/GameOverView";
 
@@ -38,6 +47,7 @@ function LobbyView({
 	roomName,
 	playerName,
 	players,
+	gameMode,
 	isPrivate,
 	isRoomLoading,
 	gameSummary,
@@ -46,6 +56,7 @@ function LobbyView({
 	roomName: string;
 	playerName: string;
 	players: RoomPlayer[];
+	gameMode: GameMode;
 	isPrivate: boolean;
 	isRoomLoading: boolean;
 	gameSummary: GameOverPayload | null;
@@ -157,6 +168,24 @@ function LobbyView({
 
 					<div className={`game-lobby__settings${isRoomLoading ? " game-lobby__settings--loading" : ""}`}>
 						<div className="game-lobby__setting">
+							<span className="game-lobby__setting-label">Mode de jeu</span>
+							<div className="game-lobby__mode-list">
+								{GAME_MODES.map((mode) => (
+									<button
+										key={mode}
+										className={`game-lobby__mode-btn${gameMode === mode ? " game-lobby__mode-btn--active" : ""}`}
+										onClick={() => isAdmin && emitSetGameMode(mode)}
+										disabled={controlsDisabled}
+										title={GAME_MODE_HINTS[mode]}
+									>
+										{GAME_MODE_LABELS[mode]}
+									</button>
+								))}
+							</div>
+							<span className="game-lobby__setting-hint">{GAME_MODE_HINTS[gameMode]}</span>
+						</div>
+
+						<div className="game-lobby__setting">
 							<span className="game-lobby__setting-label">Accès</span>
 							<button
 								className={`game-lobby__privacy-btn${isPrivate || isSolo ? " game-lobby__privacy-btn--private" : ""}`}
@@ -220,6 +249,7 @@ export default function GamePage() {
 	const cloudNavigate = useCloudNavigate();
 	const [view, setView] = useState<GameViewMode>("connecting");
 	const [players, setPlayers] = useState<RoomPlayer[]>([]);
+	const [gameMode, setGameMode] = useState<GameMode>("classique");
 	const [isPrivate, setIsPrivate] = useState(false);
 	const [isRoomLoading, setIsRoomLoading] = useState(true);
 	const [gameState, setGameState] = useState<GameStatePayload | null>(null);
@@ -242,6 +272,8 @@ export default function GamePage() {
 	const roomNameRef = useRef(roomName);
 	const playerNameRef = useRef(playerName);
 	const hasJoinedRoomRef = useRef(false);
+	// Passe a true a la RECEPTION de room:joined (le joueur est reellement entre).
+	const hasEnteredRoomRef = useRef(false);
 	const hasLeftRoomRef = useRef(false);
 	const isSpectatorRef = useRef(false);
 	const eliminateSpectateRef = useRef<string | null>(null);
@@ -306,6 +338,7 @@ export default function GamePage() {
 		if (!roomName || !username) return;
 
 		hasJoinedRoomRef.current = false;
+		hasEnteredRoomRef.current = false;
 		hasLeftRoomRef.current = false;
 		isSpectatorRef.current = false;
 		eliminateSpectateRef.current = null;
@@ -361,6 +394,7 @@ export default function GamePage() {
 			const r = room as { players?: RawPlayer[]; joined?: boolean } | null;
 			if (r?.players) setPlayers(r.players.map(parsePlayer));
 			setIsRoomLoading(false);
+			hasEnteredRoomRef.current = true;
 
 			if (r && r.joined === false) {
 				// Game already running → become spectator on first available player
@@ -390,8 +424,9 @@ export default function GamePage() {
 
 	useEffect(() => {
 		function handleSettings(data: unknown) {
-			const s = data as { private?: boolean } | null;
+			const s = data as { mode?: unknown; private?: boolean } | null;
 			if (!s) return;
+			if (typeof s.mode === "string" && isGameMode(s.mode)) setGameMode(s.mode);
 			if (typeof s.private === "boolean") setIsPrivate(s.private);
 		}
 		socket.on("room:settings", handleSettings);
@@ -431,13 +466,39 @@ export default function GamePage() {
 			});
 		}
 
+		// Un join REFUSÉ par le serveur (nom de salle invalide, etc.) n'envoie jamais
+		// room:joined: sans ce garde-fou la page reste bloquée à vie sur l'écran
+		// « Connexion à la room… ».
+		function handleJoinError(data: unknown) {
+			const error = data as { event?: unknown; message?: unknown } | null;
+			if (!error || error.event !== "room:join") return;
+			// Strictement borne a la phase de connexion: une erreur tardive ne doit
+			// jamais ejecter un joueur deja installe. On se base sur la RECEPTION de
+			// room:joined, et non sur hasJoinedRoomRef qui n'atteste que de l'emission.
+			if (hasEnteredRoomRef.current) return;
+			hasLeftRoomRef.current = true;
+			hasJoinedRoomRef.current = false;
+			setPlayers([]);
+			cloudNavigate("/dashboard");
+			void alert({
+				title: "Salle inaccessible",
+				message: typeof error.message === "string" && error.message
+					? `Impossible de rejoindre cette salle (${error.message}).`
+					: "Impossible de rejoindre cette salle.",
+				confirmLabel: "Compris",
+				danger: true,
+			});
+		}
+
 		socket.on("room:kicked", handleKicked);
 		socket.on("room:denied", handleDenied);
+		socket.on("system:Error", handleJoinError);
 		return () => {
 			socket.off("room:kicked", handleKicked);
 			socket.off("room:denied", handleDenied);
+			socket.off("system:Error", handleJoinError);
 		};
-	}, [socket, navigate, alert]);
+	}, [socket, cloudNavigate, alert]);
 
 	// Game state events
 	useEffect(() => {
@@ -588,6 +649,7 @@ export default function GamePage() {
 					roomName={roomName}
 					playerName={playerName}
 					players={players}
+					gameMode={gameMode}
 					isPrivate={isPrivate}
 					isRoomLoading={isRoomLoading}
 					gameSummary={gameOver}

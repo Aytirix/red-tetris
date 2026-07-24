@@ -8,7 +8,7 @@ vi.mock("../repositories/userRepositories.js", () => ({
 	setEquippedTheme: vi.fn(),
 }));
 
-import { buyThemeForUser, equipThemeForUser, getWalletState, settleGameRewards } from "./shopService.js";
+import { buyThemeForUser, equipThemeForUser, getWalletState, resolveEquippedTheme, settleGameRewards } from "./shopService.js";
 import { creditBerrys, getWalletRow, purchaseThemeTx, setEquippedTheme } from "../repositories/userRepositories.js";
 import { DEFAULT_THEME_ID, SHOP_THEMES } from "../config/shopThemes.js";
 
@@ -205,5 +205,24 @@ describe("shopService", () => {
 		it("accepts an empty list", async () => {
 			await expect(settleGameRewards([])).resolves.toBeUndefined();
 		});
+	});
+});
+
+describe("resolveEquippedTheme", () => {
+	it("retombe sur le defaut sans ligne ou sans theme equipe", () => {
+		expect(resolveEquippedTheme(null)).toBe(DEFAULT_THEME_ID);
+		expect(resolveEquippedTheme({ equippedTheme: null, ownedThemes: [] })).toBe(DEFAULT_THEME_ID);
+	});
+
+	it("renvoie le theme equipe quand il est possede", () => {
+		expect(resolveEquippedTheme({ equippedTheme: "synthwave", ownedThemes: ["synthwave"] })).toBe("synthwave");
+	});
+
+	it("refuse un theme NON possede (donnees incoherentes) et retombe sur le defaut", () => {
+		expect(resolveEquippedTheme({ equippedTheme: "synthwave", ownedThemes: [] })).toBe(DEFAULT_THEME_ID);
+	});
+
+	it("considere le theme par defaut comme toujours possede", () => {
+		expect(resolveEquippedTheme({ equippedTheme: DEFAULT_THEME_ID, ownedThemes: [] })).toBe(DEFAULT_THEME_ID);
 	});
 });

@@ -1416,6 +1416,43 @@ a:hover {
 	opacity: 0.8;
 }
 
+/* Sélecteur de mode de jeu */
+
+.game-lobby__mode-list {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.35rem;
+	justify-content: flex-end;
+}
+
+.game-lobby__mode-btn {
+	padding: 0.3rem 0.7rem;
+	border-radius: 999px;
+	border: 1px solid var(--color-glass-border);
+	background: transparent;
+	color: var(--color-text-muted-on-dark);
+	font-size: 0.76rem;
+	font-weight: 500;
+	cursor: pointer;
+	transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.game-lobby__mode-btn:not(:disabled):hover {
+	border-color: rgba(255, 255, 255, 0.35);
+	color: var(--color-text-on-dark);
+}
+
+.game-lobby__mode-btn--active {
+	background: rgba(255, 54, 95, 0.15);
+	border-color: rgba(255, 54, 95, 0.4);
+	color: var(--color-primary);
+}
+
+.game-lobby__mode-btn:disabled {
+	cursor: default;
+	opacity: 0.6;
+}
+
 .game-lobby__privacy-btn {
 	padding: 0.3rem 0.9rem;
 	border-radius: 999px;
@@ -1627,6 +1664,52 @@ a:hover {
 	gap: 0.1rem;
 }
 
+/* Sprint : progression vers l'objectif de lignes (colonne gauche). */
+.tetris-hud__objective {
+	grid-column: 1;
+	justify-self: start;
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 0.1rem;
+}
+
+/* Ultra : chrono (colonne droite, comme le niveau). */
+.tetris-hud__timer {
+	grid-column: 3;
+	justify-self: end;
+	display: flex;
+	flex-direction: column;
+	align-items: flex-end;
+	gap: 0.1rem;
+}
+
+.tetris-hud__timer--urgent .tetris-hud__value {
+	color: var(--color-primary);
+	text-shadow: 0 0 12px rgba(255, 54, 95, 0.55);
+}
+
+.tetris-hud__mode {
+	grid-column: 1;
+	justify-self: start;
+	align-self: center;
+}
+
+/* Invisible : jokers restants (colonne droite). */
+.tetris-hud__jokers {
+	grid-column: 3;
+	justify-self: end;
+	display: flex;
+	flex-direction: column;
+	align-items: flex-end;
+	gap: 0.1rem;
+}
+
+.tetris-hud__jokers .tetris-hud__value {
+	color: var(--color-accent);
+	letter-spacing: 0.12em;
+}
+
 .tetris-hud__spectator {
 	grid-column: 1;
 	justify-self: start;
@@ -1682,11 +1765,33 @@ a:hover {
 	border: 0;
 	border-radius: calc(var(--cs, 20px) * 0.16);
 	box-sizing: border-box;
+	/* Mode invisible : le serveur envoie l'opacité par palier (une frame par tick).
+	   La transition lisse le fondu entre deux frames pour un effacement continu. */
+	transition: opacity 320ms linear;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.tetris-cell { transition: none; }
 }
 
 .tetris-cell--empty {
 	background: rgba(5, 8, 22, 0.72);
 	box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+}
+
+/* Mode invisible : la case garde le fond + le quadrillage d'une case vide, et la
+   couche colorée de la pièce se superpose puis s'efface. A opacité 0 la case est
+   strictement identique à une case vide (aucun "trou" ne trahit la pièce). */
+.tetris-cell--fading {
+	position: relative;
+}
+
+.tetris-cell--fading > .tetris-cell__piece {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	border-radius: inherit;
 }
 
 .tetris-cell[data-piece="I"] { --c: var(--piece-i); }
@@ -2713,6 +2818,93 @@ a:hover {
 	width: 100%;
 	max-width: 1000px;
 	margin: 0 auto;
+}
+
+/* ─── Écran de configuration des touches (dans le dashboard) ─────────────────── */
+
+.keys-screen {
+	position: absolute;
+	inset: 0;
+	z-index: 5;
+	overflow-y: auto;
+	display: flex;
+	flex-direction: column;
+	gap: 1.25rem;
+	padding: 5.75rem clamp(1rem, 4vw, 3rem) 2.5rem;
+	background: linear-gradient(rgba(4, 6, 16, 0.32), rgba(4, 6, 16, 0.5));
+}
+
+.keys-screen__head,
+.keys-screen__list,
+.keys-screen__actions {
+	width: 100%;
+	max-width: 560px;
+	margin: 0 auto;
+}
+
+.keys-screen__title {
+	margin: 0.15rem 0 0.35rem;
+	color: var(--color-text-on-dark);
+	font-size: clamp(1.5rem, 3.5vw, 2.1rem);
+	text-shadow: 0 0 20px rgba(61, 231, 255, 0.3);
+}
+
+.keys-screen__hint {
+	margin: 0;
+	color: var(--color-text-on-dark);
+	font-size: 0.9rem;
+	text-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+}
+
+.keys-screen__list {
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+}
+
+.keys-row {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 1rem;
+	padding: 0.6rem 0.85rem;
+	border: 1px solid var(--color-glass-border);
+	border-radius: 10px;
+	background: rgba(255, 255, 255, 0.04);
+}
+
+.keys-row__label {
+	color: var(--color-text-on-dark);
+	font-size: 0.9rem;
+}
+
+.keys-row__key {
+	flex-shrink: 0;
+	min-width: 5.5rem;
+	padding: 0.35rem 0.8rem;
+	border-radius: 8px;
+	border: 1px solid var(--color-glass-border);
+	background: rgba(255, 255, 255, 0.07);
+	color: var(--color-text-on-dark);
+	font-family: var(--font-display);
+	font-size: 0.9rem;
+	cursor: pointer;
+	transition: border-color 0.15s, background 0.15s, color 0.15s;
+}
+
+.keys-row__key:hover {
+	border-color: var(--color-secondary-border);
+}
+
+.keys-row__key--capturing {
+	border-color: var(--color-primary);
+	background: rgba(255, 54, 95, 0.16);
+	color: var(--color-primary);
+}
+
+.keys-screen__actions {
+	display: flex;
+	justify-content: flex-end;
 }
 
 /* Contenu des panneaux en verre liquide (liquid-glass-react) : texte clair */

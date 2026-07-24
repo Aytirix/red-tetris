@@ -1,14 +1,14 @@
 import type { Socket } from "socket.io";
 import type { Game } from "./Game.js";
 import type { Player } from "./Player.js";
+import { isGameMode, type GameMode } from "../types/game/gameTypes.js";
 
 export class Room {
 	public readonly name: string;
 	private players: Player[];
 	private hostPlayerId: string | null ;
 	private status: "waiting" | "playing" | "finished" ;
-	// Seul le mode "classique" est developpe: sprint/ultra ont ete retires.
-	private mode: "classique";
+	private mode: GameMode;
 	private visibility: boolean;
 	private game: Game | null;
 	// Timer du decompte 3-2-1 entre room:start et le vrai demarrage de la partie.
@@ -71,10 +71,10 @@ export class Room {
 		this.status = status
 	}
 	setMode(mode: string, socket: Socket) : boolean {
+		// Seul l'hote choisit le mode, et uniquement parmi les modes existants.
 		if (socket.id !== this.hostPlayerId)
 			return false
-		// Seul "classique" subsiste; toute autre valeur est rejetee.
-		if (mode !== "classique")
+		if (!isGameMode(mode))
 			return false
 		this.mode = mode
 		return true
@@ -109,7 +109,7 @@ export class Room {
 	getHostId() : string | null {
 		return this.hostPlayerId
 	}
-	getMode() : "classique" {
+	getMode() : GameMode {
 		return this.mode
 	}
 	getStatus() : "waiting" | "playing" | "finished" {

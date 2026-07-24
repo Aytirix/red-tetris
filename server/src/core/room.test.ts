@@ -110,15 +110,11 @@ describe("Room", () => {
 			room.addPlayer(makePlayer("zoro", "guest"));
 		});
 
-		it("accepts classique for the host (seul mode restant)", () => {
-			expect(room.setMode("classique", makeSocket("host"))).toBe(true);
-			expect(room.getMode()).toBe("classique");
-		});
-
-		it("refuses the removed sprint/ultra modes even for the host", () => {
-			expect(room.setMode("ultra", makeSocket("host"))).toBe(false);
-			expect(room.setMode("sprint", makeSocket("host"))).toBe(false);
-			expect(room.getMode()).toBe("classique");
+		it("accepte tous les modes existants pour l'hote", () => {
+			for (const mode of ["classique", "sprint", "ultra", "suddendeath", "invisible"] as const) {
+				expect(room.setMode(mode, makeSocket("host"))).toBe(true);
+				expect(room.getMode()).toBe(mode);
+			}
 		});
 
 		it("refuses a non-host", () => {

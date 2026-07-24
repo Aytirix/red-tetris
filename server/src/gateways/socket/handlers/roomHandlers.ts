@@ -4,7 +4,7 @@ import { emitError } from "../emitters/systemEmitters.js";
 import { roomSocketStore } from "../roomSocketStore.js";
 import { createRoom, getRoom } from "../../../services/roomService.js";
 import { emitKickedRoom, emitPlayersRoom, emitRoomDenied, emitRoomJoined, emitRoomSettings, emitSubscrib } from "../emitters/roomEmitters.js";
-import { emitCountdown, emitSpectatorGame } from "../emitters/gameEmitters.js";
+import { emitCountdown, emitGameUpdate, emitSpectatorForPlayer, emitSpectatorGame } from "../emitters/gameEmitters.js";
 import { userSocketStore } from "../userSocketStore.js";
 import { Game } from "../../../core/Game.js";
 import { createPlayer } from "../../../services/playerService.js";
@@ -288,6 +288,27 @@ export function handleMove(socket: Socket, payload: unknown) : void {
 	if (!game)
 		return
 	game.move(socket.id, payload.direction)
+}
+
+// Joker du mode invisible: revele le plateau quelques secondes, en nombre limite.
+export function handleJoker(socket: Socket, payload: unknown) : void {
+	if (spectatorSocketStore.has(socket.id))
+		return
+	if (payload)
+		return
+	const room = getRoom(socket)
+	if (!room)
+		return
+	const game = room.getGame()
+	if (!game)
+		return
+	if (!game.useJoker(socket.id))
+		return
+	const playerState = game.getPlayerStateBySocketId(socket.id)
+	if (!playerState)
+		return
+	emitGameUpdate(playerState, game.getState())
+	emitSpectatorForPlayer(playerState, game.getState())
 }
 
 export function handleRotate(socket: Socket, payload: unknown) : void {

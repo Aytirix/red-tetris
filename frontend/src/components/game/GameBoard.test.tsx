@@ -107,3 +107,24 @@ describe("GameBoard — pièce fantôme", () => {
 		expect(container.querySelectorAll(".tetris-cell--ghost")).toHaveLength(0);
 	});
 });
+
+describe("GameBoard — fondu du mode invisible", () => {
+	it("applique l'opacité de la grille fade cellule par cellule", () => {
+		const board: GameBoardCell[][] = [["I", "O"], [0, "T"]];
+		const fade = [[0.25, 1], [1, 0.5]];
+		const { container } = render(<GameBoard board={board} cellSize={10} fade={fade} />);
+
+		// Une couche coloree par case PLEINE (la case vide n'en a pas).
+		const pieces = container.querySelectorAll<HTMLElement>(".tetris-cell__piece");
+		expect(pieces).toHaveLength(3);
+		expect(pieces[0].style.opacity).toBe("0.25");
+		expect(pieces[1].style.opacity).toBe("1");
+		expect(pieces[2].style.opacity).toBe("0.5");
+	});
+
+	it("ignore un fade absent", () => {
+		const board: GameBoardCell[][] = [["I"]];
+		const { container } = render(<GameBoard board={board} cellSize={10} fade={null} />);
+		expect(container.querySelector(".tetris-cell__piece")).toBeNull();
+	});
+});
