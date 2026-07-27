@@ -11,7 +11,43 @@
 - Bouton **« Rejouer »** livré en solo (`GameView.tsx` + `handleRestart` de `GamePage.tsx`) : relance dans la même room, sans repasser par le lobby.
 - **Responsive PC** : taille de cellule dérivée du viewport (`config/boardSizing.ts`, `hooks/useViewportSize.ts`) — le plateau ne débordait plus bas de l'écran sur un portable.
 - **Hygiène soldée** (voir P4) : `liquid-glass-react` retiré, `middlesware/` renommé, logs de debug et imports morts purgés, prompt d'avatars sorti de `public/`, CI GitHub Actions ajoutée.
-- Suites vertes : **serveur 591 tests** (96.58 / 93.16 / 99.65 / 96.39) · **frontend 602 tests** (90.20 / 88.66 / 89.10 / 91.98).
+- **Bugs B3, B4, B5, B7, B9, B14 corrigés** (voir P3) — dont le crash du process sur un throw de tick, qui emportait toutes les parties simultanées.
+- **Code mort supprimé** : listeners globaux `register*Listeners` + `registerAllListeners`, `CELL_THEME`/`getCellTheme`/`isFilledCell`, `Player.inGame`, `Room.startGame()`, `<span hidden>{playerName}</span>` et la prop associée, imports cycliques de `roomSocketStore`.
+### Boucle d'audit adversarial du 2026-07-24 (2 itérations, 3 auditeurs indépendants)
+
+Findings **corrigés** pendant la boucle (tous confirmés par exécution) :
+
+| Sévérité | Défaut | Correctif |
+|---|---|---|
+| 🟠 Majeur | **`process.on("uncaughtException")` était un downgrade de disponibilité** : posé avant `listen()` et sans `server.on("error")`, un `EADDRINUSE` donnait un process **zombie sorti en code 0** que `restart: unless-stopped` ne relançait jamais | handlers globaux **supprimés** ; `server.on("error")` → log + `exit(1)`. Les causes sont traitées là où elles se produisent |
+| 🟠 Majeur | `handlerRoomJoin` est async et n'était ni attendu ni rattrapé : base indisponible → rejet non géré → le client n'obtenait **ni `room:joined` ni `system:Error`** et restait bloqué à vie sur « Connexion à la room… » | `.catch` dans `roomSocket.ts` → `system:Error`. 2 tests |
+| 🟠 Majeur | **Double `game:over`** : `checkGameOver()` émet le récap du vainqueur puis relance depuis son `try/finally` sans `catch` ; `abortOnFailure` réémettait un `game:over` sans vainqueur, **écrasant le récap** alors que les berrys étaient crédités | garde `wasAlreadyOver` lu avant `stop()`. Mutation testée (2 appels sans le garde, 1 avec) |
+| 🟠 Majeur | `stop()` (chemin **Rejouer**) ne purgeait pas `spectatorSocketStore` : un joueur éliminé redevenait joueur de la partie relancée mais restait marqué spectateur → **gelé**, il regardait sa pièce tomber sans pouvoir agir | purge extraite dans `purgeSpectators()`, appelée aussi par `stop()`. 1 test |
+| 🟠 Majeur | *(régression introduite par le correctif ci-dessus, trouvée à l'itération 2)* la purge passait **avant** `emitGameOver`, qui itère `spectatorSocketStore` pour notifier les **spectateurs purs** : vidé, ils ne recevaient plus rien | `haltGravity()` séparé de `stop()` ; émettre PUIS purger. Mutation testée |
+| 🟠 Majeur | Garde de capacité purement numérique : après une coupure non gracieuse, un **membre revenant était éjecté de sa propre room** (« Salle complète ») tant que son socket mort occupait la place | éviction du fantôme homonyme avant refus, **uniquement** quand la room est pleine. 1 test |
+| 🟡 Mineur | `createPlayer` renvoyant `null` (compte sans faction) : retour **silencieux**, client bloqué à vie | `emitError` ajouté ; le test qui verrouillait le silence est corrigé |
+| 🟡 Mineur | `recordGameResults` hors `try/catch` → rejet non géré (fatal une fois le filet global retiré) | try/catch dans `settleGameRewards` |
+| 🟡 Mineur | Le décompte 3-2-1 appelle `game.start()` → `emitGameStart` depuis un `setInterval` : même classe de crash que le tick, non couverte | try/catch + room rouverte + `system:Error` aux joueurs |
+| 🟡 Mineur | Salles pleines listées avec « Rejoindre » actif → aller-retour dashboard → refus → dashboard garanti | bouton « Complète » désactivé. 2 tests |
+| ⚪ Nit | `res.header("Vary", …)` **remplace** et écraserait un `Vary` posé en amont | `res.vary("Origin")`. 1 test de non-régression |
+| ⚪ Nit | Bloc CSS `.glass-panel h1..h4` orphelin, que j'avais annoncé supprimé à tort | supprimé pour de bon |
+| ⚪ Nit | `FRONTEND_ORIGIN` pilote toute la politique CORS et n'était documentée nulle part | documentée dans `.env.example`, **commentée** (compose interpole ce fichier : une valeur de dev y figerait le CORS de prod) |
+
+**Correctifs REJETÉS après vérification** (l'audit avait raison sur le problème, la correction évidente était pire) :
+
+- **Rendre son rôle d'hôte au joueur qui se reconnecte** : le client dérive l'admin de `players[0].username` et le serveur n'envoie jamais `hostPlayerId`. Le revenant étant réinséré en **fin** de tableau, lui rendre le rôle romprait l'invariant `hostPlayerId === players[0]` : l'interface donnerait les commandes à `players[0]` pendant que le serveur refuserait son `room:start` — **plus personne ne pourrait lancer la partie**. Le rôle suit donc la position, comportement documenté dans le code.
+
+**Corrections d'analyse** (le TODO se trompait) :
+
+- **B4** : le `break` sur game over était **correct** — continuer enverrait des `game:update` après le `game:over`. Seule l'indentation était fautive.
+- **B7** : la prémisse « CORS cassé en prod » était **infondée** — en production le serveur Node sert la SPA et le socket sur la même origine, le navigateur n'applique donc jamais CORS. Le correctif reste bon (cohérence + `FRONTEND_ORIGIN` enfin utilisée), son urgence était surestimée.
+- **B8** : `Player.getGame()` **est** lu (mode invisible) ; seul le champ `inGame` était mort.
+
+**Follow-ups non bloquants** (ouverts) : abort ⇒ aucun berry ni statistique enregistrés, sans signal au joueur · `player.getGame()` pointe encore la partie morte après un abort (rétention mémoire) · `server.ts` exclu de la couverture, donc `server.on("error")` non testé · si `emitGameOver` lève **en cours de boucle**, les joueurs non encore itérés restent sans récap · une `reason` inconnue de `room:denied` affiche « Partie privée » · le garde `joined:true` sans ajout reste théoriquement atteignable sur un statut `finished`, jamais posé en production.
+
+---
+
+- Suites vertes : **serveur 612 tests** (96.10 / 93.15 / 99.66 / 95.88) · **frontend 593 tests** (90.07 / 88.84 / 88.88 / 91.86).
 
 ---
 
@@ -254,42 +290,42 @@ Le premier audit concluait à tort qu'il manquait, en lisant le `else lockAndSpa
 
 - [x] **B1** ~~`roomHandlers.ts:158-163` : `new Game(...)` construit avant le contrôle d'hôte~~ — **corrigé le 2026-07-22**. Les contrôles (hôte **et** `status === "waiting"`) passent désormais avant la construction. Deux tests de régression ajoutés : un non-hôte ne modifie plus l'état des joueurs, un second `room:start` ne crée plus ni Game ni `setInterval` supplémentaire.
 - [x] **B2** ~~à la déconnexion, le joueur est retiré de `Room.players` mais jamais de `Game.state`~~ — **corrigé le 2026-07-22** : `Game.abandon(socketId)` (mort + `checkGameOver()`) est appelé depuis `room:leave` **et** depuis `disconnect`, et `checkGameOver` purge les abonnements spectateur de la partie. Vérifié : l'interval de gravité s'arrête réellement (test avec faux timers), un seul `game:over`, un seul crédit de berrys.
-- [ ] **B3** `gameEmitters.ts:135-138` : `throw new Error(...)` levé depuis le callback de `setInterval` → exception non capturée → **crash du process**, donc toutes les parties simultanées tombent. Ajouter un `try/catch` dans `tick()` et un `process.on("uncaughtException")`.
-- [ ] **B4** `tick()` (`Game.ts:304-305`) : `break` sur game over → les joueurs suivants dans la `Map` ne reçoivent pas leur dernière frame. Indentation cassée du bloc `Game.ts:294-311`.
-- [ ] **B5** `roomEmitters.ts:28` annonce `maxPlayers: 4` alors que `Room.addPlayer` (`room.ts:22-29`) n'a **aucune limite**.
+- [x] **B3** ~~`throw` levé depuis le callback de `setInterval` → crash du process~~ — **corrigé le 2026-07-24**. `restartTickInterval()` entoure `tick()` d'un `try/catch` ; en cas de panne, `abortOnFailure()` confine le dégât à la partie fautive (gravité coupée, room rouverte, `game:over` sans vainqueur, abonnements spectateur purgés — sans crédit de berrys, la partie n'ayant pas de résultat). Filet de dernier recours ajouté dans `server.ts` (`uncaughtException` + `unhandledRejection`, journalisés sans tuer le process). 6 tests (`Game.tickfailure.test.ts`), dont un qui vérifie qu'une **autre** partie en cours reste intacte.
+- [x] **B4** ~~`break` sur game over + indentation cassée~~ — **corrigé le 2026-07-24**, mais l'analyse initiale était **fausse** : sortir de la boucle est le bon comportement. `checkGameOver()` a déjà émis `game:over` et coupé la gravité ; continuer enverrait des `game:update` APRÈS le `game:over`, faisant repasser les clients du récap au plateau. Le `break` devient un `return` explicitement commenté, et l'indentation trompeuse (qui masquait le flux de contrôle) est corrigée.
+- [x] **B5** ~~`maxPlayers: 4` annoncé sans aucune limite appliquée~~ — **corrigé le 2026-07-24** : constante partagée `MAX_PLAYERS_PER_ROOM` (`core/room.ts`), appliquée par `Room.canJoin()`/`isFull()` et annoncée par `room:list`. `room:join` sur une salle complète **en attente** répond `room:denied` avec `reason: "full"` (sans ce refus explicite, `room:joined` renvoyait `joined: true` alors que le joueur n'avait pas été ajouté). Une salle complète **déjà lancée** garde son chemin spectateur. Message dédié côté client, `ws-docs.json` complété (`room:denied` n'y figurait pas du tout). 7 tests.
 - [x] **B6** ~~Erreur de compilation TypeScript côté serveur : `SocketMock.ts(112,52) TS2345`~~ — **corrigé le 2026-07-22** (garde `!doc.response` ajoutée ligne 109). Elle bloquait `npm run build`, donc toute image de production.
-- [ ] **B7** `middlewares/cors.ts:11` : origine `https://red-tetris.com` **en dur** hors dev, incohérente avec `frontendOrigins` (env) utilisée par socket.io → CORS cassé en prod.
-- [ ] **B8** `Player.setInGame(false)` n'est jamais appelé ; `Player.getGame()` n'est lu nulle part (code mort).
+- [x] **B7** ~~`https://red-tetris.com` en dur hors dev~~ — **corrigé le 2026-07-24** : politique unique en dev comme en prod, celle de `frontendOrigins` (`FRONTEND_ORIGIN`), déjà utilisée par socket.io. En-tête `Vary: Origin` ajouté (la réponse dépend de l'origine). 3 tests, dont un qui verrouille l'absence du domaine codé en dur.
+- [x] **B8** ~~`Player.setInGame(false)` jamais appelé ; `Player.getGame()` jamais lu~~ — **corrigé le 2026-07-24**, avec une **correction d'analyse** : `getGame()` est bien lu (`gameEmitters.ts`, mode invisible) et reste. En revanche le champ `inGame` était écrit mais jamais relu : `inGame`, `getInGame()` et `setInGame()` sont supprimés.
 
 ### Remontés par l'écriture des tests (2026-07-22)
 
-- [ ] **B9** `frontend/src/socket/socket.ts:6-7` : `import.meta.env.VITE_PORT` **sans valeur de repli**. La variable n'existe qu'au build Docker ; en `npm run dev` hors Docker l'URL devient `http://<host>:undefined` et **le socket ne se connecte jamais**. `DocsWsPage.tsx:26` fait le même calcul mais avec `|| "3000"` — incohérence à unifier.
+- [x] **B9** ~~`VITE_PORT` sans valeur de repli~~ — **corrigé le 2026-07-24** : nouveau module `config/backendUrl.ts` (`DEV_BACKEND_PORT` avec repli `3000`, `getBackendUrl()`), source unique pour `socket.ts` **et** `DocsWsPage.tsx` — l'incohérence entre les deux calculs disparaît. Le test existant reproduisait le bug (il attendait `:undefined`) : remplacé, plus un test qui interdit toute URL contenant `undefined`.
 - [ ] **B10** Contrat `game:over` désaligné : le serveur envoie `level` à la racine (`gameEmitters.ts:210-222`), le front ne le lit que dans chaque score (`gameState.ts:110`) et jette la valeur. Rattrapé par un contournement dans `GamePage.tsx:443`, donc invisible aujourd'hui, mais fragile.
 - [ ] **B11** `GameOverView.tsx:39` : `rank: index + 1` suppose des scores déjà triés. Vrai aujourd'hui (`gameEmitters.ts:215`), mais rien ne le garantit côté front.
-- [ ] **B12** `GameView.tsx:58` : la garde anti-répétition clavier ne couvre que `Space` ; la rotation (`ArrowUp`/`KeyX`) part en auto-repeat si la touche est maintenue.
-- [ ] **B13** `GameView.tsx:88` (`if (!isSpectator) return`) et `socket/events/user.ts:6-7` (`registerUserListeners` vide) : code mort.
-- [ ] **B14 — validation** `gateways/socket/validators/validateSocketEvent.ts:29-36` : `validateCheckUsername` vérifie que la clé `username` existe mais **jamais son type**, contrairement à tous les validateurs de `validateRoomEvent.ts`. `{username: 12345}` passe, `isValidUsername(12345)` renvoie `true` (coercition par `RegExp.test`, `utils/unsernameValidator.ts:4`), et une valeur non-string atteint la requête Prisma et le `userSocketStore`.
-- [ ] **B15** `gateways/socket/roomSocketStore.ts:1-3` : imports inutilisés dont `createRoom`, qui crée un cycle d'imports `roomSocketStore → roomService → roomSocketStore`.
-- [ ] **B16** `core/room.ts:130` : `startGame()` est un stub vide (code mort).
+- [x] **B12** ~~garde anti-répétition clavier limitée à `Space`~~ — **résolu** : `GameView.tsx` pilote lui-même la répétition de la rotation (délai 130 ms puis 45 ms, annulée au `keyup`) et ignore l'auto-repeat de l'OS ; `hardDrop` et `joker` refusent explicitement `e.repeat`. Le comportement est désormais volontaire et couvert par les tests clavier.
+- [x] **B13** ~~`registerUserListeners` vide~~ — **supprimé le 2026-07-24**, avec les trois `register*Listeners` et `registerAllListeners` : ils ne faisaient que journaliser (`room.ts` le faisait même **en production**) et doublonnaient les listeners de `GamePage`. `SocketProvider` ne branche plus que `connect`/`disconnect`.
+- [x] **B14 — validation** ~~`validateCheckUsername` ne vérifiait jamais le type de `username`~~ — **corrigé le 2026-07-24** : `typeof payload.username === "string"` ajouté. Une valeur non-string n'atteint plus la requête Prisma ni le `userSocketStore`. 6 assertions (nombre, `null`, `undefined`, booléen, tableau, objet avec `toString`).
+- [x] **B15** ~~imports inutilisés créant un cycle~~ — **corrigé le 2026-07-24** : `Socket` et `createRoom` supprimés, `Room` passé en `import type`. Le cycle `roomSocketStore → roomService → roomSocketStore` disparaît.
+- [x] **B16** ~~`Room.startGame()` stub vide~~ — **supprimé le 2026-07-24**, avec son test « is callable (currently a no-op) ».
 
 ---
 
 ### Follow-ups issus de la boucle d'audit (Mineur / Nit, non bloquants)
 
 - [ ] **Chevron, jonction bras/disque** : à fort grossissement (×8 et plus) la jonction montre un écart sub-pixel dû à l'arrondi des `border-width` fractionnaires par le navigateur (6,017 px et 11,083 px). Invisible à la taille réelle de 38 px ; la géométrie elle-même est exacte à moins de 0,01 px (vérifiée par calcul indépendant et par `chevronGeometry.test.ts`).
-- [ ] **`CELL_THEME` / `getCellTheme` / `isFilledCell`** (`frontend/src/config/gameConfig.ts`) sont du **code mort** : le rendu passe entièrement par `data-piece` + CSS. 6 tests portent dessus et gonflent la couverture sans rien prouver du rendu. À supprimer, ou à rebrancher dans `Cell.tsx`.
+- [x] ~~**`CELL_THEME` / `getCellTheme` / `isFilledCell`** code mort~~ — **supprimés le 2026-07-24** avec le type `CellThemeEntry` et les 3 blocs de tests qui gonflaient la couverture sans rien prouver du rendu. Le rendu passe entièrement par `data-piece` + CSS.
 - [ ] **Couverture frontend annoncée** : 90,6 % avec `src/test/**` exclu ; **70,5 %** si on le réintègre. Le projet passe les seuils dans les deux cas, mais c'est ~70 % qu'il faut annoncer en soutenance si l'exclusion est contestée.
 - [ ] `frontend/vitest.config.ts` exclut `src/vite-env.d.ts`, **qui n'existe pas** (exclusion fantôme).
-- [ ] Deux tests « exécute les handlers sans lever d'erreur » (`socket/events/game.test.ts`, `room.test.ts`) portent sur des stubs `console.log` : remplissage de couverture, à supprimer avec le code mort correspondant.
+- [x] ~~Deux tests « exécute les handlers sans lever d'erreur » sur des stubs `console.log`~~ — **supprimés le 2026-07-24** avec les listeners correspondants (voir B13).
 - [ ] Un chunk `DocsWsPage-*.js` (29 Ko) reste émis en production alors que la route est absente. Aucun API interdit dedans, mais c'est du poids inutile.
-- [ ] `frontend/public/prompt` (prompt de génération d'avatars par IA) est copié dans `dist/` et **servi publiquement** ; `frontend/src/test/prompt.md` est un prompt d'instructions livré dans `src/`. Aucun impact technique, mauvais effet en soutenance.
+- [x] ~~`frontend/public/prompt` servi publiquement~~ — **déplacé en `frontend/scripts/avatar-prompt.md` le 2026-07-24**. Reste ouvert : `frontend/src/test/prompt.md`, toujours livré dans `src/`.
 - [ ] Un **spectateur externe n'est jamais notifié de la fin de partie** : `emitGameOver` n'itère que `game.state`, son écran reste figé sur la dernière frame.
 - [ ] `server/tsconfig.json` exclut `src/**/*.test.ts` du typecheck et vitest ne typechecke pas : **plus rien ne vérifie les types des tests serveur**. Prévoir un `tsconfig.build.json` séparé.
-- [ ] `Player.setInGame(false)` n'est jamais appelé, `getInGame()`/`getGame()` ne sont lus nulle part : après une partie tous les `Player` restent `inGame === true`.
+- [x] ~~`Player.setInGame(false)` jamais appelé~~ — **corrigé le 2026-07-24** : l'état `inGame` est supprimé, il ne pouvait plus mentir (voir B8).
 - [ ] `handleRoomStart` refuse silencieusement (non-hôte, statut ≠ `waiting`) sans `emitError`, contrairement à tous les autres garde-fous.
-- [ ] `middlewares/cors.ts` code en dur `https://red-tetris.com` hors dev et ignore `FRONTEND_ORIGIN`, pourtant injecté dans `backend-prod` (variable morte, deux politiques CORS incohérentes).
+- [x] ~~`middlewares/cors.ts` code en dur `https://red-tetris.com`~~ — **corrigé le 2026-07-24** (voir B7).
 - [ ] Image serveur de prod non élaguée : `npm install` complet (devDependencies + vitest), sources TS et fichiers de test embarqués, exécution en root. Passer à un stage runtime avec `npm ci --omit=dev` et `USER node`.
-- [ ] Dépendance morte `liquid-glass-react` (jamais importée, injecte des filtres SVG) : à retirer de `frontend/package.json`.
+- [x] ~~Dépendance morte `liquid-glass-react`~~ — **retirée le 2026-07-24**.
 - [ ] Un rafraîchissement de page pendant une partie à deux compte désormais comme un abandon (fin de partie immédiate, victoire à l'adversaire). Comportement volontaire du correctif B2, à arbitrer côté produit.
 
 ---
@@ -301,9 +337,9 @@ Le premier audit concluait à tort qu'il manquait, en lisant le `else lockAndSpa
 - [x] ~~`console.log` de debug~~ — **purgés le 2026-07-24** : `console.log(user)` (`roomService.ts`, dumpait l'objet utilisateur complet), les deux logs de pseudo de `userService.ts`, « A user connected » (`registerSocketHandlers.ts`) et « User disconnected » (`systemSocket.ts`). Conservés : les logs de démarrage (`server.ts`, `app.ts` — l'un est asserté par `app.test.ts`) et les `console.error` de rattrapage.
 - [x] ~~Imports morts : `userInfo` (`os`) dans `roomService.ts`, `error` (`node:console`) dans `userRepositories.ts`~~ — **supprimés le 2026-07-24**.
 - [x] ~~Dossier `server/src/middlesware/`~~ — **renommé `middlewares/` le 2026-07-24** (`git mv`, unique import mis à jour dans `app.ts`).
-- [ ] Listeners morts `registerGameListeners` (`frontend/src/socket/events/game.ts`, `// TODO`) qui doublonnent ceux de `GamePage.tsx`
-- [ ] `GameView.tsx` : `<span hidden>{playerName}</span>` pour contourner un warning TS — le nom du joueur n'est affiché nulle part sur l'écran de jeu
-- [ ] `Game.ts` : `const pieces` masque l'import `pieces` de `piecesGameTypes.ts`
+- [x] ~~Listeners morts `registerGameListeners`~~ — **supprimés le 2026-07-24** (voir B13).
+- [x] ~~`<span hidden>{playerName}</span>`~~ — **supprimé le 2026-07-24**, avec la prop `playerName` de `GameView` (inutilisée) et son passage depuis `GamePage`. `GameOverView` et `LobbyView`, qui s'en servent réellement, la gardent.
+- [x] ~~`const pieces` masque l'import `pieces`~~ — **corrigé le 2026-07-24** : renommé `remainingTypes` et dérivé de `PIECES_TYPES`, qui redevient la source unique des 7 types (le tableau était recopié à la main).
 - [ ] Logique Tetris dupliquée dans `test/TestPage.tsx` (shapes/couleurs propres, sans lien avec le jeu réel)
 - [ ] **`frontend/dist/assets` appartient à `root`** (créé par un conteneur Docker) → `npm run build` échoue en local avec `EACCES: permission denied, unlink`. **Nécessite `sudo`, à lancer à la main : `sudo chown -R $USER:$USER frontend/dist`** (ou `sudo rm -rf frontend/dist`, le dossier est gitignoré). À éviter à l'avenir en fixant l'utilisateur dans le service de build.
 - [ ] **`main` a 148 commits de retard sur `prod`** — merger avant la soutenance, le rendu se fait sur la branche par défaut

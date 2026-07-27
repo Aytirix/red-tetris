@@ -264,6 +264,18 @@
     "responseDescription": ""
   },
   {
+    "id": "f7b1c9d2-4e83-4a15-9c60-2d8ab3e51f04",
+    "name": "room:denied",
+    "direction": "back-to-front",
+    "group": "room",
+    "description": "Refus d'entree dans une salle, envoye au seul socket concerne a la place de room:joined. Le client redirige vers le dashboard et affiche un message adapte a la raison.",
+    "payload": "{\n  \"reason\": \"private\" | \"full\"\n}",
+    "payloadDescription": "reason = \"private\": salle privee (dont les parties solo) et le pseudo n'en est pas membre.\nreason = \"full\": salle en attente ayant atteint sa capacite (4 joueurs).\n\nUne salle DEJA LANCEE ne renvoie pas room:denied: le nouvel arrivant recoit room:joined avec joined=false et bascule en spectateur.",
+    "response": "",
+    "responseName": "",
+    "responseDescription": ""
+  },
+  {
     "id": "f1a11111-0000-4000-8000-000000000001",
     "name": "shop:Get",
     "direction": "front-to-back",

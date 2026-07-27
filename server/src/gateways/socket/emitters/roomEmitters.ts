@@ -1,5 +1,5 @@
 import type { Socket } from "socket.io";
-import type { Room } from "../../../core/room.js";
+import { MAX_PLAYERS_PER_ROOM, type Room } from "../../../core/room.js";
 import type { RoomJoinedPayload } from "../../../types/socket/roomSocketTypes.js";
 import { roomSocketStore } from "../roomSocketStore.js";
 import { userSocketStore } from "../userSocketStore.js";
@@ -27,7 +27,7 @@ export function emitSubscrib() : void {
 		.map((room) => ({
 			roomId: room.name,
 			playerCount: room.countPlayer(),
-			maxPlayers: 4,
+			maxPlayers: MAX_PLAYERS_PER_ROOM,
 			mode: room.getMode(),
 		}))
 	for (const [, objet] of userSocketStore) {
@@ -65,7 +65,7 @@ export function emitKickedRoom(socket: Socket) : void {
 	socket.emit("room:kicked")
 }
 
-// Refus d'entree dans une room: le client est redirige (ex: partie privee).
-export function emitRoomDenied(socket: Socket, reason: "private") : void {
+// Refus d'entree dans une room: le client est redirige (partie privee ou complete).
+export function emitRoomDenied(socket: Socket, reason: "private" | "full") : void {
 	socket.emit("room:denied", { reason })
 }

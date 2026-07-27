@@ -86,5 +86,13 @@ export async function settleGameRewards(entries: GameSettlementEntry[]): Promise
 	}
 	// GameSettlementEntry contient tous les champs de GameResultInput (+ socket, ignoré
 	// ici) : on passe directement les entrées au record.
-	await recordGameResults(entries);
+	// Protégé comme la boucle ci-dessus : l'appelant (`Game.checkGameOver`) lance cette
+	// promesse sans l'attendre, donc un rejet ici ne serait rattrapé par personne et
+	// abattrait le process — pour de simples statistiques, alors que la partie est
+	// terminée et les berrys déjà crédités.
+	try {
+		await recordGameResults(entries);
+	} catch (err) {
+		console.error("recordGameResults failed:", err);
+	}
 }

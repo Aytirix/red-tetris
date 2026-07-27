@@ -3,7 +3,9 @@ import type { Socket } from "socket.io";
 
 vi.mock("../../../config/prisma.js", () => ({ prisma: {} }));
 vi.mock("./roomHandlers.js", () => ({
-	handlerRoomJoin: vi.fn(),
+	// Seul handler asynchrone: le routeur enchaine un .catch dessus, le mock DOIT
+	// donc renvoyer une promesse.
+	handlerRoomJoin: vi.fn(async () => undefined),
 	handlerRoomSubscribe: vi.fn(),
 	handlerRoomUnsubscribe: vi.fn(),
 	handlerRoomLeave: vi.fn(),
@@ -75,5 +77,35 @@ describe("registerRoomSocket", () => {
 		events.get(event)!(payload);
 
 		expect(handlers[handlerName]).toHaveBeenCalledWith(socket, payload);
+	});
+
+	// Regression: handlerRoomJoin est async et n'etait ni attendu ni rattrape. Une
+	// base indisponible produisait un rejet non gere -> le client n'obtenait NI
+	// room:joined NI system:Error et restait bloque a vie sur « Connexion a la room… ».
+	it("repond system:Error quand room:join rejette", async () => {
+		const { socket, events } = makeSocket("s1");
+		vi.spyOn(console, "error").mockImplementation(() => undefined);
+		vi.mocked(handlers.handlerRoomJoin).mockRejectedValueOnce(new Error("db down"));
+		registerRoomSocket(socket);
+
+		events.get("room:join")!({ roomId: "salle1" });
+		// Laisse la micro-tache du .catch se resoudre.
+		await Promise.resolve();
+		await Promise.resolve();
+
+		expect(socket.emit).toHaveBeenCalledWith("system:Error", {
+			event: "room:join",
+			message: "Failed to join room",
+		});
+	});
+
+	it("ne perturbe pas le chemin nominal de room:join", async () => {
+		const { socket, events } = makeSocket("s1");
+		registerRoomSocket(socket);
+
+		events.get("room:join")!({ roomId: "salle1" });
+		await Promise.resolve();
+
+		expect(socket.emit).not.toHaveBeenCalled();
 	});
 });

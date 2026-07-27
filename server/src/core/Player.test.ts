@@ -34,7 +34,6 @@ describe("Player", () => {
 	it("starts outside of any game", () => {
 		const player = new Player("zoro", makeSocket("s"), "zoro", "pirate");
 		expect(player.getGame()).toBeUndefined();
-		expect(player.getInGame()).toBe(false);
 	});
 
 	it("setGame / getGame stores the game reference", () => {
@@ -44,13 +43,6 @@ describe("Player", () => {
 		expect(player.getGame()).toBe(fakeGame);
 	});
 
-	it("setInGame / getInGame toggles the in-game flag", () => {
-		const player = new Player("sanji", makeSocket("s"), "sanji", "pirate");
-		player.setInGame(true);
-		expect(player.getInGame()).toBe(true);
-		player.setInGame(false);
-		expect(player.getInGame()).toBe(false);
-	});
 });
 
 describe("Player — cosmetique", () => {

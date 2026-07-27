@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { Socket } from "socket.io";
-import { Room } from "./room.js";
+import { MAX_PLAYERS_PER_ROOM, Room } from "./room.js";
 import { Player } from "./Player.js";
 import type { Game } from "./Game.js";
 
@@ -90,6 +90,44 @@ describe("Room", () => {
 		it("returns false when the room is finished", () => {
 			room.setStatus("finished");
 			expect(room.canJoin()).toBe(false);
+		});
+
+		// B5: room:list annoncait `maxPlayers: 4` sans qu'aucune regle ne l'applique —
+		// un 5e joueur entrait et l'interface affichait « 5/4 ».
+		it("returns false once the room reached its capacity", () => {
+			for (let i = 0; i < MAX_PLAYERS_PER_ROOM; i++)
+				expect(room.addPlayer(makePlayer(`joueur${i}`))).toBe(true);
+
+			expect(room.isFull()).toBe(true);
+			expect(room.canJoin()).toBe(false);
+		});
+
+		it("refuses the player beyond the capacity", () => {
+			for (let i = 0; i < MAX_PLAYERS_PER_ROOM; i++)
+				room.addPlayer(makePlayer(`joueur${i}`));
+
+			expect(room.addPlayer(makePlayer("detrop"))).toBe(false);
+			expect(room.countPlayer()).toBe(MAX_PLAYERS_PER_ROOM);
+		});
+
+		it("is not full below the capacity", () => {
+			for (let i = 0; i < MAX_PLAYERS_PER_ROOM - 1; i++)
+				room.addPlayer(makePlayer(`joueur${i}`));
+
+			expect(room.isFull()).toBe(false);
+			expect(room.canJoin()).toBe(true);
+		});
+
+		// Une place liberee doit redevenir joignable, sinon une room pleine resterait
+		// morte apres le depart d'un joueur.
+		it("becomes joinable again after a player leaves", () => {
+			const players = Array.from({ length: MAX_PLAYERS_PER_ROOM }, (_v, i) => makePlayer(`joueur${i}`));
+			for (const player of players) room.addPlayer(player);
+
+			room.removePlayer(players[0]!);
+
+			expect(room.isFull()).toBe(false);
+			expect(room.canJoin()).toBe(true);
 		});
 	});
 
@@ -327,9 +365,4 @@ describe("Room", () => {
 		});
 	});
 
-	describe("startGame", () => {
-		it("is callable (currently a no-op)", () => {
-			expect(() => room.startGame()).not.toThrow();
-		});
-	});
 });

@@ -3,6 +3,12 @@ import type { Game } from "./Game.js";
 import type { Player } from "./Player.js";
 import { isGameMode, type GameMode } from "../types/game/gameTypes.js";
 
+// Capacite d'une room. Cette valeur etait deja ANNONCEE aux clients par room:list
+// (et affichee « 2/4 » sur le dashboard) sans jamais etre appliquee: un 5e joueur
+// entrait et l'interface affichait « 5/4 ». Une seule source de verite desormais,
+// partagee entre la regle d'entree et ce qui est annonce.
+export const MAX_PLAYERS_PER_ROOM = 4;
+
 export class Room {
 	public readonly name: string;
 	private players: Player[];
@@ -65,7 +71,10 @@ export class Room {
 		return (true);
 	}
 	canJoin() : boolean {
-		return this.status === "waiting"
+		return this.status === "waiting" && !this.isFull()
+	}
+	isFull() : boolean {
+		return this.players.length >= MAX_PLAYERS_PER_ROOM
 	}
 	setStatus(status: "waiting" | "playing" | "finished") : void {
 		this.status = status
@@ -172,5 +181,4 @@ export class Room {
 	findPlayerByName(username: string): Player | undefined {
 		return this.players.find((player) => player.getName() === username)
 	}
-	startGame() : void {}
 	}

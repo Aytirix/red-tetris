@@ -59,7 +59,7 @@ function makeState(overrides: Partial<GameStatePayload> = {}): GameStatePayload 
 
 function renderGameView(overrides: Partial<Parameters<typeof GameView>[0]> = {}) {
 	return render(
-		<GameView state={makeState()} roomName="room-42" playerName="luffy" {...overrides} />,
+		<GameView state={makeState()} roomName="room-42" {...overrides} />,
 	);
 }
 
@@ -386,7 +386,7 @@ describe("GameView — quitter et élimination", () => {
 });
 
 describe("GameView — secousse à la réception de lignes de pénalité", () => {
-	const base = { roomName: "room-42", playerName: "luffy" } as const;
+	const base = { roomName: "room-42" } as const;
 
 	function penaltyBoard(penaltyCount: number, rows = 20, cols = 10): GameBoardCell[][] {
 		const b = board(rows, cols);
@@ -467,7 +467,7 @@ describe("GameView — touches personnalisables et joker", () => {
 	beforeEach(() => localStorage.clear());
 
 	it("declenche le joker sur la touche par defaut", () => {
-		render(<GameView state={makeState({ mode: "invisible", jokersLeft: 3 })} roomName="salle" playerName="luffy" />);
+		render(<GameView state={makeState({ mode: "invisible", jokersLeft: 3 })} roomName="salle" />);
 
 		fireEvent.keyDown(window, { code: "KeyJ" });
 
@@ -475,7 +475,7 @@ describe("GameView — touches personnalisables et joker", () => {
 	});
 
 	it("ne repete pas le joker si la touche reste enfoncee", () => {
-		render(<GameView state={makeState({ mode: "invisible" })} roomName="salle" playerName="luffy" />);
+		render(<GameView state={makeState({ mode: "invisible" })} roomName="salle" />);
 
 		fireEvent.keyDown(window, { code: "KeyJ" });
 		fireEvent.keyDown(window, { code: "KeyJ", repeat: true });
@@ -485,7 +485,7 @@ describe("GameView — touches personnalisables et joker", () => {
 
 	it("respecte une touche reassignee par le joueur", () => {
 		localStorage.setItem("keyBindings", JSON.stringify({ ...DEFAULT_KEY_BINDINGS, rotate: "KeyW" }));
-		render(<GameView state={makeState()} roomName="salle" playerName="luffy" />);
+		render(<GameView state={makeState()} roomName="salle" />);
 
 		fireEvent.keyDown(window, { code: "KeyW" });
 		expect(gameEvents.emitGameRotate).toHaveBeenCalledTimes(1);
@@ -496,14 +496,14 @@ describe("GameView — touches personnalisables et joker", () => {
 	});
 
 	it("affiche les jokers restants et la touche associee en mode invisible", () => {
-		render(<GameView state={makeState({ mode: "invisible", jokersLeft: 2 })} roomName="salle" playerName="luffy" />);
+		render(<GameView state={makeState({ mode: "invisible", jokersLeft: 2 })} roomName="salle" />);
 
 		expect(screen.getByText("Jokers · J")).toBeInTheDocument();
 		expect(screen.getByText("★★☆")).toBeInTheDocument();
 	});
 
 	it("n'affiche pas les jokers hors mode invisible", () => {
-		const { container } = render(<GameView state={makeState()} roomName="salle" playerName="luffy" />);
+		const { container } = render(<GameView state={makeState()} roomName="salle" />);
 		expect(container.querySelector(".tetris-hud__jokers")).toBeNull();
 	});
 });
@@ -514,7 +514,6 @@ describe("GameView — cosmetique en spectateur", () => {
 			<GameView
 				state={makeState({ spectator: "zoro", theme: "synthwave" })}
 				roomName="salle"
-				playerName="luffy"
 			/>,
 		);
 
@@ -524,7 +523,7 @@ describe("GameView — cosmetique en spectateur", () => {
 
 	it("retombe sur son propre theme si le serveur n'en fournit pas", () => {
 		const { container } = render(
-			<GameView state={makeState({ spectator: "zoro", theme: null })} roomName="salle" playerName="luffy" />,
+			<GameView state={makeState({ spectator: "zoro", theme: null })} roomName="salle" />,
 		);
 
 		expect((container.querySelector(".tetris-stage") as HTMLElement).getAttribute("data-recipe")).toBe("neon");
@@ -532,7 +531,7 @@ describe("GameView — cosmetique en spectateur", () => {
 
 	it("garde son propre theme sur son propre plateau", () => {
 		const { container } = render(
-			<GameView state={makeState({ theme: "synthwave" })} roomName="salle" playerName="luffy" />,
+			<GameView state={makeState({ theme: "synthwave" })} roomName="salle" />,
 		);
 
 		expect((container.querySelector(".tetris-stage") as HTMLElement).getAttribute("data-recipe")).toBe("neon");

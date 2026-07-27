@@ -7,7 +7,6 @@ const ws = vi.hoisted(() => ({ socket: null as unknown as FakeSocket }));
 
 vi.mock("../socket/socket", () => ({
 	get socket() { return ws.socket; },
-	registerAllListeners: vi.fn(),
 }));
 
 import {

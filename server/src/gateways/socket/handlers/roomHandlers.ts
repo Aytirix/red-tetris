@@ -62,9 +62,41 @@ export async function handlerRoomJoin(socket: Socket, payload: unknown): Promise
 					return
 				}
 			}
+			// Room COMPLETE et pas encore lancee: refus explicite. Sans ce garde-fou
+			// addPlayer() echouerait en silence et emitRoomJoined renverrait quand meme
+			// `joined: true` (calcule sur le seul statut) — le client se croirait dans
+			// une room ou il ne figure pas. Une room « playing » garde son chemin
+			// existant: joined:false, donc bascule spectateur.
+			if (room.getStatus() === "waiting" && room.isFull()) {
+				// Avant de refuser, on traite le cas de la RECONNEXION: apres une coupure
+				// non gracieuse, le socket mort du joueur occupe encore sa place (le
+				// disconnect peut tarder jusqu'au pingTimeout de socket.io). Un refus sec
+				// ejecterait un membre de SA PROPRE room. On evince donc son fantome — et
+				// uniquement dans ce cas, pour ne rien changer au chemin nominal.
+				const username = userSocketStore.get(socket.id)?.username ?? null
+				const stalePlayer = username ? room.findPlayerByName(username) : undefined
+				if (!stalePlayer || stalePlayer.getSocketId() === socket.id) {
+					emitRoomDenied(socket, "full")
+					return
+				}
+				// Un hote qui se reconnecte ainsi PERD son role, transmis a players[0].
+				// Volontaire: le client derive l'admin de `players[0].username` et le
+				// serveur n'envoie jamais hostPlayerId. Rendre le role au revenant, qui
+				// est reinsere en FIN de tableau, romprait l'invariant
+				// `hostPlayerId === players[0]`: l'interface donnerait les commandes a
+				// players[0] pendant que le serveur refuserait son room:start — plus
+				// personne ne pourrait lancer la partie. Le role suit donc la position.
+				room.removePlayer(stalePlayer)
+			}
 			const newPlayer = await createPlayer(socket)
-			if (!newPlayer)
+			// createPlayer renvoie null (et ne rejette pas) si le socket n'a pas de
+			// pseudo, ou si le compte n'existe pas / n'a pas de faction. Sans reponse,
+			// le client reste bloque A VIE sur « Connexion a la room… »: il n'attend
+			// que room:joined ou system:Error.
+			if (!newPlayer) {
+				emitError(socket, "room:join", "Failed to join room")
 				return
+			}
 			if (!room.addPlayer(newPlayer)) {
 				emitRoomJoined(socket, room)
 				return
@@ -227,23 +259,38 @@ function startGameWithCountdown(room: Room) : void {
 	emitCountdown(room.getPlayers(), COUNTDOWN_SEQUENCE[0]!)
 	let index = 0
 	const timer = setInterval(() => {
-		index++
-		if (index < COUNTDOWN_SEQUENCE.length) {
-			emitCountdown(room.getPlayers(), COUNTDOWN_SEQUENCE[index]!)
-			return
+		// Comme le tick de gravite, ce callback n'a AUCUN appelant pour rattraper une
+		// exception: elle tuerait le process, donc toutes les parties simultanees.
+		// `game.start()` -> `emitGameStart` leve sur un invariant manquant.
+		try {
+			index++
+			if (index < COUNTDOWN_SEQUENCE.length) {
+				emitCountdown(room.getPlayers(), COUNTDOWN_SEQUENCE[index]!)
+				return
+			}
+			// Fin du decompte.
+			room.clearCountdown()
+			if (room.countPlayer() === 0) {
+				roomSocketStore.delete(room.name)
+				return
+			}
+			// Copie du tableau: getPlayers() renvoie la liste vivante de la Room, un depart
+			// en cours de partie muterait sinon retroactivement Game.players (dont dependent
+			// isSolo, getTickSpeed et updateLevel).
+			const game = new Game(room.getMode(), [...room.getPlayers()], room)
+			room.setGame(game)
+			game.start()
+		} catch (error) {
+			// Panne confinee a CETTE room: decompte arrete, room rouverte, joueurs
+			// prevenus pour ne pas rester bloques sur un ecran de decompte fige.
+			console.error(`Countdown failed in room "${room.name}":`, error)
+			room.clearCountdown()
+			room.getGame()?.stop()
+			room.setGame(null)
+			room.setStatus("waiting")
+			for (const player of room.getPlayers())
+				emitError(player.getSocket(), "room:start", "Failed to start game")
 		}
-		// Fin du decompte.
-		room.clearCountdown()
-		if (room.countPlayer() === 0) {
-			roomSocketStore.delete(room.name)
-			return
-		}
-		// Copie du tableau: getPlayers() renvoie la liste vivante de la Room, un depart
-		// en cours de partie muterait sinon retroactivement Game.players (dont dependent
-		// isSolo, getTickSpeed et updateLevel).
-		const game = new Game(room.getMode(), [...room.getPlayers()], room)
-		room.setGame(game)
-		game.start()
 	}, COUNTDOWN_STEP_MS)
 	room.setCountdownTimer(timer)
 }

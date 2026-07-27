@@ -20,14 +20,13 @@ const MINI_PADDING_PX = 18;
 type Props = {
 	state: GameStatePayload;
 	roomName: string;
-	playerName: string;
 	eliminated?: boolean;
 	onEliminationDone?: () => void;
 	onLeave?: () => void;
 	onRestart?: () => void;
 };
 
-export default function GameView({ state, roomName, playerName, eliminated = false, onEliminationDone, onLeave, onRestart }: Props) {
+export default function GameView({ state, roomName, eliminated = false, onEliminationDone, onLeave, onRestart }: Props) {
 	const isSpectator = state.spectator !== false;
 	const spectatorOf = isSpectator ? (state.spectator as string) : null;
 	const isSolo = roomName.startsWith("sologame_");
@@ -266,9 +265,6 @@ export default function GameView({ state, roomName, playerName, eliminated = fal
 					/>
 				</aside>
 			</div>
-			{/* avoid unused warning for player name in this component scope */}
-			<span hidden>{playerName}</span>
-
 			{eliminated && (
 				<div className="tetris-gameover-overlay">
 					<span

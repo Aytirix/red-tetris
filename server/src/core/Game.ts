@@ -73,7 +73,6 @@ export class Game {
 				spectator: false,
 			});
 			player.setGame(this)
-			player.setInGame(true)
 		}
 	}
 	createBoard() : Board {
@@ -290,8 +289,58 @@ export class Game {
 		if (this.intervalId)
 			clearInterval(this.intervalId)
 		this.intervalId = setInterval(() => {
-			this.tick()
+			// Une exception levee dans un callback de setInterval n'a AUCUN appelant pour
+			// la rattraper: elle remonte en uncaughtException et tue le process, donc
+			// TOUTES les parties simultanees. On isole la panne a la partie fautive.
+			try {
+				this.tick()
+			} catch (error) {
+				this.abortOnFailure(error)
+			}
 		}, this.getTickSpeed())
+	}
+	// Sortie de secours quand un tick leve (etat impossible cote emitters, par ex.).
+	// Meme demontage que checkGameOver() — gravite stoppee, room rouverte, abonnements
+	// spectateur purges — mais SANS credit de berrys ni enregistrement de stats: la
+	// partie n'a pas de resultat exploitable. Les joueurs recoivent game:over (sans
+	// vainqueur) pour ne pas rester bloques sur un plateau fige.
+	private abortOnFailure(error: unknown) : void {
+		console.error(`Game tick failed in room "${this.room.name}":`, error)
+		// LU AVANT stop(), qui pose isOver. Cas reel: checkGameOver() emet le bon
+		// game:over (avec vainqueur) puis LEVE dans son try/finally sans catch;
+		// l'exception remonte jusqu'ici. Reemettre un game:over sans vainqueur
+		// ecraserait le recap deja affiche chez les joueurs deja notifies, alors que
+		// les berrys, eux, ont bien ete credites au vainqueur.
+		const wasAlreadyOver = this.isOver
+		// `haltGravity()` et NON `stop()`: `stop()` purge les spectateurs, or
+		// `emitGameOver` a besoin de `spectatorSocketStore` pour notifier les
+		// spectateurs PURS (jamais joueurs). Purger avant l'emission les laisserait
+		// gelés sur un plateau mort, sans recap ni retour lobby — exactement ce que
+		// cette methode cherche a eviter. La purge a donc lieu APRES, comme dans
+		// checkGameOver().
+		this.haltGravity()
+		this.room.setStatus("waiting")
+		this.room.setGame(null)
+		if (!wasAlreadyOver) {
+			// L'emission peut lever pour la meme raison que le tick: elle ne doit pas
+			// empecher la purge des abonnements, sinon les sockets concernes resteraient
+			// rattaches a une partie morte a la partie suivante.
+			try {
+				emitGameOver(this.state, null)
+			} catch (emitError) {
+				console.error("emitGameOver failed while aborting game:", emitError)
+			}
+		}
+		this.purgeSpectators()
+	}
+	// Detache les spectateurs de CETTE partie. Un abonnement survivant fait sortir
+	// immediatement handleMove/Rotate/Drop/Joker: le socket concerne serait gele
+	// (il regarde sa piece tomber sans pouvoir agir) a la partie suivante.
+	private purgeSpectators() : void {
+		for (const [spectatorSocketId, subscription] of spectatorSocketStore) {
+			if (subscription.game === this)
+				spectatorSocketStore.delete(spectatorSocketId)
+		}
 	}
 	clearLines(playerState: PlayerGameState) : number {
 		let clearedLines = 0
@@ -438,14 +487,17 @@ export class Game {
 		emitSpectatorForPlayer(playerState, this.state)
 	}
 	randomPiece() : PieceType[] {
-		const pieces: PieceType[] = ["I", "J", "L", "O", "S", "T", "Z"]
+		// Copie de PIECES_TYPES, source unique des 7 types (le tableau etait recopie a la
+		// main ici, sous le nom `pieces` — qui MASQUAIT l'import `pieces`, le dictionnaire
+		// des formes utilise juste a cote dans spawnPiece).
+		const remainingTypes: PieceType[] = [...PIECES_TYPES]
 		const bag: PieceType[] = []
-		for (let i = 0; i < 7; i++) {
-			const randomIndex = Math.floor(Math.random() * pieces.length)
-			const randomPiece : PieceType | undefined = pieces[randomIndex]
+		for (let i = 0; i < PIECES_TYPES.length; i++) {
+			const randomIndex = Math.floor(Math.random() * remainingTypes.length)
+			const randomPiece : PieceType | undefined = remainingTypes[randomIndex]
 			if (!randomPiece)
 				throw new Error("No piece type available in PIECES_TYPES")
-			pieces.splice(randomIndex, 1)
+			remainingTypes.splice(randomIndex, 1)
 			bag.push(randomPiece)
 		}
 		return bag
@@ -485,6 +537,18 @@ export class Game {
 	// sans émettre game:over ni créditer/enregistrer quoi que ce soit — on repart de zéro
 	// avec une nouvelle Game juste après.
 	stop() : void {
+		this.haltGravity()
+		// Indispensable sur le chemin « Rejouer »: un joueur elimine s'est abonne en
+		// spectateur, et il redevient JOUEUR de la partie relancee (il n'a jamais quitte
+		// la room). Sans cette purge son abonnement survit et le gele pour toute la
+		// nouvelle partie. Ici aucun game:over n'est emis (restart), la purge peut donc
+		// avoir lieu immediatement.
+		this.purgeSpectators()
+	}
+	// Marque la partie terminee et coupe la gravite, SANS toucher aux abonnements
+	// spectateur: les chemins qui emettent encore un game:over doivent purger apres
+	// l'emission, pas avant.
+	private haltGravity() : void {
 		this.isOver = true
 		if (this.intervalId) {
 			clearInterval(this.intervalId)
@@ -601,10 +665,7 @@ export class Game {
 		try {
 			emitGameOver(this.state, winner)
 		} finally {
-			for (const [spectatorSocketId, subscription] of spectatorSocketStore) {
-				if (subscription.game === this)
-					spectatorSocketStore.delete(spectatorSocketId)
-			}
+			this.purgeSpectators()
 		}
 		return true
 	}
@@ -653,20 +714,24 @@ export class Game {
 		if (this.deadline !== null && this.checkGameOver())
 			return
 		for (const [, playerState] of this.state) {
-			let isGameOver: boolean = false
 			if (!playerState.isAlive)
 				continue
-				const currentPiece = playerState.currentPiece
-					if (currentPiece && this.canMove(playerState, 0, 1))
-						currentPiece?.moveDown()
-					else
-						isGameOver = this.lockAndSpawnNext(playerState)
-				if (isGameOver)
-					break
-				if (!isGameOver && playerState.isAlive) {
-					emitGameUpdate(playerState, this.state)
-					emitSpectatorForPlayer(playerState, this.state)
-				}
-			}
+			const currentPiece = playerState.currentPiece
+			if (currentPiece && this.canMove(playerState, 0, 1))
+				currentPiece.moveDown()
+			else if (this.lockAndSpawnNext(playerState))
+				// La partie vient de se terminer: checkGameOver() a deja emis game:over
+				// et coupe la gravite. Continuer la boucle enverrait des game:update
+				// APRES le game:over — les clients restants repasseraient du recap au
+				// plateau. On sort donc immediatement, la derniere frame des joueurs
+				// suivants est volontairement sacrifiee.
+				return
+			// Un joueur peut etre mort SANS que la partie se termine (elimination en
+			// multi): plus rien a lui envoyer, il bascule spectateur.
+			if (!playerState.isAlive)
+				continue
+			emitGameUpdate(playerState, this.state)
+			emitSpectatorForPlayer(playerState, this.state)
+		}
 	}
 }

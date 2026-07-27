@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
-import { socket, registerAllListeners } from "../socket/socket";
+import { socket } from "../socket/socket";
 import type { Socket } from "socket.io-client";
 
 interface SocketContextType {
@@ -13,8 +13,6 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
 	const [isConnected, setIsConnected] = useState(socket.connected);
 
 	useEffect(() => {
-		registerAllListeners();
-
 		function onConnect() {
 			setIsConnected(true);
 		}

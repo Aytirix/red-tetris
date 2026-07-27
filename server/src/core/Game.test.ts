@@ -126,11 +126,10 @@ describe("Game", () => {
 			}
 		});
 
-		it("attaches the game to every player and flags them in-game", () => {
+		it("attaches the game to every player", () => {
 			const { game, players } = makeGame(3);
 			for (const player of players) {
 				expect(player.getGame()).toBe(game);
-				expect(player.getInGame()).toBe(true);
 			}
 		});
 

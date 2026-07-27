@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useAlert } from "../components/Alert";
+import { getBackendUrl } from "../config/backendUrl";
 import { socket } from "../socket/socket";
 
 interface WsEvent {
@@ -23,7 +24,7 @@ interface WsLogEntry {
 	time: string;
 }
 
-const BACKEND_URL = `${window.location.protocol}//${window.location.hostname}:${import.meta.env.VITE_PORT || "3000"}`;
+const BACKEND_URL = getBackendUrl();
 
 function formatJson(str: string): string {
 	try {

@@ -746,6 +746,26 @@ describe("GamePage — sortie de room", () => {
 		expect(ctx.navigate).toHaveBeenCalledWith("/dashboard");
 		expect(await screen.findByText("Partie privée")).toBeInTheDocument();
 	});
+
+	// B5: le serveur refuse desormais aussi une salle COMPLETE. Un message unique
+	// « Partie privée » serait faux dans ce cas.
+	it("distingue une salle complete d'une partie privee", async () => {
+		renderGamePage();
+		receive("room:denied", { reason: "full" });
+
+		expect(ctx.navigate).toHaveBeenCalledWith("/dashboard");
+		expect(await screen.findByText("Salle complète")).toBeInTheDocument();
+		expect(screen.queryByText("Partie privée")).not.toBeInTheDocument();
+	});
+
+	// Un refus sans raison exploitable ne doit pas afficher un message trompeur:
+	// on retombe sur le cas historique.
+	it("retombe sur le message par defaut si la raison est absente", async () => {
+		renderGamePage();
+		receive("room:denied", undefined);
+
+		expect(await screen.findByText("Partie privée")).toBeInTheDocument();
+	});
 });
 
 describe("GamePage — join refuse", () => {

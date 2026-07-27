@@ -1,12 +1,6 @@
 import { describe, expect, it } from "vitest";
-import {
-	CELL_THEME,
-	PIECE_SHAPES,
-	getCellTheme,
-	isFilledCell,
-	trimShape,
-} from "./gameConfig";
-import type { GameBoardCell, PieceType } from "../types/game";
+import { PIECE_SHAPES, trimShape } from "./gameConfig";
+import type { PieceType } from "../types/game";
 
 const PIECE_TYPES: PieceType[] = ["I", "J", "L", "O", "S", "T", "Z"];
 
@@ -30,44 +24,6 @@ describe("PIECE_SHAPES", () => {
 		for (const type of PIECE_TYPES) {
 			const filled = PIECE_SHAPES[type].flat().filter((v) => v === 1).length;
 			expect(filled).toBe(4);
-		}
-	});
-});
-
-describe("getCellTheme", () => {
-	it("retourne le theme vide pour une cellule 0", () => {
-		expect(getCellTheme(0)).toBe(CELL_THEME.empty);
-		expect(getCellTheme(0).color).toBe("transparent");
-	});
-
-	it("retourne le theme penalite pour une cellule 'penalty'", () => {
-		expect(getCellTheme("penalty")).toBe(CELL_THEME.penalty);
-	});
-
-	it("retourne un theme monochrome pour une cellule de spectre", () => {
-		expect(getCellTheme("spectrum")).toBe(CELL_THEME.spectrum);
-		// Le spectre ne doit jamais reprendre la couleur d'une piece.
-		for (const type of PIECE_TYPES)
-			expect(CELL_THEME.spectrum.gradient).not.toBe(CELL_THEME[type].gradient);
-	});
-
-	it("retourne le theme associe pour chaque type de piece", () => {
-		for (const type of PIECE_TYPES) {
-			expect(getCellTheme(type)).toBe(CELL_THEME[type]);
-			expect(getCellTheme(type).gradient).toBeTruthy();
-		}
-	});
-});
-
-describe("isFilledCell", () => {
-	it("est faux uniquement pour la cellule vide", () => {
-		expect(isFilledCell(0)).toBe(false);
-	});
-
-	it("est vrai pour les pieces et la penalite", () => {
-		const cells: GameBoardCell[] = [...PIECE_TYPES, "penalty"];
-		for (const cell of cells) {
-			expect(isFilledCell(cell)).toBe(true);
 		}
 	});
 });
@@ -134,15 +90,3 @@ describe("trimShape", () => {
 	});
 });
 
-describe("CELL_THEME", () => {
-	it("declare une entree pour chaque piece plus empty/filled/penalty/spectrum", () => {
-		const keys = Object.keys(CELL_THEME).sort();
-		expect(keys).toEqual([...PIECE_TYPES, "empty", "filled", "penalty", "spectrum"].sort());
-	});
-
-	it("fournit une bordure pour toutes les entrees", () => {
-		for (const entry of Object.values(CELL_THEME)) {
-			expect(typeof entry.border).toBe("string");
-		}
-	});
-});

@@ -23,7 +23,7 @@ import {
 } from "./roomHandlers.js";
 import { createPlayer } from "../../../services/playerService.js";
 import { Player } from "../../../core/Player.js";
-import { Room } from "../../../core/room.js";
+import { MAX_PLAYERS_PER_ROOM, Room } from "../../../core/room.js";
 import { Game } from "../../../core/Game.js";
 import { roomSocketStore } from "../roomSocketStore.js";
 import { userSocketStore } from "../userSocketStore.js";
@@ -133,14 +133,21 @@ describe("roomHandlers", () => {
 			expect(lastEmit(socket, "room:joined")).toBeDefined();
 		});
 
-		it("does nothing on an existing room when the player cannot be created", async () => {
+		// Regression: le handler retournait en SILENCE quand createPlayer renvoyait null
+		// (socket sans pseudo, compte inexistant ou sans faction). Le client n'attend
+		// que room:joined ou system:Error: il restait bloque a vie sur
+		// « Connexion a la room… ».
+		it("signale l'erreur sur une room existante quand le joueur ne peut pas etre cree", async () => {
 			const { room } = seedRoom("salle1", ["luffy"]);
 			const socket = makeSocket("s2");
 
 			await handlerRoomJoin(socket, { roomId: "salle1" });
 
 			expect(room.countPlayer()).toBe(1);
-			expect(socket.emit).not.toHaveBeenCalled();
+			expect(socket.emit).toHaveBeenCalledWith("system:Error", {
+				event: "room:join",
+				message: "Failed to join room",
+			});
 		});
 
 		it("answers joined=false (spectator) when the game is already running", async () => {
@@ -166,6 +173,71 @@ describe("roomHandlers", () => {
 			expect(room.countPlayer()).toBe(1);
 			expect(lastEmit(intrus, "room:denied")).toEqual(["room:denied", { reason: "private" }]);
 			expect(lastEmit(intrus, "room:joined")).toBeUndefined();
+		});
+
+		// B5: la capacite annoncee par room:list n'etait appliquee nulle part.
+		it("refuse un joueur de plus une fois la room complete", async () => {
+			const { room } = seedRoom("salle1", ["luffy", "zoro", "nami", "usopp"]);
+			expect(room.countPlayer()).toBe(MAX_PLAYERS_PER_ROOM);
+			const detrop = makeSocket("s5");
+			userSocketStore.set("s5", { username: "sanji", subscribe: false, socket: detrop });
+
+			await handlerRoomJoin(detrop, { roomId: "salle1" });
+
+			expect(room.countPlayer()).toBe(MAX_PLAYERS_PER_ROOM);
+			expect(lastEmit(detrop, "room:denied")).toEqual(["room:denied", { reason: "full" }]);
+			// Le refus doit etre EXPLICITE: sans lui, emitRoomJoined renverrait
+			// `joined: true` (calcule sur le seul statut) alors que le joueur n'a pas
+			// ete ajoute — le client se croirait dans une room ou il ne figure pas.
+			expect(lastEmit(detrop, "room:joined")).toBeUndefined();
+		});
+
+		// Regression: le garde de capacite etait purement numerique et ignorait
+		// isMember(). Apres une coupure non gracieuse le socket mort occupe encore une
+		// place (le disconnect peut tarder jusqu'au pingTimeout socket.io): un membre
+		// revenant se faisait ejecter de SA PROPRE room avec « Salle complete ».
+		it("laisse revenir un membre dont l'ancien socket occupe encore sa place", async () => {
+			const { room } = seedRoom("salle1", ["luffy", "zoro", "nami", "usopp"]);
+			const ancienSocketId = room.findPlayerByName("usopp")!.getSocketId();
+			// Reconnexion: meme pseudo, nouveau socket.id (c'est ce que fait un refresh).
+			const revenant = makeSocket("sock-usopp-2");
+			userSocketStore.set(revenant.id, { username: "usopp", subscribe: false, socket: revenant });
+
+			await handlerRoomJoin(revenant, { roomId: "salle1" });
+
+			expect(lastEmit(revenant, "room:denied")).toBeUndefined();
+			expect(lastEmit(revenant, "room:joined")![1]).toMatchObject({ joined: true });
+			// Le fantome a cede sa place: l'effectif ne depasse pas la capacite.
+			expect(room.countPlayer()).toBe(MAX_PLAYERS_PER_ROOM);
+			const socketIds = room.getPlayers().map((player) => player.getSocketId());
+			expect(socketIds).toContain(revenant.id);
+			expect(socketIds).not.toContain(ancienSocketId);
+		});
+
+		it("laisse entrer tant que la room n'est pas complete", async () => {
+			const { room } = seedRoom("salle1", ["luffy", "zoro", "nami"]);
+			const dernier = makeSocket("s4");
+			userSocketStore.set("s4", { username: "usopp", subscribe: false, socket: dernier });
+
+			await handlerRoomJoin(dernier, { roomId: "salle1" });
+
+			expect(room.countPlayer()).toBe(MAX_PLAYERS_PER_ROOM);
+			expect(lastEmit(dernier, "room:denied")).toBeUndefined();
+			expect(lastEmit(dernier, "room:joined")![1]).toMatchObject({ joined: true });
+		});
+
+		// Une room COMPLETE mais deja lancee garde son chemin existant: le nouvel
+		// arrivant devient spectateur, il ne doit pas etre refuse.
+		it("bascule en spectateur (et non en refus) sur une room complete deja lancee", async () => {
+			const { room } = seedRoom("salle1", ["luffy", "zoro", "nami", "usopp"]);
+			room.setStatus("playing");
+			const tardif = makeSocket("s5");
+			userSocketStore.set("s5", { username: "sanji", subscribe: false, socket: tardif });
+
+			await handlerRoomJoin(tardif, { roomId: "salle1" });
+
+			expect(lastEmit(tardif, "room:denied")).toBeUndefined();
+			expect(lastEmit(tardif, "room:joined")![1]).toMatchObject({ joined: false });
 		});
 
 		it("refuse un non-membre qui force l'URL d'une partie solo", async () => {
@@ -530,14 +602,13 @@ describe("roomHandlers", () => {
 		});
 
 		// Regression: la Game etait construite AVANT le controle d'hote, et son
-		// constructeur rattache tous les joueurs (setGame/setInGame).
+		// constructeur rattache tous les joueurs (setGame).
 		it("leaves every player untouched when a non-host asks for the start", () => {
 			const { room, sockets } = seedRoom("salle1", ["luffy", "zoro"]);
 
 			handleRoomStart(sockets.get("zoro")!, undefined);
 
 			for (const player of room.getPlayers()) {
-				expect(player.getInGame()).toBe(false);
 				expect(player.getGame()).toBeUndefined();
 			}
 		});
@@ -618,6 +689,27 @@ describe("roomHandlers", () => {
 			expect(secondGame).toBeInstanceOf(Game);
 			expect(secondGame).not.toBe(firstGame);
 			expect(room.getStatus()).toBe("playing");
+		});
+
+		// Regression: `stop()` (chemin Rejouer) ne purgeait PAS spectatorSocketStore,
+		// contrairement a checkGameOver/abortOnFailure. Un joueur elimine s'abonne en
+		// spectateur puis redevient JOUEUR de la partie relancee (il n'a jamais quitte
+		// la room): son abonnement survivant faisait sortir immediatement
+		// handleMove/Rotate/Drop/Joker — il regardait sa piece tomber sans pouvoir agir.
+		it("purge les abonnements spectateur de l'ancienne partie", () => {
+			const { room, sockets } = seedRoom("salle1", ["luffy", "zoro"]);
+			handleRoomStart(sockets.get("luffy")!, undefined);
+			vi.advanceTimersByTime(3000);
+			const firstGame = room.getGame()!;
+			const elimine = sockets.get("zoro")!;
+			spectatorSocketStore.set(elimine.id, {
+				game: firstGame,
+				player: room.findPlayerByName("zoro")!,
+			});
+
+			handleRoomRestart(sockets.get("luffy")!, undefined);
+
+			expect(spectatorSocketStore.has(elimine.id)).toBe(false);
 		});
 
 		it("relance aussi une partie deja terminee (room en attente)", () => {

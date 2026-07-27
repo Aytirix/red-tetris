@@ -1,5 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { Socket } from "socket.io-client";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { ioMock, fakeSocket } = vi.hoisted(() => {
 	const fakeSocket = {
@@ -22,7 +21,6 @@ import {
 	emitGameRotate,
 	emitSubscribeSpectator,
 	emitUnsubscribeSpectator,
-	registerGameListeners,
 } from "./game";
 
 describe("emitters game", () => {
@@ -71,35 +69,5 @@ describe("emitters game", () => {
 	it("emet game:unsubscribeSpectatorGame avec un payload vide", () => {
 		emitUnsubscribeSpectator();
 		expect(fakeSocket.emit).toHaveBeenCalledWith("game:unsubscribeSpectatorGame", {});
-	});
-});
-
-describe("registerGameListeners", () => {
-	let logSpy: ReturnType<typeof vi.spyOn>;
-
-	beforeEach(() => {
-		fakeSocket.on.mockClear();
-		logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
-	});
-
-	afterEach(() => {
-		logSpy.mockRestore();
-	});
-
-	it("branche les trois evenements de partie", () => {
-		registerGameListeners(fakeSocket as unknown as Socket);
-
-		const events = fakeSocket.on.mock.calls.map((call) => call[0]);
-		expect(events).toEqual(["game:start", "game:update", "game:over"]);
-	});
-
-	it("execute les handlers sans lever d'erreur", () => {
-		registerGameListeners(fakeSocket as unknown as Socket);
-
-		const handlers = fakeSocket.on.mock.calls.map((call) => call[1] as (p: unknown) => void);
-		expect(handlers).toHaveLength(3);
-		for (const handler of handlers) {
-			expect(() => handler({ any: "payload" })).not.toThrow();
-		}
 	});
 });

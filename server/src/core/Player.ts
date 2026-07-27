@@ -12,7 +12,6 @@ export class Player {
 	// spectateurs du plateau de ce joueur (et non le leur).
 	private readonly theme: string;
 	private game: Game | undefined;
-	private inGame: boolean;
 	constructor (name: string, socket: Socket, avatar: string, faction: string, theme: string = DEFAULT_THEME_ID) {
 		this.name = name
 		this.socketId = socket.id
@@ -20,7 +19,6 @@ export class Player {
 		this.avatar = avatar
 		this.faction = faction
 		this.theme = theme
-		this.inGame = false
 	}
 	getTheme() : string {
 		return this.theme
@@ -43,13 +41,7 @@ export class Player {
 	getGame() : Game | undefined {
 		return this.game
 	}
-	getInGame() : boolean {
-		return this.inGame
-	}
 	setGame(game: Game) : void {
 		this.game = game
-	}
-	setInGame(inGame: boolean) : void {
-		this.inGame = inGame
 	}
 }

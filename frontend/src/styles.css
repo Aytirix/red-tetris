@@ -3088,13 +3088,6 @@ a:hover {
 	}
 }
 
-.glass-panel h1,
-.glass-panel h2,
-.glass-panel h3,
-.glass-panel h4 {
-	color: var(--color-text-on-dark);
-}
-
 /* ── Adversaire éliminé: mini-board grisé ──────────────────────────────────
    Placé APRÈS les recipes de thème et scopé sous [data-recipe] (spécificité
    0,3,0, même niveau que les recipes) → l'emporte quel que soit le thème

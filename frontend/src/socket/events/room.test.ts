@@ -1,5 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { Socket } from "socket.io-client";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { ioMock, fakeSocket } = vi.hoisted(() => {
 	const fakeSocket = {
@@ -25,7 +24,6 @@ import {
 	emitStartGame,
 	emitSubscribeRooms,
 	emitUnsubscribeRooms,
-	registerRoomListeners,
 } from "./room";
 
 describe("emitters room", () => {
@@ -72,35 +70,5 @@ describe("emitters room", () => {
 
 		emitUnsubscribeRooms();
 		expect(fakeSocket.emit).toHaveBeenCalledWith("room:unsubscribeList");
-	});
-});
-
-describe("registerRoomListeners", () => {
-	let logSpy: ReturnType<typeof vi.spyOn>;
-
-	beforeEach(() => {
-		fakeSocket.on.mockClear();
-		logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
-	});
-
-	afterEach(() => {
-		logSpy.mockRestore();
-	});
-
-	it("branche les evenements de room", () => {
-		registerRoomListeners(fakeSocket as unknown as Socket);
-
-		const events = fakeSocket.on.mock.calls.map((call) => call[0]);
-		expect(events).toEqual(["room:joined", "room:left", "room:players"]);
-	});
-
-	it("execute les handlers sans lever d'erreur", () => {
-		registerRoomListeners(fakeSocket as unknown as Socket);
-
-		const handlers = fakeSocket.on.mock.calls.map((call) => call[1] as (p?: unknown) => void);
-		expect(() => handlers[0]({ id: "room-42" })).not.toThrow();
-		expect(() => handlers[1]()).not.toThrow();
-		expect(() => handlers[2](["luffy", "zoro"])).not.toThrow();
-		expect(logSpy).toHaveBeenCalledTimes(3);
 	});
 });

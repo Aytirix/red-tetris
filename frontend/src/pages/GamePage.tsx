@@ -498,7 +498,7 @@ export default function GamePage() {
 			});
 		}
 
-		function handleDenied() {
+		function handleDenied(data: unknown) {
 			hasLeftRoomRef.current = true;
 			hasJoinedRoomRef.current = false;
 			isSpectatorRef.current = false;
@@ -506,9 +506,15 @@ export default function GamePage() {
 			setGameOver(null);
 			setPlayers([]);
 			cloudNavigate("/dashboard");
+			// Le serveur refuse pour deux raisons distinctes ; un message unique
+			// « Partie privée » serait faux pour une salle simplement complète.
+			const reason = (data as { reason?: unknown } | null)?.reason;
+			const isFull = reason === "full";
 			void alert({
-				title: "Partie privée",
-				message: "Cette partie est privée : vous ne pouvez pas la rejoindre.",
+				title: isFull ? "Salle complète" : "Partie privée",
+				message: isFull
+					? "Cette salle a atteint son nombre maximum de joueurs."
+					: "Cette partie est privée : vous ne pouvez pas la rejoindre.",
 				confirmLabel: "Compris",
 				danger: true,
 			});
@@ -714,7 +720,6 @@ export default function GamePage() {
 				<GameView
 					state={gameState}
 					roomName={roomName}
-					playerName={playerName}
 					eliminated={eliminated}
 					onEliminationDone={handleEliminationDone}
 					onLeave={handleLeave}

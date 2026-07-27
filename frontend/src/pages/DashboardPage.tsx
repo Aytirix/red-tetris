@@ -350,7 +350,14 @@ export default function DashboardPage() {
 										<span>Aucune salle disponible</span>
 									</div>
 								) : (
-									visibleRooms.map(room => (
+									visibleRooms.map(room => {
+										// Le serveur refuse desormais une salle pleine
+										// (room:denied « full »). Sans ce garde-fou le bouton
+										// reste actif et l'utilisateur fait un aller-retour
+										// dashboard -> partie -> refus -> dashboard pour rien.
+										const isFull = !!room.maxPlayers
+											&& room.playerCount >= room.maxPlayers;
+										return (
 										<div key={room.roomId} className={styles.roomItem}>
 											<span className={styles.roomName}>{room.roomId}</span>
 											<span className={styles.roomMeta}>
@@ -364,11 +371,14 @@ export default function DashboardPage() {
 												className="button button-outline"
 												style={{ padding: "0.35rem 0.75rem", fontSize: "0.82rem", flexShrink: 0 }}
 												onClick={() => handleJoinRoom(room.roomId)}
+												disabled={isFull}
+												title={isFull ? "Salle complète" : undefined}
 											>
-												Rejoindre
+												{isFull ? "Complète" : "Rejoindre"}
 											</button>
 										</div>
-									))
+										);
+									})
 								)}
 							</div>
 						</div>

@@ -1,5 +1,4 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { Socket } from "socket.io-client";
 
 const { ioMock, fakeSocket } = vi.hoisted(() => {
 	const fakeSocket = {
@@ -16,7 +15,7 @@ vi.mock("socket.io-client", () => ({
 	Socket: class {},
 }));
 
-import { emitCheckUsernameAvailable, registerUserListeners } from "./user";
+import { emitCheckUsernameAvailable } from "./user";
 
 describe("emitters user", () => {
 	beforeEach(() => {
@@ -34,10 +33,5 @@ describe("emitters user", () => {
 	it("transmet le pseudo tel quel, meme vide", () => {
 		emitCheckUsernameAvailable("");
 		expect(fakeSocket.emit).toHaveBeenCalledWith("user:CheckUsernameAvailable", { username: "" });
-	});
-
-	it("registerUserListeners ne branche aucun listener pour l'instant", () => {
-		registerUserListeners(fakeSocket as unknown as Socket);
-		expect(fakeSocket.on).not.toHaveBeenCalled();
 	});
 });

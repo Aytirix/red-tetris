@@ -76,6 +76,18 @@ describe("validateSocketEvent", () => {
 			expect(validateCheckUsername({ user: "luffy" })).toBe(false);
 			expect(validateCheckUsername({ username: "luffy", extra: 1 })).toBe(false);
 		});
+
+		// B14: seule la PRESENCE de la cle etait verifiee. isValidUsername() teste une
+		// RegExp, qui coercit son argument en chaine -> `{username: 12345}` passait la
+		// validation de format et atteignait la requete Prisma et le userSocketStore.
+		it("refuses a username that is not a string", () => {
+			expect(validateCheckUsername({ username: 12345 })).toBe(false);
+			expect(validateCheckUsername({ username: null })).toBe(false);
+			expect(validateCheckUsername({ username: undefined })).toBe(false);
+			expect(validateCheckUsername({ username: true })).toBe(false);
+			expect(validateCheckUsername({ username: ["luffy"] })).toBe(false);
+			expect(validateCheckUsername({ username: { toString: () => "luffy" } })).toBe(false);
+		});
 	});
 
 	describe("validateSocketEvent", () => {

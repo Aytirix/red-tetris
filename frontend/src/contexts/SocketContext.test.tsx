@@ -4,12 +4,10 @@ import { createFakeSocket, type FakeSocket } from "../../test/fakeSocket";
 
 const ws = vi.hoisted(() => ({
 	socket: null as unknown as FakeSocket,
-	registerAllListeners: vi.fn(),
 }));
 
 vi.mock("../socket/socket", () => ({
 	get socket() { return ws.socket; },
-	registerAllListeners: ws.registerAllListeners,
 }));
 
 import { SocketProvider, useSocket } from "./SocketContext";
@@ -23,16 +21,18 @@ function Probe() {
 beforeEach(() => {
 	ws.socket = createFakeSocket();
 	ws.socket.connected = false;
-	ws.registerAllListeners.mockClear();
 });
 
 afterEach(cleanup);
 
 describe("SocketContext", () => {
-	it("branche les listeners applicatifs une seule fois au montage", () => {
+	// Le provider ne branche QUE connect/disconnect: les listeners applicatifs
+	// appartiennent aux pages, qui les retirent en quittant.
+	it("ne branche que connect et disconnect au montage", () => {
 		render(<SocketProvider><Probe /></SocketProvider>);
 
-		expect(ws.registerAllListeners).toHaveBeenCalledTimes(1);
+		expect(ws.socket.listenerCount("connect")).toBe(1);
+		expect(ws.socket.listenerCount("disconnect")).toBe(1);
 	});
 
 	it("expose le socket partage et l'etat de connexion initial", () => {

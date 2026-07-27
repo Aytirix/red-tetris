@@ -195,6 +195,33 @@ describe("DashboardPage — multijoueur", () => {
 		expect(ctx.navigate).toHaveBeenCalledWith("/Mugiwara/luffy");
 	});
 
+	// Le serveur refuse desormais une salle pleine (room:denied « full »). Laisser le
+	// bouton actif garantissait un aller-retour dashboard -> partie -> refus -> dashboard.
+	it("desactive le bouton d'une salle complete", () => {
+		renderDashboard();
+		goToMultiplayer();
+		act(() => {
+			ctx.socket.receive("room:list", [
+				{ roomId: "Mugiwara", playerCount: 4, maxPlayers: 4 },
+			]);
+		});
+
+		const bouton = screen.getByRole("button", { name: "Complète" });
+		expect(bouton).toBeDisabled();
+
+		fireEvent.click(bouton);
+		expect(ctx.navigate).not.toHaveBeenCalledWith("/Mugiwara/luffy");
+	});
+
+	// Sans `maxPlayers` (contrat historique) on ne doit jamais bloquer l'entree.
+	it("laisse le bouton actif quand la capacite n'est pas annoncee", () => {
+		renderDashboard();
+		goToMultiplayer();
+		act(() => { ctx.socket.receive("room:list", [{ roomId: "Mugiwara", playerCount: 9 }]); });
+
+		expect(screen.getByRole("button", { name: "Rejoindre" })).toBeEnabled();
+	});
+
 	it("cree une salle avec un nom d'equipage encore libre", () => {
 		vi.spyOn(Math, "random").mockReturnValue(0);
 		renderDashboard();
