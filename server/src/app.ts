@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { wsDocsRouter } from "./routes/wsDocs.js";
-import { corsMiddleware } from "./middlesware/cors.js";
+import { corsMiddleware } from "./middlewares/cors.js";
 
 const currentDir = path.dirname(fileURLToPath(import.meta.url));
 

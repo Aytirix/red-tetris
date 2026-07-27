@@ -1,8 +1,17 @@
 # Red Tetris — Suivi de conformité au sujet
 
 > Audit du code (branche `theo`, commit `02ede87`) contre `sujet/en.subject.pdf` **v5.2**, réalisé le **2026-07-22**.
+> Resynchronisé le **2026-07-24** sur la branche `prod` (commit `fa33933`).
 > Légende : ✅ conforme · ⚠️ partiel · ❌ manquant ou violation.
 > Ce fichier est le tableau de bord du reste à faire. À mettre à jour au fil des corrections.
+
+## Mise à jour du 2026-07-24
+
+- **Lignes de pénalité livrées** (`Game.ts` : `buildPenaltyLine`, `addPenaltyLines`, `addPenaltyToOpponents`, couvertes par `Game.test.ts`) → **plus aucune mécanique obligatoire du sujet manquante**.
+- Bouton **« Rejouer »** livré en solo (`GameView.tsx` + `handleRestart` de `GamePage.tsx`) : relance dans la même room, sans repasser par le lobby.
+- **Responsive PC** : taille de cellule dérivée du viewport (`config/boardSizing.ts`, `hooks/useViewportSize.ts`) — le plateau ne débordait plus bas de l'écran sur un portable.
+- **Hygiène soldée** (voir P4) : `liquid-glass-react` retiré, `middlesware/` renommé, logs de debug et imports morts purgés, prompt d'avatars sorti de `public/`, CI GitHub Actions ajoutée.
+- Suites vertes : **serveur 591 tests** (96.58 / 93.16 / 99.65 / 96.39) · **frontend 602 tests** (90.20 / 88.66 / 89.10 / 91.98).
 
 ---
 
@@ -18,7 +27,7 @@
 
 **Correction d'audit** : le **lock delay était déjà conforme** — la première analyse était fausse (voir P1-7).
 
-**Plus aucun point éliminatoire.** Il reste **une** mécanique obligatoire : les lignes de pénalité (en cours côté équipe).
+**Plus aucun point éliminatoire.** ~~Il reste **une** mécanique obligatoire : les lignes de pénalité (en cours côté équipe).~~ → **livrées le 2026-07-24** : plus aucune mécanique obligatoire manquante.
 
 ### Boucle d'audit adversarial du 2026-07-22 (3 itérations, 6 auditeurs indépendants)
 
@@ -78,7 +87,7 @@ Le socle est bon : architecture client/serveur correcte, classes `Game`/`Piece`/
 |---|---|---|---|
 | 12 | Terrain 10 colonnes × 20 lignes | ✅ | `server/src/types/game/gameTypes.ts:5-6` |
 | 13 | Même séquence de pièces pour tous, mêmes coordonnées | ✅ | `Game.ts:204-247` (sacs de 7, file unique, index par joueur) |
-| 14 | **n lignes complétées → n-1 lignes de pénalité indestructibles chez les adversaires** | ❌ | `Game.ts:159-175` : aucun envoi ; `"penalty"` déclaré dans `gameTypes.ts:14` mais **jamais écrit** |
+| 14 | **n lignes complétées → n-1 lignes de pénalité indestructibles chez les adversaires** | ✅ | corrigé : `Game.addPenaltyToOpponents()` appelé depuis `lockAndSpawnNext()` ; lignes `"penalty"` exclues du filtre de `clearLines()` (donc ineffaçables), pile remontée, pièce en vol décalée, mort si débordement |
 | 15 | **Spectre = hauteur du bloc le plus haut par colonne** | ✅ | corrigé : `getSpectrumBoard()` dans `gameEmitters.ts` — spectre pour les joueurs, plateaux réels pour les spectateurs |
 | 16 | Nom des adversaires affiché | ✅ | `MiniBoard.tsx:41-46` |
 | 17 | Mise à jour temps réel des adversaires | ✅ | ré-émis à chaque tick |
@@ -97,7 +106,7 @@ Le socle est bon : architecture client/serveur correcte, classes `Game`/`Piece`/
 | 25 | BrowserRouter ou MemoryRouter | ✅ | `router.tsx:21` |
 | 26 | Premier joueur = hôte, seul à lancer | ✅ | `room.ts:25-26`, `roomHandlers.ts:159` |
 | 27 | Hôte réattribué s'il quitte | ✅ | `room.ts:81-99` |
-| 28 | Restart par l'hôte | ⚠️ | possible indirectement (la room repasse `waiting` en fin de partie, `Game.ts:262`) mais **aucun bouton « Rejouer »** dans `GameOverView.tsx` |
+| 28 | Restart par l'hôte | ✅ | solo : bouton « Rejouer » (`GameView.tsx`, `room:restart`) qui relance dans la même room ; multi : la room repasse `waiting` en fin de partie (`Game.ts`) et l'hôte relance depuis le lobby |
 | 29 | Pas de nouveau joueur en cours de partie | ✅ | `room.ts:30-32` → `joined:false` → bascule spectateur |
 | 30 | Fin quand il ne reste qu'un joueur | ✅ | `Game.ts:248-252` |
 | 31 | Parties simultanées | ✅ | `roomSocketStore.ts:5` (une `Room` + un `Game` + un interval par partie) |
@@ -186,15 +195,14 @@ Le code de `src/test/` (détection de mains) est **conservé dans le dépôt** e
 
 ## P1 — Mécaniques obligatoires absentes
 
-### [ ] 5. Lignes de pénalité (n-1, indestructibles)
+### [x] 5. Lignes de pénalité (n-1, indestructibles) — LIVRÉ le 2026-07-24
 
-C'est **le** manque fonctionnel principal : le multijoueur n'a aujourd'hui aucune interaction entre joueurs.
-
-- [ ] Dans `Game.clearLines()` (`Game.ts:159-175`), remonter le nombre de lignes effacées
-- [ ] Ajouter `addPenaltyLines(playerState, n-1)` : pousser `n-1` lignes `"penalty"` en bas du board de **chaque adversaire vivant**, décaler leur pile vers le haut, tuer le joueur si sa pile déborde
-- [ ] Rendre ces lignes indestructibles : les exclure du filtre de `clearLines` (aujourd'hui le filtre est `row.every(cell => cell !== 0)`)
-- [ ] Gérer la collision de la pièce courante avec les lignes montantes
-- [ ] Le rendu client existe déjà (`gameState.ts:22-23` accepte `"penalty"`) — vérifier la couleur grise
+- [x] `clearLines()` renvoie le nombre de lignes effacées, `lockAndSpawnNext()` appelle `addPenaltyToOpponents(playerState, cleared - 1)`
+- [x] `addPenaltyLines()` : pousse les lignes `"penalty"` en bas du plateau de chaque adversaire vivant, remonte sa pile, le tue si elle déborde
+- [x] Indestructibles : `clearLines()` exclut toute rangée contenant une cellule `"penalty"`
+- [x] Collision gérée : la pièce en vol est remontée du même nombre de lignes
+- [x] Rendu client déjà en place (`gameState.ts` accepte `"penalty"`), couvert par `Cell.test.tsx` / `GameBoard.test.tsx`
+- [ ] Reste à faire : **le voir tourner à deux joueurs en vrai** (validé par tests uniquement)
 
 ### [x] 6. Spectre des adversaires — CORRIGÉ le 2026-07-22
 
@@ -250,7 +258,7 @@ Le premier audit concluait à tort qu'il manquait, en lisant le `else lockAndSpa
 - [ ] **B4** `tick()` (`Game.ts:304-305`) : `break` sur game over → les joueurs suivants dans la `Map` ne reçoivent pas leur dernière frame. Indentation cassée du bloc `Game.ts:294-311`.
 - [ ] **B5** `roomEmitters.ts:28` annonce `maxPlayers: 4` alors que `Room.addPlayer` (`room.ts:22-29`) n'a **aucune limite**.
 - [x] **B6** ~~Erreur de compilation TypeScript côté serveur : `SocketMock.ts(112,52) TS2345`~~ — **corrigé le 2026-07-22** (garde `!doc.response` ajoutée ligne 109). Elle bloquait `npm run build`, donc toute image de production.
-- [ ] **B7** `middlesware/cors.ts:11` : origine `https://red-tetris.com` **en dur** hors dev, incohérente avec `frontendOrigins` (env) utilisée par socket.io → CORS cassé en prod.
+- [ ] **B7** `middlewares/cors.ts:11` : origine `https://red-tetris.com` **en dur** hors dev, incohérente avec `frontendOrigins` (env) utilisée par socket.io → CORS cassé en prod.
 - [ ] **B8** `Player.setInGame(false)` n'est jamais appelé ; `Player.getGame()` n'est lu nulle part (code mort).
 
 ### Remontés par l'écriture des tests (2026-07-22)
@@ -279,7 +287,7 @@ Le premier audit concluait à tort qu'il manquait, en lisant le `else lockAndSpa
 - [ ] `server/tsconfig.json` exclut `src/**/*.test.ts` du typecheck et vitest ne typechecke pas : **plus rien ne vérifie les types des tests serveur**. Prévoir un `tsconfig.build.json` séparé.
 - [ ] `Player.setInGame(false)` n'est jamais appelé, `getInGame()`/`getGame()` ne sont lus nulle part : après une partie tous les `Player` restent `inGame === true`.
 - [ ] `handleRoomStart` refuse silencieusement (non-hôte, statut ≠ `waiting`) sans `emitError`, contrairement à tous les autres garde-fous.
-- [ ] `middlesware/cors.ts` code en dur `https://red-tetris.com` hors dev et ignore `FRONTEND_ORIGIN`, pourtant injecté dans `backend-prod` (variable morte, deux politiques CORS incohérentes).
+- [ ] `middlewares/cors.ts` code en dur `https://red-tetris.com` hors dev et ignore `FRONTEND_ORIGIN`, pourtant injecté dans `backend-prod` (variable morte, deux politiques CORS incohérentes).
 - [ ] Image serveur de prod non élaguée : `npm install` complet (devDependencies + vitest), sources TS et fichiers de test embarqués, exécution en root. Passer à un stage runtime avec `npm ci --omit=dev` et `USER node`.
 - [ ] Dépendance morte `liquid-glass-react` (jamais importée, injecte des filtres SVG) : à retirer de `frontend/package.json`.
 - [ ] Un rafraîchissement de page pendant une partie à deux compte désormais comme un abandon (fin de partie immédiate, victoire à l'adversaire). Comportement volontaire du correctif B2, à arbitrer côté produit.
@@ -288,18 +296,19 @@ Le premier audit concluait à tort qu'il manquait, en lisant le `else lockAndSpa
 
 ## P4 — Nettoyage et hygiène
 
-- [ ] **README.md périmé et faux** : il annonce Redux Toolkit, shadcn/ui, Motion, Playwright, React Testing Library et une arborescence `features/` — **rien de tout cela n'existe**. Il contient aussi des artefacts de génération (`:contentReference[oaicite:N]{index=N}`) et référence `frontend/nginx.conf`, absent. À réécrire (installation, lancement, protocole, commandes de test, couverture).
-- [ ] Dépendance morte `liquid-glass-react` (`frontend/package.json:13`) — jamais importée, et ce type de lib injecte des filtres SVG. À retirer.
-- [ ] `console.log` de debug : `Game.ts:233` (`"test"`), `roomService.ts:21`
-- [ ] Imports morts : `userInfo` (`os`) dans `roomService.ts:7`, `error` (`node:console`) dans `userRepositories.ts:6`
-- [ ] Dossier `server/src/middlesware/` — faute de frappe, à renommer `middlewares/`
-- [ ] Listeners morts `registerGameListeners` (`frontend/src/socket/events/game.ts:6-18`, `// TODO`) qui doublonnent ceux de `GamePage.tsx:463-467`
-- [ ] `GameView.tsx:148` : `<span hidden>{playerName}</span>` pour contourner un warning TS — le nom du joueur n'est affiché nulle part sur l'écran de jeu
-- [ ] `Game.ts:205` : `const pieces` masque l'import `pieces` de `piecesGameTypes.ts`
-- [ ] Logique Tetris dupliquée dans `test/TestPage.tsx:16-136` (shapes/couleurs propres, sans lien avec le jeu réel)
-- [ ] **`frontend/dist/assets` appartient à `root`** (créé par un conteneur Docker) → `npm run build` échoue en local avec `EACCES: permission denied, unlink`. À supprimer avec les droits adéquats, et à éviter en fixant l'utilisateur dans le service de build.
-- [ ] **`main` a 124 commits de retard sur `theo`** — merger avant la soutenance, le rendu se fait sur la branche par défaut
-- [ ] Pas de CI (`.github/` absent) — le sujet parle de pipelines de livraison continue : une action GitHub qui lance `npm test` serait un plus
+- [x] ~~**README.md périmé et faux**~~ — réécrit : démarrage, profils Docker, service de la SPA par le serveur Node, commandes de test.
+- [x] ~~Dépendance morte `liquid-glass-react`~~ — **retirée le 2026-07-24** (`npm uninstall`), ainsi que la règle CSS orpheline `.glass-panel` qu'elle avait laissée. Le thème de boutique nommé `liquid-glass` (`pieceThemes.ts`) n'a aucun rapport et reste en place.
+- [x] ~~`console.log` de debug~~ — **purgés le 2026-07-24** : `console.log(user)` (`roomService.ts`, dumpait l'objet utilisateur complet), les deux logs de pseudo de `userService.ts`, « A user connected » (`registerSocketHandlers.ts`) et « User disconnected » (`systemSocket.ts`). Conservés : les logs de démarrage (`server.ts`, `app.ts` — l'un est asserté par `app.test.ts`) et les `console.error` de rattrapage.
+- [x] ~~Imports morts : `userInfo` (`os`) dans `roomService.ts`, `error` (`node:console`) dans `userRepositories.ts`~~ — **supprimés le 2026-07-24**.
+- [x] ~~Dossier `server/src/middlesware/`~~ — **renommé `middlewares/` le 2026-07-24** (`git mv`, unique import mis à jour dans `app.ts`).
+- [ ] Listeners morts `registerGameListeners` (`frontend/src/socket/events/game.ts`, `// TODO`) qui doublonnent ceux de `GamePage.tsx`
+- [ ] `GameView.tsx` : `<span hidden>{playerName}</span>` pour contourner un warning TS — le nom du joueur n'est affiché nulle part sur l'écran de jeu
+- [ ] `Game.ts` : `const pieces` masque l'import `pieces` de `piecesGameTypes.ts`
+- [ ] Logique Tetris dupliquée dans `test/TestPage.tsx` (shapes/couleurs propres, sans lien avec le jeu réel)
+- [ ] **`frontend/dist/assets` appartient à `root`** (créé par un conteneur Docker) → `npm run build` échoue en local avec `EACCES: permission denied, unlink`. **Nécessite `sudo`, à lancer à la main : `sudo chown -R $USER:$USER frontend/dist`** (ou `sudo rm -rf frontend/dist`, le dossier est gitignoré). À éviter à l'avenir en fixant l'utilisateur dans le service de build.
+- [ ] **`main` a 148 commits de retard sur `prod`** — merger avant la soutenance, le rendu se fait sur la branche par défaut
+- [x] ~~Pas de CI~~ — **`.github/workflows/ci.yml` ajouté le 2026-07-24** : deux jobs (serveur, frontend) qui rejouent `npm ci` + `npm run build` + `npm test` sur `push` (`main`, `prod`, `theo`) et sur PR. Les seuils de couverture font échouer le job d'eux-mêmes. Node `22` (le plus récent) : `prisma generate` exige Node ≥ 22.12.
+- [x] ~~`frontend/public/prompt` servi publiquement~~ — **déplacé en `frontend/scripts/avatar-prompt.md` le 2026-07-24** : conservé dans le dépôt, plus copié dans `dist/`.
 
 ---
 

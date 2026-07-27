@@ -3,7 +3,6 @@ import {prisma} from "../config/prisma.js";
 import type { User } from "../generated/prisma/client.js";
 import type { Faction } from "../generated/prisma/enums.js";
 import { userSocketStore } from "../gateways/socket/userSocketStore.js";
-import { error } from "node:console";
 import type { WalletRow } from "../types/shopTypes.js";
 
 export async function findUserByUsername(username: string) : Promise<User | null> {

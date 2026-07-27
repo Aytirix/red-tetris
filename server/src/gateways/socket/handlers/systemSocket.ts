@@ -6,7 +6,6 @@ import { userSocketStore } from "../userSocketStore.js";
 
 export function handlerDisconnect(socket: Socket): void {
 			socket.on("disconnect", () => {
-				console.log("User disconnected: " + socket.id);
 				for (const room of roomSocketStore.values()) {
 					// Meme raison que room:leave: sortir le joueur de la partie en cours
 					// avant de demonter la room, sinon son interval de gravite tourne

@@ -2994,11 +2994,6 @@ a:hover {
 	justify-content: flex-end;
 }
 
-/* Contenu des panneaux en verre liquide (liquid-glass-react) : texte clair */
-.glass-panel {
-	color: var(--color-text-on-dark);
-}
-
 /* ─── Transition « nuages » entre pages (100% CSS, aucun canvas/SVG) ─────────── */
 
 .cloud-transition {

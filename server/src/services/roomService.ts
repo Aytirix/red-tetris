@@ -4,7 +4,6 @@ import { getNameById, userSocketStore } from "../gateways/socket/userSocketStore
 import { Player } from "../core/Player.js";
 import { createPlayer } from "./playerService.js";
 import { roomSocketStore } from "../gateways/socket/roomSocketStore.js";
-import { userInfo } from "os";
 
 export async function createRoom(socket: Socket, roomName: string): Promise <Room | null> {
 	const newRoom = new Room(roomName);
@@ -18,7 +17,6 @@ export async function createRoom(socket: Socket, roomName: string): Promise <Roo
 
 export function removePlayer(socket: Socket): void {
 	const user = userSocketStore.get(socket.id);
-	console.log(user)
 	if (!user)
 		return;
 	for (const room of roomSocketStore.values()) {
