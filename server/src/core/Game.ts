@@ -6,6 +6,8 @@ import {
 	INVISIBLE_JOKER_REVEAL_MS,
 	INVISIBLE_REVEAL_CAP_MS,
 	INVISIBLE_REVEAL_PER_LINE_MS,
+	LINE_CLEAR_SCORES,
+	LINES_PER_LEVEL,
 	SPRINT_TARGET_LINES,
 	SUDDEN_DEATH_TICK_MS,
 	ULTRA_DURATION_MS,
@@ -46,6 +48,11 @@ export class Game {
 	private deadline: number | null;
 	// Horodatage de création de la partie : sert à calculer la durée jouée (stats).
 	private readonly startedAt: number;
+	// Instant du dernier tick de gravite. Sert a dire au client combien de temps il
+	// reste avant qu'une piece posee sur la pile ne se verrouille (au tick suivant),
+	// pour qu'il puisse afficher un decompte JUSTE meme si le joueur bouge la piece
+	// entre deux ticks (bouger ne decale pas la gravite).
+	private lastTickAt: number;
 	constructor (mode: GameMode, players: Player[], room: Room) {
 		this.mode = mode;
 		this.players = players;
@@ -56,6 +63,7 @@ export class Game {
 		this.isOver = false
 		this.deadline = null
 		this.startedAt = Date.now()
+		this.lastTickAt = this.startedAt
 		for (const player of players) {
 			this.state.set(player.getSocketId(), {
 					board: this.createBoard(),//fonction create board,
@@ -263,11 +271,25 @@ export class Game {
 			return
 		if (!this.isSolo())
 			return
-		const nextLevel = Math.floor(playerState.score / 500) + 1
+		const nextLevel = Math.floor(playerState.lines / LINES_PER_LEVEL) + 1
 		if (nextLevel === playerState.level)
 			return
 		playerState.level = nextLevel
 		this.restartTickInterval()
+	}
+	/**
+	 * Temps restant (ms) avant que la piece courante ne se verrouille, ou null si elle
+	 * peut encore descendre. Une piece qui ne peut plus tomber est verrouillee au tick
+	 * SUIVANT (voir tick()): le joueur dispose donc d'un tick complet pour la glisser,
+	 * et le client affiche ce sursis. Bouger la piece ne reprogramme pas la gravite,
+	 * d'ou le calcul a partir du dernier tick plutot qu'une duree fixe.
+	 */
+	getLockDelayMs(playerState: PlayerGameState) : number | null {
+		if (!playerState.isAlive || !playerState.currentPiece)
+			return null
+		if (this.canMove(playerState, 0, 1))
+			return null
+		return Math.max(0, this.getTickSpeed() - (Date.now() - this.lastTickAt))
 	}
 	getTickSpeed() : number {
 		// Sudden death: vitesse maximale des la premiere piece, pour tout le monde.
@@ -288,6 +310,8 @@ export class Game {
 	restartTickInterval() : void {
 		if (this.intervalId)
 			clearInterval(this.intervalId)
+		// Le compte a rebours du prochain tick repart de maintenant.
+		this.lastTickAt = Date.now()
 		this.intervalId = setInterval(() => {
 			// Une exception levee dans un callback de setInterval n'a AUCUN appelant pour
 			// la rattraper: elle remonte en uncaughtException et tue le process, donc
@@ -372,7 +396,12 @@ export class Game {
 		)
 		playerState.board = [...emptyRows, ...keptRows]
 		playerState.lockedAt = [...emptyLocks, ...keptLocks]
-		playerState.score += clearedLines * 100
+		// Score AVANT la mise a jour du niveau: les lignes sont creditees a la vitesse
+		// a laquelle elles ont ete jouees, pas a celle du niveau qu'elles debloquent.
+		// Une piece ne couvre jamais plus de 4 rangees, mais on borne l'index par
+		// securite plutot que de risquer un `undefined` en score.
+		const clearIndex = Math.min(clearedLines, LINE_CLEAR_SCORES.length - 1)
+		playerState.score += LINE_CLEAR_SCORES[clearIndex]! * playerState.level
 		playerState.lines += clearedLines
 		// Un « Tetris » = 4 lignes nettoyées d'un seul coup (le maximum). On compte
 		// l'événement, pas les lignes, pour la statistique dédiée.
@@ -708,6 +737,7 @@ export class Game {
 		return isGameOver
 	}
 	tick() : void {
+		this.lastTickAt = Date.now()
 		// Chrono ultra: seul mode dont la fin ne depend pas d'un evenement de jeu, il faut
 		// donc l'evaluer a chaque tick. Restreint aux modes chronometres pour ne rien
 		// changer au deroulement des autres (la survie reste geree par lockAndSpawnNext).

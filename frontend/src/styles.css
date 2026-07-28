@@ -1523,15 +1523,29 @@ a:hover {
 /* ─── Tetris stage ─────────────────────────────────────────────────────────── */
 
 .tetris-stage {
-	flex: 1;
-	min-height: 100vh;
+	/* Surtout pas `flex: 1` : sa base `0%` remplacerait la hauteur ci-dessous, qui
+	   redeviendrait indéfinie — les `height: 100%` des enfants ne résoudraient plus
+	   et la scène se dimensionnerait sur son contenu. */
+	flex: 0 0 auto;
+	/* Largeur d'une colonne latérale. Piste de grille DÉFINIE (et non `auto`) : la
+	   zone du plateau reçoit ainsi une largeur qui ne dépend pas de son contenu,
+	   condition pour pouvoir la mesurer sans boucle de mise en page. */
+	--stage-side: clamp(120px, 20vw, 320px);
+	/* La scène tient exactement dans la fenêtre et ne défile jamais : le plateau est
+	   dimensionné pour la place disponible (config/boardSizing.ts). `dvh` suit les
+	   barres d'outils mobiles qui se rétractent ; `vh` reste le repli. */
+	height: 100vh;
+	height: 100dvh;
+	min-height: 0;
+	overflow: hidden;
 	display: flex;
-	align-items: center;
+	align-items: stretch;
 	justify-content: center;
 	padding: 1.5rem 1rem;
 	position: relative;
 	isolation: isolate;
 }
+
 
 .tetris-stage::before {
 	content: "";
@@ -1546,12 +1560,16 @@ a:hover {
 
 .tetris-stage__inner {
 	display: grid;
-	grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
-	align-items: start;
+	grid-template-columns: var(--stage-side) minmax(0, 1fr) var(--stage-side);
+	align-items: stretch;
 	justify-items: center;
 	gap: 1.25rem;
 	width: 100%;
 	max-width: 1400px;
+	/* Hauteur définie héritée de la scène : c'est elle qui permet à la zone du
+	   plateau de connaître sa place sans dépendre de sa propre taille. */
+	height: 100%;
+	min-height: 0;
 }
 
 .tetris-stage__center {
@@ -1560,6 +1578,23 @@ a:hover {
 	align-items: center;
 	gap: 0.75rem;
 	min-width: 0;
+	/* Occupe toute sa piste de grille : sans ça la colonne se réduirait à la largeur
+	   de son contenu, et la zone du plateau se mesurerait donc… à la largeur du
+	   plateau qu'elle sert à dimensionner. */
+	width: 100%;
+	height: 100%;
+	min-height: 0;
+}
+
+/* Toute la hauteur restante sous le HUD, plateau centré dedans. */
+.tetris-stage__board-area {
+	flex: 1 1 auto;
+	min-height: 0;
+	min-width: 0;
+	width: 100%;
+	display: flex;
+	align-items: center;
+	justify-content: center;
 }
 
 .tetris-stage__board-wrap {
@@ -1608,9 +1643,8 @@ a:hover {
 	gap: 0.85rem;
 	min-width: 0;
 	width: 100%;
-	/* Doit rester aligné sur `sideColumnWidth()` (config/boardSizing.ts), qui
-	   réserve cette largeur au moment de calculer la taille des cellules. */
-	max-width: clamp(170px, 22vw, 320px);
+	/* Même valeur que la piste de grille : la colonne remplit exactement sa piste. */
+	max-width: var(--stage-side);
 	/* Sur un écran peu haut la colonne est bornée à la hauteur du plateau : son
 	   contenu (pièce suivante + touches + adversaires) doit défiler, pas déborder. */
 	overflow-y: auto;
@@ -1627,6 +1661,8 @@ a:hover {
 
 .tetris-stage--waiting {
 	color: var(--color-text-on-dark);
+	/* Pas de plateau à faire tenir ici : on recentre simplement le message. */
+	align-items: center;
 }
 
 /* ── Scène de jeu : adaptation aux écrans de PC ──────────────────────────────
@@ -1712,6 +1748,49 @@ a:hover {
 	}
 }
 
+/* Fenêtre trop étroite pour trois colonnes (tablette, fenêtre réduite de moitié) :
+   les colonnes latérales passeraient sous 120 px et écraseraient le plateau. On
+   empile : plateau d'abord, colonnes latérales en rangées dessous. La zone du
+   plateau garde une hauteur DÉFINIE (62dvh) — sans elle, sa taille dépendrait du
+   plateau qu'elle sert justement à dimensionner. */
+@media (max-width: 860px) {
+	.tetris-stage {
+		height: auto;
+		min-height: 100dvh;
+		overflow-y: auto;
+	}
+
+	.tetris-stage__inner {
+		grid-template-columns: minmax(0, 1fr);
+		height: auto;
+	}
+
+	.tetris-stage__center {
+		order: -1;
+		height: auto;
+	}
+
+	.tetris-stage__board-area {
+		flex: 0 0 auto;
+		height: 62dvh;
+	}
+
+	.tetris-stage__side {
+		flex-direction: row;
+		flex-wrap: wrap;
+		justify-content: center;
+		align-items: flex-start;
+		max-width: 100%;
+		/* Annule la hauteur inline calée sur le plateau : ce ne sont plus des colonnes. */
+		max-height: none !important;
+		overflow: visible;
+	}
+
+	.tetris-stage__side--left {
+		order: 2;
+	}
+}
+
 .tetris-stage__waiting {
 	display: flex;
 	align-items: center;
@@ -1727,6 +1806,9 @@ a:hover {
 
 .tetris-hud {
 	width: 100%;
+	/* Le HUD reste calé sur la largeur du plateau (variable posée par GameView), même
+	   si la colonne centrale, elle, occupe toute sa piste. */
+	max-width: var(--stage-board-width, 100%);
 	display: grid;
 	grid-template-columns: 1fr auto 1fr;
 	align-items: start;
@@ -1824,6 +1906,16 @@ a:hover {
 	color: var(--color-text-muted-on-dark);
 }
 
+/* Aucun retour à la ligne dans le HUD : sa HAUTEUR ne doit pas dépendre de sa
+   largeur. Sinon, le HUD étant calé sur la largeur du plateau (--stage-board-width),
+   on boucle : plateau plus étroit → HUD plus haut → moins de place → plateau encore
+   plus petit. La hauteur ne dépend donc que des tailles de police. */
+.tetris-hud__label,
+.tetris-hud__value,
+.tetris-hud__mode {
+	white-space: nowrap;
+}
+
 .tetris-hud__value {
 	font-family: var(--font-display);
 	font-size: 1.4rem;
@@ -1847,6 +1939,107 @@ a:hover {
 	padding: 2px;
 	border-radius: 6px;
 }
+
+/* ── Traînée de vitesse (chute instantanée) ─────────────────────────────────
+   Le serveur téléporte la pièce en bas : sans sillage, la chute ne se voit pas.
+   Les bandes sont posées en surcouche absolue au-dessus de la grille (un enfant
+   placé DANS la grille décalerait les cellules auto-placées). */
+.tetris-board-layer {
+	position: relative;
+}
+
+.tetris-drop-trail {
+	position: absolute;
+	inset: 0;
+	pointer-events: none;
+	z-index: 2;
+}
+
+.tetris-drop-trail__streak {
+	position: absolute;
+	border-radius: calc(var(--cs, 20px) * 0.16);
+	/* Dégradé vers le BAS : la traînée est la plus dense juste au-dessus du point
+	   d'impact et s'évanouit vers le haut, comme un filé de vitesse. */
+	background: linear-gradient(180deg, transparent 0%, color-mix(in oklab, var(--c) 55%, transparent) 70%, var(--c) 100%);
+	/* `screen` fait briller la traînée sur le plateau sombre sans masquer les cases. */
+	mix-blend-mode: screen;
+	filter: blur(calc(var(--cs, 20px) * 0.05));
+	transform-origin: bottom center;
+	animation: tetris-drop-streak 260ms cubic-bezier(0.2, 0.7, 0.3, 1) both;
+	--c: var(--piece-i);
+}
+
+.tetris-drop-trail__streak[data-piece="I"] { --c: var(--piece-i); }
+.tetris-drop-trail__streak[data-piece="J"] { --c: var(--piece-j); }
+.tetris-drop-trail__streak[data-piece="L"] { --c: var(--piece-l); }
+.tetris-drop-trail__streak[data-piece="O"] { --c: var(--piece-o); }
+.tetris-drop-trail__streak[data-piece="S"] { --c: var(--piece-s); }
+.tetris-drop-trail__streak[data-piece="T"] { --c: var(--piece-t); }
+.tetris-drop-trail__streak[data-piece="Z"] { --c: var(--piece-z); }
+
+@keyframes tetris-drop-streak {
+	0% { opacity: 0.95; transform: scaleY(0.35); }
+	35% { opacity: 0.8; transform: scaleY(1); }
+	100% { opacity: 0; transform: scaleY(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+	/* Durée quasi nulle plutôt que `animation: none` : `animationend` doit continuer
+	   à se déclencher, sinon la traînée resterait affichée pour toujours. */
+	.tetris-drop-trail__streak {
+		animation-duration: 0.01ms;
+	}
+}
+
+/* ── Décompte avant verrouillage ────────────────────────────────────────────
+   Une pièce qui touche la pile n'est verrouillée qu'au tick suivant : ce sursis
+   est le dernier moment pour la glisser. On le rend lisible en remplissant la
+   pièce de bas en haut, la durée venant du serveur (`--lock-ms`). */
+.tetris-lock-timer {
+	position: absolute;
+	inset: 0;
+	pointer-events: none;
+	z-index: 3;
+}
+
+.tetris-lock-timer__cell {
+	position: absolute;
+	overflow: hidden;
+	border-radius: calc(var(--cs, 20px) * 0.16);
+	/* Liseré : signale « posée, plus de chute » dès la première frame, avant même que
+	   le remplissage ait progressé. */
+	box-shadow: inset 0 0 0 max(1px, calc(var(--cs, 20px) * 0.07)) rgba(255, 255, 255, 0.9);
+	--c: var(--piece-i);
+}
+
+.tetris-lock-timer__cell[data-piece="I"] { --c: var(--piece-i); }
+.tetris-lock-timer__cell[data-piece="J"] { --c: var(--piece-j); }
+.tetris-lock-timer__cell[data-piece="L"] { --c: var(--piece-l); }
+.tetris-lock-timer__cell[data-piece="O"] { --c: var(--piece-o); }
+.tetris-lock-timer__cell[data-piece="S"] { --c: var(--piece-s); }
+.tetris-lock-timer__cell[data-piece="T"] { --c: var(--piece-t); }
+.tetris-lock-timer__cell[data-piece="Z"] { --c: var(--piece-z); }
+
+/* La jauge elle-même : atteint le haut de la pièce pile au verrouillage.
+   `linear`, sans easing : c'est une horloge, pas un effet. */
+.tetris-lock-timer__cell::after {
+	content: "";
+	position: absolute;
+	inset: 0;
+	background: linear-gradient(0deg, rgba(255, 255, 255, 0.8), color-mix(in oklab, var(--c) 45%, white) 100%);
+	mix-blend-mode: screen;
+	transform-origin: bottom center;
+	animation: tetris-lock-fill var(--lock-ms, 400ms) linear both;
+}
+
+@keyframes tetris-lock-fill {
+	from { transform: scaleY(0); }
+	to { transform: scaleY(1); }
+}
+
+/* Pas de garde `prefers-reduced-motion` ici : ce remplissage n'est pas décoratif,
+   c'est l'information « il te reste ce temps-là ». Il est linéaire et sans
+   clignotement, donc sans risque pour les personnes sensibles au mouvement. */
 
 /* Cellules & thèmes de pièces.
    Couleur par pièce via data-piece → variables --piece-* posées par le thème

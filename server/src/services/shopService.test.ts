@@ -15,7 +15,7 @@ vi.mock("./statsService.js", () => ({ recordGameResults: vi.fn() }));
 import { buyThemeForUser, equipThemeForUser, getWalletState, resolveEquippedTheme, settleGameRewards, type GameSettlementEntry } from "./shopService.js";
 import { creditBerrys, getWalletRow, purchaseThemeTx, setEquippedTheme } from "../repositories/userRepositories.js";
 import { recordGameResults } from "./statsService.js";
-import { DEFAULT_THEME_ID, SHOP_THEMES } from "../config/shopThemes.js";
+import { DEFAULT_THEME_ID, SHOP_THEMES, getShopTheme } from "../config/shopThemes.js";
 
 type FakeSocket = Socket & { emit: ReturnType<typeof vi.fn> };
 
@@ -108,7 +108,9 @@ describe("shopService", () => {
 
 			const state = await buyThemeForUser("luffy", "daltonien");
 
-			expect(purchaseThemeTx).toHaveBeenCalledWith("luffy", "daltonien", 2500);
+			// Prix lu dans le catalogue autoritatif: le test suit un reequilibrage sans
+			// figer une valeur en dur.
+			expect(purchaseThemeTx).toHaveBeenCalledWith("luffy", "daltonien", getShopTheme("daltonien")!.price);
 			expect(state.equipped).toBe("daltonien");
 		});
 

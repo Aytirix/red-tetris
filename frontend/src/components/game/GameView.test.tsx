@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import type { GameBoardCell, GameStatePayload, OpponentBoard } from "../../types/game";
 import { DEFAULT_KEY_BINDINGS } from "../../config/keyBindings";
 
@@ -53,6 +53,7 @@ function makeState(overrides: Partial<GameStatePayload> = {}): GameStatePayload 
 		fade: null,
 		jokersLeft: 0,
 		theme: null,
+		lockInMs: null,
 		...overrides,
 	};
 }
@@ -223,6 +224,38 @@ describe("GameView — plateau et HUD", () => {
 		expect(20 * cell + 19 * 2 + 22).toBeLessThanOrEqual(700 - 132);
 	});
 
+	// Le dimensionnement ne se fie plus a une estimation du HUD et des marges: il
+	// MESURE la zone reservee au plateau (ResizeObserver), absente de jsdom — on la
+	// simule ici pour verifier que la cellule suit la place reellement disponible.
+	it("dimensionne la cellule sur la zone mesuree, pas sur le viewport", () => {
+		const observers: Array<(entries: unknown[]) => void> = [];
+		vi.stubGlobal("ResizeObserver", class {
+			constructor(callback: (entries: unknown[]) => void) { observers.push(callback); }
+			observe() {}
+			disconnect() {}
+		});
+		try {
+			// Viewport genereux: sans mesure, le repli donnerait la cellule maximale.
+			setViewport(1920, 1200);
+			const { container } = renderGameView();
+			const grid = container.querySelector(".tetris-board") as HTMLElement;
+			expect(grid.style.gridTemplateColumns).toBe("repeat(10, 38px)");
+
+			// Zone reelle bien plus petite que ce que laissait croire le viewport.
+			act(() => {
+				for (const notify of observers) notify([{ contentRect: { width: 400, height: 420 } }]);
+			});
+
+			const cell = Number(/repeat\(10, (\d+)px\)/.exec(grid.style.gridTemplateColumns)?.[1]);
+			expect(cell).toBe(18); // (420 - 22 - 19*2) / 20 = 18
+			// Le plateau rendu tient dans la zone mesuree, en hauteur comme en largeur.
+			expect(20 * cell + 19 * 2 + 22).toBeLessThanOrEqual(420);
+			expect(10 * cell + 9 * 2 + 22).toBeLessThanOrEqual(400);
+		} finally {
+			vi.unstubAllGlobals();
+		}
+	});
+
 	it("transmet la projection fantome de la piece courante", () => {
 		const { container } = renderGameView({
 			state: makeState({ ghost: [{ x: 0, y: 0 }], currentPiece: { type: "S" } }),
@@ -335,6 +368,129 @@ describe("GameView — résumé des touches", () => {
 	it("ne l'affiche pas pour un spectateur", () => {
 		renderGameView({ state: makeState({ spectator: "zoro", opponents: makeOpponents(2) }) });
 		expect(screen.queryByLabelText("Touches configurées")).toBeNull();
+	});
+
+	// Le joker n'existe qu'en mode invisible: l'annoncer ailleurs promet une touche
+	// qui ne fait rien.
+	it("masque le joker hors du mode invisible", () => {
+		renderGameView({ state: makeState({ mode: "classique" }) });
+		const legend = screen.getByLabelText("Touches configurées");
+		expect(within(legend).queryByText(/Joker/)).toBeNull();
+	});
+
+	it("affiche le joker en mode invisible", () => {
+		renderGameView({ state: makeState({ mode: "invisible" }) });
+		const legend = screen.getByLabelText("Touches configurées");
+		expect(within(legend).getByText(/Joker/)).toBeInTheDocument();
+	});
+});
+
+describe("GameView — traînée de vitesse (chute instantanée)", () => {
+	// La pièce est téléportée en bas par le serveur: sans sillage, la chute est
+	// invisible. Les bandes vont du fantôme vers le haut, une par colonne.
+	it("dessine une traînée au-dessus du point d'atterrissage", () => {
+		const { container } = renderGameView({
+			state: makeState({ ghost: [{ x: 3, y: 18 }, { x: 4, y: 18 }] }),
+		});
+
+		expect(container.querySelectorAll(".tetris-drop-trail__streak")).toHaveLength(0);
+		fireEvent.keyDown(window, { code: "Space" });
+
+		const streaks = container.querySelectorAll(".tetris-drop-trail__streak");
+		expect(streaks).toHaveLength(2);
+		expect(gameEvents.emitGameDrop).toHaveBeenCalledTimes(1);
+	});
+
+	it("efface la traînée à la fin de l'animation", () => {
+		const { container } = renderGameView({ state: makeState({ ghost: [{ x: 3, y: 18 }] }) });
+		fireEvent.keyDown(window, { code: "Space" });
+		expect(container.querySelectorAll(".tetris-drop-trail__streak")).toHaveLength(1);
+
+		fireEvent.animationEnd(container.querySelector(".tetris-drop-trail") as Element);
+
+		expect(container.querySelectorAll(".tetris-drop-trail__streak")).toHaveLength(0);
+	});
+
+	// Mode invisible: le serveur n'envoie pas le fantôme. Une traînée y révélerait la
+	// position d'atterrissage, soit exactement ce que le mode cache.
+	it("ne dessine rien sans projection fantôme (mode invisible)", () => {
+		const { container } = renderGameView({ state: makeState({ mode: "invisible", ghost: [] }) });
+		fireEvent.keyDown(window, { code: "Space" });
+
+		expect(container.querySelectorAll(".tetris-drop-trail__streak")).toHaveLength(0);
+		expect(gameEvents.emitGameDrop).toHaveBeenCalledTimes(1);
+	});
+
+	// Une pièce qui atterrit sur la toute premiere rangee n'a aucun sillage a montrer.
+	it("ne dessine rien quand la pièce atterrit tout en haut", () => {
+		const { container } = renderGameView({ state: makeState({ ghost: [{ x: 3, y: 0 }] }) });
+		fireEvent.keyDown(window, { code: "Space" });
+
+		expect(container.querySelectorAll(".tetris-drop-trail__streak")).toHaveLength(0);
+	});
+});
+
+describe("GameView — decompte avant verrouillage", () => {
+	// Une piece posee sur la pile n'est verrouillee qu'au tick SUIVANT: la jauge rend
+	// ce sursis visible, sur la duree exacte envoyee par le serveur.
+	const grounded = { lockInMs: 300, ghost: [{ x: 3, y: 19 }, { x: 4, y: 19 }] };
+
+	it("remplit les cases de la piece posee sur la duree du sursis", () => {
+		const { container } = renderGameView({ state: makeState(grounded) });
+
+		const cells = container.querySelectorAll<HTMLElement>(".tetris-lock-timer__cell");
+		expect(cells).toHaveLength(2);
+		expect(cells[0].style.getPropertyValue("--lock-ms")).toBe("300ms");
+	});
+
+	it("n'affiche rien tant que la piece peut descendre", () => {
+		const { container } = renderGameView({
+			state: makeState({ lockInMs: null, ghost: [{ x: 3, y: 19 }] }),
+		});
+
+		expect(container.querySelectorAll(".tetris-lock-timer__cell")).toHaveLength(0);
+	});
+
+	// Glisser la piece pendant le sursis ne repousse PAS le verrouillage: la jauge doit
+	// suivre la piece sans repartir de zero ni changer de duree.
+	it("suit la piece qui glisse sans relancer le decompte", () => {
+		const { container, rerender } = render(
+			<GameView state={makeState(grounded)} roomName="room-42" />,
+		);
+
+		rerender(
+			<GameView
+				state={makeState({ lockInMs: 120, ghost: [{ x: 5, y: 19 }, { x: 6, y: 19 }] })}
+				roomName="room-42"
+			/>,
+		);
+
+		const cells = container.querySelectorAll<HTMLElement>(".tetris-lock-timer__cell");
+		expect(cells).toHaveLength(2);
+		// Position suivie…
+		expect(cells[0].style.left).not.toBe("");
+		// …mais duree figee a celle du premier contact.
+		expect(cells[0].style.getPropertyValue("--lock-ms")).toBe("300ms");
+	});
+
+	it("disparait des que la piece repart en chute", () => {
+		const { container, rerender } = render(
+			<GameView state={makeState(grounded)} roomName="room-42" />,
+		);
+		expect(container.querySelectorAll(".tetris-lock-timer__cell")).toHaveLength(2);
+
+		rerender(<GameView state={makeState({ lockInMs: null })} roomName="room-42" />);
+
+		expect(container.querySelectorAll(".tetris-lock-timer__cell")).toHaveLength(0);
+	});
+
+	// Mode invisible: pas de fantome envoye, donc aucune case a marquer.
+	it("n'affiche rien sans projection fantome (mode invisible)", () => {
+		const { container } = renderGameView({
+			state: makeState({ mode: "invisible", lockInMs: 300, ghost: [] }),
+		});
+
+		expect(container.querySelectorAll(".tetris-lock-timer__cell")).toHaveLength(0);
 	});
 });
 

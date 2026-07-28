@@ -11,7 +11,7 @@ export GID
 
 BACKEND_DEV := backend-dev
 
-.PHONY: help dev dev-build dev-down dev-logs prod prod-build prod-down prod-logs down clean test test-server test-front test-watch-server test-watch-front node_modules-server node_modules-front db-reset db-seed
+.PHONY: help dev dev-build dev-down dev-logs prod prod-build prod-down prod-logs down clean test test-server test-front test-watch-server test-watch-front node_modules-server node_modules-front db-reset db-seed db-seed-berrys
 
 help: ## Affiche cette aide
 	@printf "\n"
@@ -37,8 +37,9 @@ help: ## Affiche cette aide
 	@printf "  \033[36m%-18s\033[0m %s\n" "test-watch-front" "Tests du frontend en mode watch"
 	@printf "\n"
 	@printf "\033[1mBase de donnees\033[0m\n"
-	@printf "  \033[36m%-12s\033[0m %s\n" "db-reset" "Reset la base (migrations) puis la repeuple avec le seed"
-	@printf "  \033[36m%-12s\033[0m %s\n" "db-seed" "Repeuple la base avec le seed (sans reset)"
+	@printf "  \033[36m%-18s\033[0m %s\n" "db-reset" "Reset la base (migrations) puis la repeuple avec le seed"
+	@printf "  \033[36m%-18s\033[0m %s\n" "db-seed" "Repeuple la base avec le seed (sans reset)"
+	@printf "  \033[36m%-18s\033[0m %s\n" "db-seed-berrys" "Meme casting avec 500 000 berrys, mais sans aucune statistique"
 	@printf "\n"
 	@printf "\033[1mMaintenance\033[0m\n"
 	@printf "  \033[36m%-12s\033[0m %s\n" "down" "Stoppe les stacks dev et prod sans supprimer les volumes"
@@ -103,6 +104,10 @@ db-reset: ## Reset la base (drop + rejoue les migrations) puis la repeuple avec 
 db-seed: ## Repeuple la base avec le seed (personnages One Piece + fausses stats)
 	@printf "\n\033[1;38;5;216m>>> Seed de la base\033[0m\n"
 	$(COMPOSE) $(DEV_PROFILE) run --rm $(BACKEND_DEV) npm run seed
+
+db-seed-berrys: ## Cree les personnages One Piece avec 500 000 berrys, sans aucune statistique
+	@printf "\n\033[1;38;5;216m>>> Seed berrys seuls (sans stats)\033[0m\n"
+	$(COMPOSE) $(DEV_PROFILE) run --rm $(BACKEND_DEV) npm run seed:berrys
 
 down: ## Stoppe les stacks dev et prod sans supprimer les volumes
 	$(COMPOSE) $(ALL_PROFILES) down --remove-orphans

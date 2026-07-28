@@ -39,7 +39,8 @@ export const GAME_MODE_MIN_PLAYERS: Record<GameMode, number> = {
 // Règles détaillées affichées dans le lobby (une puce par ligne).
 export const GAME_MODE_RULES: Record<GameMode, string[]> = {
 	classique: [
-		"Nettoie des lignes pour marquer des points.",
+		"Nettoie des lignes pour marquer des points : 100 / 300 / 500 / 800 selon que tu en fais 1, 2, 3 ou 4 d'un coup.",
+		"En solo, le niveau multiplie le score : au niveau 3, un Tetris vaut 2 400 points.",
 		"Chaque ligne que tu nettoies envoie des lignes de pénalité aux adversaires.",
 		"Le dernier joueur encore en vie remporte la partie.",
 	],
@@ -51,7 +52,7 @@ export const GAME_MODE_RULES: Record<GameMode, string[]> = {
 	ultra: [
 		"Partie chronométrée : 2 minutes.",
 		"Le meilleur score à la fin du temps l'emporte.",
-		"Enchaîne les lignes pour maximiser ton score.",
+		"Vise les Tetris (4 lignes d'un coup) : 800 points, contre 400 pour les mêmes lignes faites une par une.",
 	],
 	suddendeath: [
 		"Vitesse maximale dès la première pièce.",
@@ -109,6 +110,12 @@ export type GameStatePayload = {
 	jokersLeft: number;
 	/** Cosmetique du proprietaire du plateau affiche (thème de pièces), null si inconnu. */
 	theme: string | null;
+	/**
+	 * Sursis (ms) avant que la pièce posée sur la pile ne se verrouille, null si elle
+	 * peut encore descendre. Le serveur le calcule depuis son dernier tick : le joueur
+	 * a un tick complet pour glisser la pièce, et bouger ne le repousse pas.
+	 */
+	lockInMs: number | null;
 };
 
 export type GameOverScore = {

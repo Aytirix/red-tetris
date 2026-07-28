@@ -353,6 +353,28 @@ describe("normalizeGameState — jokers", () => {
 	});
 });
 
+describe("normalizeGameState — sursis avant verrouillage", () => {
+	const base = { board: [[0, 0], [0, 0]], score: 0, level: 1 };
+
+	it("lit le sursis envoye par le serveur", () => {
+		expect(normalizeGameState({ ...base, lockInMs: 240 })!.lockInMs).toBe(240);
+		expect(normalizeGameState({ ...base, lockInMs: 0 })!.lockInMs).toBe(0);
+	});
+
+	it("vaut null si absent (piece encore en chute)", () => {
+		expect(normalizeGameState(base)!.lockInMs).toBeNull();
+		expect(normalizeGameState({ ...base, lockInMs: null })!.lockInMs).toBeNull();
+	});
+
+	// Une duree negative ou NaN produirait une animation CSS a duree invalide: la jauge
+	// se remplirait instantanement, donnant une echeance fausse au joueur.
+	it("ignore les durees absurdes", () => {
+		expect(normalizeGameState({ ...base, lockInMs: -50 })!.lockInMs).toBeNull();
+		expect(normalizeGameState({ ...base, lockInMs: NaN })!.lockInMs).toBeNull();
+		expect(normalizeGameState({ ...base, lockInMs: "400" })!.lockInMs).toBeNull();
+	});
+});
+
 describe("normalizeGameState — valeurs hostiles (audit)", () => {
 	const base = { board: [[0, 0], [0, 0]], score: 0, level: 1 };
 

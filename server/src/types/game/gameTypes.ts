@@ -13,6 +13,17 @@ export function isGameMode(value: string): value is GameMode {
 	return (GAME_MODES as readonly string[]).includes(value);
 }
 
+// Bareme de score du Tetris Guideline (indexe par nombre de lignes nettoyees d'un
+// SEUL coup, 0 a 4), multiplie par le niveau. La prime aux multi-lignes est la
+// mecanique centrale du jeu: un Tetris rapporte 8x un Single, pas 4x, ce qui
+// recompense le joueur qui creuse un puits et attend la barre I au lieu d'aplanir.
+export const LINE_CLEAR_SCORES = [0, 100, 300, 500, 800] as const;
+// Lignes a nettoyer pour monter d'un niveau. Le niveau se calculait avant sur le
+// score (500 pts = 5 lignes a 100 pts/ligne); on garde exactement la meme cadence de
+// difficulte, mais adossee aux LIGNES: le score n'est plus proportionnel aux lignes
+// (multi-lignes et multiplicateur de niveau), il ferait exploser la vitesse.
+export const LINES_PER_LEVEL = 5;
+
 // Sprint: premier a nettoyer 40 lignes.
 export const SPRINT_TARGET_LINES = 40;
 // Ultra: 2 minutes, meilleur score.

@@ -4,7 +4,8 @@ import type { PieceType } from "../types/game";
 // Le PRIX est autoritatif côté serveur (config/shopThemes.ts). Ici on garde le
 // rendu (recipe -> classe CSS) + la palette des 7 pièces + le libellé/desc.
 // Le prix listé sert de repli d'affichage; le catalogue serveur (shop:State)
-// prime toujours.
+// prime toujours — garder les deux alignés évite d'afficher un prix périmé le temps
+// que `shop:State` arrive.
 
 export type ThemeRecipe = "neon" | "glass" | "minimal" | "synth" | "jewel";
 
@@ -33,7 +34,7 @@ export const PIECE_THEMES: PieceTheme[] = [
 		name: "Daltonien",
 		description: "Palette Okabe-Ito distinguable en daltonisme. Accessible et parfaitement lisible.",
 		recipe: "minimal",
-		price: 500,
+		price: 12000,
 		palette: { I: "#56B4E9", J: "#0072B2", L: "#E69F00", O: "#F0E442", S: "#009E73", T: "#CC79A7", Z: "#D55E00" },
 	},
 	{
@@ -41,7 +42,7 @@ export const PIECE_THEMES: PieceTheme[] = [
 		name: "Soft Pastel",
 		description: "Flat doux premium, dégradé zénithal et coins arrondis. Épuré et reposant, façon Apple Arcade.",
 		recipe: "minimal",
-		price: 800,
+		price: 25000,
 		palette: { I: "#38BDF8", J: "#5B8DEF", L: "#FB923C", O: "#FACC5A", S: "#4ADE80", T: "#B57EDC", Z: "#F87171" },
 	},
 	{
@@ -49,7 +50,7 @@ export const PIECE_THEMES: PieceTheme[] = [
 		name: "Verre Liquide",
 		description: "Verre dépoli translucide, rim-light blanc et reflet spéculaire. Glassmorphism premium.",
 		recipe: "glass",
-		price: 1500,
+		price: 40000,
 		palette: { I: "#22D3EE", J: "#4F7CFF", L: "#FF9A3C", O: "#FFD84D", S: "#34E27A", T: "#B968FF", Z: "#FF5C7A" },
 	},
 	{
@@ -57,7 +58,7 @@ export const PIECE_THEMES: PieceTheme[] = [
 		name: "Synthwave",
 		description: "Néon synthwave éclatant, cœur blanc et gros halo. Ambiance rétro-arcade Miami.",
 		recipe: "synth",
-		price: 2500,
+		price: 50000,
 		palette: { I: "#00E5FF", J: "#448AFF", L: "#FFAB40", O: "#FFEA00", S: "#39FF14", T: "#EA80FC", Z: "#FF2D6B" },
 	},
 	{
@@ -65,7 +66,7 @@ export const PIECE_THEMES: PieceTheme[] = [
 		name: "Joyaux",
 		description: "Cristaux sombres à cœur lumineux et facettes. Le thème le plus somptueux.",
 		recipe: "jewel",
-		price: 4000,
+		price: 75000,
 		palette: { I: "#22D3EE", J: "#4F7CFF", L: "#FF9A3C", O: "#FFD84D", S: "#34E27A", T: "#B968FF", Z: "#FF5C7A" },
 	},
 ];

@@ -155,6 +155,7 @@ export function emitGameStart(state: Map<string, PlayerGameState>, game: Game) :
  * - linesTarget: objectif (sprint) ou null
  * - timeLeftMs : temps restant (ultra) ou null
  * - fade       : opacite par cellule (invisible) ou null
+ * - lockInMs   : sursis avant verrouillage de la piece posee, ou null si elle tombe
  * La Game est recuperee via le Player: les emetteurs ne la recoivent pas en parametre.
  */
 function getModeFields(playerState: PlayerGameState) {
@@ -169,6 +170,7 @@ function getModeFields(playerState: PlayerGameState) {
 			fade: null,
 			jokersLeft: playerState.jokersLeft,
 			theme: playerState.player.getTheme(),
+			lockInMs: null,
 		};
 	}
 	const fade = game.getFadeGrid(playerState);
@@ -184,6 +186,8 @@ function getModeFields(playerState: PlayerGameState) {
 		rawFade: fade,
 		fade: maskFadeGrid(fade),
 		jokersLeft: playerState.jokersLeft,
+		// Sursis avant verrouillage: le client en fait une jauge sur la piece posee.
+		lockInMs: game.getLockDelayMs(playerState),
 	};
 }
 

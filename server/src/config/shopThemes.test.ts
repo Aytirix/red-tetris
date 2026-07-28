@@ -18,7 +18,7 @@ describe("shopThemes", () => {
 
 	describe("getShopTheme", () => {
 		it("returns the catalogue entry of a known theme", () => {
-			expect(getShopTheme("daltonien")).toEqual({ id: "daltonien", price: 2500 });
+			expect(getShopTheme("daltonien")).toEqual({ id: "daltonien", price: 12000 });
 		});
 
 		it("returns undefined for an unknown theme", () => {

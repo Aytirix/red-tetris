@@ -409,7 +409,7 @@ describe("Game", () => {
 			expect(state.board[BOARD_HEIGHT - 2]![3]).toBe(0);
 		});
 
-		it("adds 100 points per cleared line", () => {
+		it("adds 100 points for a single line", () => {
 			const { game, states } = makeGame(1);
 			const state = states[0]!;
 			state.board = emptyBoard();
@@ -418,6 +418,53 @@ describe("Game", () => {
 			game.clearLines(state);
 
 			expect(state.score).toBe(100);
+		});
+
+		// Bareme Guideline: la prime aux multi-lignes est la mecanique du jeu. Quatre
+		// lignes d'un coup valent 800, contre 400 si elles sont faites une par une.
+		it.each([
+			[1, 100],
+			[2, 300],
+			[3, 500],
+			[4, 800],
+		])("scores %i line(s) cleared at once as %i points", (lines, expected) => {
+			const { game, states } = makeGame(1);
+			const state = states[0]!;
+			state.board = emptyBoard();
+			for (let i = 0; i < lines; i++)
+				state.board[BOARD_HEIGHT - 1 - i] = fullRow();
+
+			game.clearLines(state);
+
+			expect(state.score).toBe(expected);
+		});
+
+		it("multiplies the line score by the current level", () => {
+			const { game, states } = makeGame(1);
+			const state = states[0]!;
+			state.level = 4;
+			state.board = emptyBoard();
+			state.board[BOARD_HEIGHT - 1] = fullRow();
+			state.board[BOARD_HEIGHT - 2] = fullRow();
+
+			game.clearLines(state);
+
+			expect(state.score).toBe(300 * 4);
+		});
+
+		// Les lignes sont payees a la vitesse a laquelle elles ont ete jouees: le niveau
+		// qu'elles debloquent ne doit pas s'appliquer retroactivement.
+		it("scores at the level in force before the level-up", () => {
+			const { game, states } = makeGame(1);
+			const state = states[0]!;
+			state.lines = 4; // la 5e ligne fait passer au niveau 2
+			state.board = emptyBoard();
+			state.board[BOARD_HEIGHT - 1] = fullRow();
+
+			game.clearLines(state);
+
+			expect(state.score).toBe(100);
+			expect(state.level).toBe(2);
 		});
 
 		it("clears several lines at once and scores them all", () => {
@@ -431,7 +478,7 @@ describe("Game", () => {
 
 			game.clearLines(state);
 
-			expect(state.score).toBe(400);
+			expect(state.score).toBe(800);
 			expect(state.board.every((row) => row.every((cell) => cell === 0))).toBe(true);
 		});
 
@@ -457,7 +504,7 @@ describe("Game", () => {
 
 			game.clearLines(state);
 
-			expect(state.score).toBe(200);
+			expect(state.score).toBe(300);
 			expect(state.board[BOARD_HEIGHT - 1]![0]).toBe("O");
 		});
 	});
@@ -975,15 +1022,17 @@ describe("Game", () => {
 	});
 
 	describe("updateLevel", () => {
-		it("levels up every 500 points in solo", () => {
+		// Le niveau suit les LIGNES, pas le score: avec le bareme Guideline (multi-lignes
+		// primees puis multipliees par le niveau), un seuil en points s'emballerait.
+		it("levels up every 5 lines in solo", () => {
 			const { game, states } = makeGame(1);
 			const state = states[0]!;
 
-			state.score = 500;
+			state.lines = 5;
 			game.updateLevel(state);
 			expect(state.level).toBe(2);
 
-			state.score = 1500;
+			state.lines = 15;
 			game.updateLevel(state);
 			expect(state.level).toBe(4);
 		});
@@ -991,7 +1040,17 @@ describe("Game", () => {
 		it("does not change the level below the next threshold", () => {
 			const { game, states } = makeGame(1);
 			const state = states[0]!;
-			state.score = 400;
+			state.lines = 4;
+			game.updateLevel(state);
+			expect(state.level).toBe(1);
+		});
+
+		// Un gros score obtenu en peu de lignes (Tetris) ne doit plus faire monter le niveau.
+		it("ignores the score entirely", () => {
+			const { game, states } = makeGame(1);
+			const state = states[0]!;
+			state.score = 100_000;
+			state.lines = 0;
 			game.updateLevel(state);
 			expect(state.level).toBe(1);
 		});
@@ -999,9 +1058,68 @@ describe("Game", () => {
 		it("never levels up in multiplayer", () => {
 			const { game, states } = makeGame(2);
 			const state = states[0]!;
-			state.score = 5000;
+			state.lines = 50;
 			game.updateLevel(state);
 			expect(state.level).toBe(1);
+		});
+	});
+
+	describe("getLockDelayMs", () => {
+		// Une piece qui ne peut plus descendre n'est verrouillee qu'au tick SUIVANT: le
+		// client a besoin de ce sursis pour afficher un decompte juste.
+		it("est null tant que la piece peut descendre", () => {
+			const { game, states } = makeGame(1);
+			const state = states[0]!;
+			state.currentPiece = placedPiece(O, "O", 4, 0);
+
+			expect(game.getLockDelayMs(state)).toBeNull();
+		});
+
+		it("vaut un tick complet juste apres le tick qui a pose la piece", () => {
+			const { game, states } = makeGame(1);
+			const state = states[0]!;
+			state.currentPiece = placedPiece(O, "O", 4, BOARD_HEIGHT - 2);
+			game.restartTickInterval();
+
+			expect(game.getLockDelayMs(state)).toBe(game.getTickSpeed());
+		});
+
+		// Bouger la piece ne reprogramme PAS la gravite: le sursis continue de s'ecouler,
+		// sinon le joueur pourrait la retenir indefiniment en la faisant glisser.
+		it("decroit avec le temps ecoule depuis le dernier tick", () => {
+			const { game, states } = makeGame(1);
+			const state = states[0]!;
+			state.currentPiece = placedPiece(O, "O", 4, BOARD_HEIGHT - 2);
+			game.restartTickInterval();
+
+			vi.advanceTimersByTime(100);
+
+			expect(game.getLockDelayMs(state)).toBe(game.getTickSpeed() - 100);
+		});
+
+		// Sans gravite en cours (partie mise en pause par une fin de partie, derive de
+		// l'horloge), le sursis se borne a zero au lieu de partir en negatif.
+		it("ne descend jamais sous zero", () => {
+			const { game, states } = makeGame(1);
+			const state = states[0]!;
+			state.currentPiece = placedPiece(O, "O", 4, BOARD_HEIGHT - 2);
+			game.restartTickInterval();
+			// Gravite coupee (fin de partie) : le temps passe sans qu'aucun tick ne
+			// reprogramme l'echeance.
+			vi.clearAllTimers();
+
+			vi.advanceTimersByTime(10_000);
+
+			expect(game.getLockDelayMs(state)).toBe(0);
+		});
+
+		it("est null pour un joueur elimine", () => {
+			const { game, states } = makeGame(1);
+			const state = states[0]!;
+			state.currentPiece = placedPiece(O, "O", 4, BOARD_HEIGHT - 2);
+			state.isAlive = false;
+
+			expect(game.getLockDelayMs(state)).toBeNull();
 		});
 	});
 

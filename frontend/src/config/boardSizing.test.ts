@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
 	computeMainCellSize,
 	computeMiniCellSize,
+	fitCellSize,
 	MAIN_CELL_MAX,
 	MAIN_CELL_MIN,
 } from "./boardSizing";
@@ -95,6 +96,42 @@ describe("computeMainCellSize", () => {
 			expect(cell).toBeGreaterThanOrEqual(previous);
 			previous = cell;
 		}
+	});
+});
+
+describe("fitCellSize", () => {
+	// Le plateau est dimensionné sur la place MESURÉE : il ne doit jamais la dépasser,
+	// sinon la scène (qui ne défile plus) le rognerait.
+	it.each([
+		[420, 900],
+		[420, 700],
+		[380, 560],
+		[300, 480],
+	])("tient dans une zone de %ix%i px", (availableWidth, availableHeight) => {
+		const rows = 20;
+		const cols = 10;
+		const cell = fitCellSize({ availableWidth, availableHeight, rows, cols });
+		expect(renderedBoardHeight(rows, cell)).toBeLessThanOrEqual(availableHeight);
+		expect(cols * cell + (cols - 1) * 2 + 22).toBeLessThanOrEqual(availableWidth);
+	});
+
+	it("plafonne à la taille historique quand la place est immense", () => {
+		expect(fitCellSize({ availableWidth: 4000, availableHeight: 4000, rows: 20, cols: 10 })).toBe(MAIN_CELL_MAX);
+	});
+
+	it("garde un plancher de lisibilité quand la zone est minuscule", () => {
+		expect(fitCellSize({ availableWidth: 80, availableHeight: 60, rows: 20, cols: 10 })).toBe(MAIN_CELL_MIN);
+	});
+
+	it("est contraint par la plus petite des deux dimensions", () => {
+		const wide = fitCellSize({ availableWidth: 2000, availableHeight: 500, rows: 20, cols: 10 });
+		const tall = fitCellSize({ availableWidth: 200, availableHeight: 2000, rows: 20, cols: 10 });
+		expect(wide).toBe(fitCellSize({ availableWidth: 500, availableHeight: 500, rows: 20, cols: 10 }));
+		expect(tall).toBeLessThan(wide);
+	});
+
+	it("retombe sur la taille max si le plateau est vide (pas de division par zéro)", () => {
+		expect(fitCellSize({ availableWidth: 500, availableHeight: 800, rows: 0, cols: 0 })).toBe(MAIN_CELL_MAX);
 	});
 });
 

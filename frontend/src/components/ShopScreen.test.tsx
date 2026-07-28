@@ -26,6 +26,10 @@ function renderShop() {
 	return render(<AlertProvider><ShopScreen /></AlertProvider>);
 }
 
+/** Prix local du theme le plus cher: suit un reequilibrage du catalogue sans
+    qu'on ait a reajuster le butin des tests a la main. */
+const JEWEL_PRICE = PIECE_THEMES.find((theme) => theme.id === "jewel")!.price;
+
 /** Carte de la boutique correspondant au theme donne. */
 function card(themeName: string): HTMLElement {
 	return screen.getByText(themeName).closest("article") as HTMLElement;
@@ -80,7 +84,7 @@ describe("ShopScreen", () => {
 	});
 
 	it("demande confirmation avant d'acheter puis relaie l'achat", async () => {
-		shop.state.berrys = 10_000;
+		shop.state.berrys = JEWEL_PRICE;
 		renderShop();
 
 		fireEvent.click(within(card("Joyaux")).getByRole("button", { name: /^Acheter · / }));
@@ -92,7 +96,7 @@ describe("ShopScreen", () => {
 	});
 
 	it("n'achete rien si la confirmation est annulee", async () => {
-		shop.state.berrys = 10_000;
+		shop.state.berrys = JEWEL_PRICE;
 		renderShop();
 
 		fireEvent.click(within(card("Joyaux")).getByRole("button", { name: /^Acheter · / }));

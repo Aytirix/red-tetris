@@ -9,7 +9,8 @@
     "test": "vitest run --coverage",
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",
-    "seed": "tsx prisma/seed.ts"
+    "seed": "tsx prisma/seed.ts",
+    "seed:berrys": "tsx prisma/seed-berrys.ts"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.7.0",

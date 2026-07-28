@@ -1,17 +1,21 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import type { GameStatePayload } from "../../types/game";
 import { emitGameDrop, emitGameJoker, emitGameMove, emitGameRotate, emitSubscribeSpectator } from "../../socket/events/game";
 import { actionForCode, loadKeyBindings } from "../../config/keyBindings";
 import { useKeyLabel } from "../../hooks/useKeyLabel";
 import { useShop } from "../../contexts/ShopContext";
 import { getPieceTheme, themeCssVars } from "../../config/pieceThemes";
-import { computeMainCellSize, computeMiniCellSize } from "../../config/boardSizing";
+import { computeMainCellSize, computeMiniCellSize, fitCellSize } from "../../config/boardSizing";
 import { useViewportSize } from "../../hooks/useViewportSize";
-import GameBoard from "./GameBoard";
+import { useElementSize } from "../../hooks/useElementSize";
+import GameBoard, { type DropStreak, type DropTrail, type LockTimer } from "./GameBoard";
 import GameHud from "./GameHud";
 import ControlsLegend from "./ControlsLegend";
 import NextPiecePreview from "./NextPiecePreview";
 import OpponentsColumn from "./OpponentsColumn";
+
+// Longueur du sillage laisse par une chute instantanee, en rangees.
+const DROP_TRAIL_ROWS = 6;
 
 const MINI_HEADER_PX = 22;
 const MINI_GAP_PX = 12;
@@ -45,22 +49,38 @@ export default function GameView({ state, roomName, eliminated = false, onElimin
 
 	const boardRows = state.board.length;
 	const boardCols = state.board[0]?.length ?? 0;
-	// Le plateau s'adapte à la fenêtre : sur un écran de PC portable peu haut, une
-	// cellule figée à 38 px ferait déborder le plateau sous le bas du viewport.
+	// Le plateau s'adapte à l'écran : la scène occupe exactement la hauteur du
+	// viewport et ne défile pas, donc le plateau doit tenir dans la place qui reste
+	// sous le HUD. On MESURE cette place (`boardAreaRef`) au lieu de la deviner :
+	// une estimation en dur du HUD et des marges finit toujours par dériver du CSS,
+	// et le plateau repassait alors sous le bas de la fenêtre.
+	const boardAreaRef = useRef<HTMLDivElement>(null);
+	const boardArea = useElementSize(boardAreaRef);
+	// Repli tant que rien n'est mesuré (premier rendu, environnement sans
+	// ResizeObserver) : estimation à partir du viewport.
 	const viewport = useViewportSize();
 	const mainCellSize = useMemo(
-		() => computeMainCellSize({
-			viewportWidth: viewport.width,
-			viewportHeight: viewport.height,
-			rows: boardRows,
-			cols: boardCols,
-		}),
-		[viewport.width, viewport.height, boardRows, boardCols],
+		() => boardArea
+			? fitCellSize({
+				availableWidth: boardArea.width,
+				availableHeight: boardArea.height,
+				rows: boardRows,
+				cols: boardCols,
+			})
+			: computeMainCellSize({
+				viewportWidth: viewport.width,
+				viewportHeight: viewport.height,
+				rows: boardRows,
+				cols: boardCols,
+			}),
+		[boardArea, viewport.width, viewport.height, boardRows, boardCols],
 	);
 	const miniCellSize = computeMiniCellSize(mainCellSize);
 	// Hauteur réellement occupée par le plateau (cellules + gouttières), qui borne
 	// la hauteur des colonnes latérales.
 	const mainBoardHeightPx = boardRows * mainCellSize + Math.max(0, boardRows - 1) * 2;
+	// Largeur du plateau, cadre compris : le HUD s'y aligne (--stage-board-width).
+	const mainBoardWidthPx = boardCols * mainCellSize + Math.max(0, boardCols - 1) * 2 + 22;
 
 	// Secousse du plateau quand le joueur encaisse des lignes de pénalité.
 	// Une ligne de pénalité est une rangée entièrement composée de cellules "penalty"
@@ -93,6 +113,51 @@ export default function GameView({ state, roomName, eliminated = false, onElimin
 		prevPenaltyRows.current = penaltyRows;
 	}, [penaltyRows, watchedBoard]);
 
+	// ── Traînée de vitesse de la chute instantanée ──────────────────────────────
+	// La pièce est téléportée en bas par le serveur : sans repère visuel, on ne voit
+	// pas la chute. On dessine donc des lignes de vitesse dans le sillage, depuis
+	// quelques rangées au-dessus du point d'atterrissage (la projection fantôme).
+	// En mode invisible le serveur n'envoie PAS le fantôme : la traînée y est donc
+	// absente d'elle-même, et c'est voulu — elle trahirait la position d'atterrissage.
+	const [dropTrail, setDropTrail] = useState<DropTrail | null>(null);
+	// Le gestionnaire clavier est monté une fois : il lirait un `state` figé au montage.
+	// Ces refs lui donnent accès au fantôme et à la pièce du rendu courant.
+	const ghostRef = useRef(state.ghost);
+	const currentPieceRef = useRef(state.currentPiece?.type ?? null);
+	const dropCountRef = useRef(0);
+	useEffect(() => {
+		ghostRef.current = state.ghost;
+		currentPieceRef.current = state.currentPiece?.type ?? null;
+	}, [state.ghost, state.currentPiece]);
+
+	// ── Décompte avant verrouillage ─────────────────────────────────────────────
+	// Une pièce qui ne peut plus descendre n'est verrouillée qu'au tick SUIVANT : le
+	// joueur dispose d'un tick complet pour la glisser, sans rien pour le lui dire.
+	// On remplit donc la pièce de bas en haut sur la durée exacte du sursis, envoyée
+	// par le serveur (`lockInMs`) — la calculer ici dupliquerait la cadence de la
+	// gravité, et bouger la pièce ne repousse PAS l'échéance.
+	// Les cases de la pièce posée sont exactement sa projection : quand elle touche,
+	// le fantôme coïncide avec elle. En mode invisible le fantôme n'est pas envoyé,
+	// il n'y a donc pas de jauge (ce mode assume de ne rien montrer).
+	const [lockTimer, setLockTimer] = useState<LockTimer | null>(null);
+	const lockSeqRef = useRef(0);
+	const grounded = state.lockInMs !== null && state.ghost.length > 0;
+	const lockInMs = state.lockInMs;
+	useEffect(() => {
+		if (!grounded) {
+			setLockTimer(null);
+			return;
+		}
+		// `prev ?? …` : une fois la jauge lancée, les frames suivantes (le joueur bouge
+		// la pièce) ne doivent NI la relancer NI changer sa durée.
+		setLockTimer((prev) => prev ?? {
+			id: ++lockSeqRef.current,
+			ms: lockInMs ?? 0,
+			cells: [],
+			piece: null,
+		});
+	}, [grounded, lockInMs]);
+
 	// Split opponents: left column fills until full (2 minis per row), then right (under next piece)
 	const { left, right } = useMemo(() => {
 		if (state.opponents.length === 0) return { left: [], right: [] };
@@ -108,6 +173,27 @@ export default function GameView({ state, roomName, eliminated = false, onElimin
 			right: state.opponents.slice(fitLeft),
 		};
 	}, [state.opponents, mainBoardHeightPx, miniCellSize]);
+
+	// Sillage à dessiner : une bande par colonne du fantôme, s'arrêtant juste au-dessus
+	// de la case d'atterrissage la plus haute de cette colonne. Une pièce qui atterrit
+	// tout en haut (colonne pleine) ne laisse aucune traînée : il n'y a pas de sillage.
+	const startDropTrail = useCallback(() => {
+		const ghost = ghostRef.current;
+		if (!ghost || ghost.length === 0) return;
+		const topByColumn = new Map<number, number>();
+		for (const cell of ghost) {
+			const current = topByColumn.get(cell.x);
+			if (current === undefined || cell.y < current) topByColumn.set(cell.x, cell.y);
+		}
+		const streaks: DropStreak[] = [];
+		for (const [x, top] of topByColumn) {
+			if (top <= 0) continue;
+			streaks.push({ x, fromY: Math.max(0, top - DROP_TRAIL_ROWS), toY: top - 1 });
+		}
+		if (streaks.length === 0) return;
+		dropCountRef.current += 1;
+		setDropTrail({ id: dropCountRef.current, streaks, piece: currentPieceRef.current });
+	}, []);
 
 	// Keyboard input — only for player (non-spectator).
 	// Les touches sont personnalisables (menu « Touches » du dashboard) ; on les lit
@@ -160,7 +246,9 @@ export default function GameView({ state, roomName, eliminated = false, onElimin
 				case "moveLeft": emitGameMove("left"); break;
 				case "moveRight": emitGameMove("right"); break;
 				case "softDrop": emitGameMove("down"); break;
-				case "hardDrop": emitGameDrop(); break;
+				// Traînée déclenchée à la frappe, pas à la réception de l'état : le
+				// serveur renvoie la pièce déjà posée, l'effet arriverait trop tard.
+				case "hardDrop": startDropTrail(); emitGameDrop(); break;
 				case "joker": emitGameJoker(); break;
 			}
 		}
@@ -177,7 +265,7 @@ export default function GameView({ state, roomName, eliminated = false, onElimin
 			window.removeEventListener("keyup", onKeyUp);
 			stopRotateRepeat();
 		};
-	}, [isSpectator]);
+	}, [isSpectator, startDropTrail]);
 
 	function handleSpectatorSelect(username: string) {
 		if (!isSpectator) return;
@@ -218,7 +306,10 @@ export default function GameView({ state, roomName, eliminated = false, onElimin
 				</aside>
 
 				{/* Center — main board with score on top, level top-right */}
-				<div className="tetris-stage__center">
+				<div
+					className="tetris-stage__center"
+					style={{ "--stage-board-width": `${mainBoardWidthPx}px` } as CSSProperties}
+				>
 					<GameHud
 						score={state.score}
 						level={state.level}
@@ -231,17 +322,28 @@ export default function GameView({ state, roomName, eliminated = false, onElimin
 						jokersLeft={state.jokersLeft}
 						jokerKey={jokerKey}
 					/>
-					<div
-						className={`tetris-stage__board-wrap${shakePhase ? ` tetris-stage__board-wrap--shake-${shakePhase}` : ""}`}
-						onAnimationEnd={() => setShakePhase(0)}
-					>
-						<GameBoard
-							board={state.board}
-							cellSize={mainCellSize}
-							ghost={state.ghost}
-							ghostPiece={state.currentPiece?.type ?? null}
-							fade={state.fade}
-						/>
+					{/* Boîte élastique : prend toute la hauteur restante sous le HUD. C'est
+					    elle qu'on mesure pour dimensionner les cellules. */}
+					<div className="tetris-stage__board-area" ref={boardAreaRef}>
+						<div
+							className={`tetris-stage__board-wrap${shakePhase ? ` tetris-stage__board-wrap--shake-${shakePhase}` : ""}`}
+							onAnimationEnd={() => setShakePhase(0)}
+						>
+							<GameBoard
+								board={state.board}
+								cellSize={mainCellSize}
+								ghost={state.ghost}
+								ghostPiece={state.currentPiece?.type ?? null}
+								fade={state.fade}
+								dropTrail={dropTrail}
+								onDropTrailEnd={() => setDropTrail(null)}
+								// Cases et couleur pris sur la frame COURANTE: la pièce peut
+								// encore glisser pendant le sursis, la jauge doit la suivre.
+								lockTimer={lockTimer && grounded
+									? { ...lockTimer, cells: state.ghost, piece: state.currentPiece?.type ?? null }
+									: null}
+							/>
+						</div>
 					</div>
 				</div>
 
@@ -253,7 +355,7 @@ export default function GameView({ state, roomName, eliminated = false, onElimin
 					<NextPiecePreview piece={state.nextPiece} />
 					{/* Résumé des touches: uniquement pour le joueur actif (pas les
 					    spectateurs, ni les éliminés qui basculent en spectateur). */}
-					{!isSpectator && <ControlsLegend />}
+					{!isSpectator && <ControlsLegend mode={state.mode} />}
 					<OpponentsColumn
 						opponents={right}
 						cellSize={miniCellSize}

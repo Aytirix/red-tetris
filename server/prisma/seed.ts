@@ -1,10 +1,11 @@
 import "dotenv/config";
 import { prisma } from "../src/config/prisma.js";
 import type { Faction } from "../src/generated/prisma/enums.js";
+import { BERRYS, MARINES, PIRATES } from "./characters.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Seed de correction : crée un joueur par personnage One Piece (pirates + marines),
-// chacun avec son avatar, 100 000 berrys, et un historique de parties généré qui
+// chacun avec son avatar, 500 000 berrys, et un historique de parties généré qui
 // alimente de FAUSSES statistiques variées entre les joueurs.
 //
 // Approche : on génère d'abord un historique de parties (GameRecord) par joueur, puis
@@ -19,8 +20,7 @@ import type { Faction } from "../src/generated/prisma/enums.js";
 // ─────────────────────────────────────────────────────────────────────────────
 
 // Nom d'utilisateur = personnage, avatar = fichier /img/avatar/<faction>/<avatar>.png
-const PIRATES = ["luffy", "zoro", "sanji", "nami", "usopp", "chopper", "robin", "franky", "brook", "jinbei"];
-const MARINES = ["garp", "akainu", "aokiji", "kizaru", "sengoku", "smoker", "tashigi", "koby", "fujitora", "ryokugyu"];
+// (casting et montant des berrys : voir ./characters.ts, partagé avec seed-berrys.ts)
 
 // Deux « stars » un peu plus fortes, pour un classement lisible en correction.
 const STARS = new Set(["luffy", "garp"]);
@@ -29,8 +29,6 @@ const STARS = new Set(["luffy", "garp"]);
 // pour l'instant que « classique » ; on saupoudre les autres modes (déjà définis côté
 // serveur) pour DÉMONTRER que le niveau D fonctionne dès qu'ils seront rouverts.
 const SECONDARY_MODES = ["sprint", "ultra", "suddendeath", "invisible"];
-
-const BERRYS = 100_000;
 
 type Character = { username: string; avatar: string; faction: Faction; skill: number };
 
@@ -145,7 +143,7 @@ async function main() {
 		const games = generateGames(character);
 		const agg = aggregate(games);
 
-		// Upsert du joueur : avatar, faction, 100 000 berrys et agrégats de stats.
+		// Upsert du joueur : avatar, faction, 500 000 berrys et agrégats de stats.
 		await prisma.user.upsert({
 			where: { username: character.username },
 			create: {
@@ -232,7 +230,7 @@ async function main() {
 	const marine = factionTotals.marine;
 	const pirate = factionTotals.pirate;
 	const leader = pirate.wins === marine.wins ? "égalité" : pirate.wins > marine.wins ? "🏴 Pirates" : "⚓ Marines";
-	console.log(`\n✅ ${characters.length} joueurs seedés (100 000 ฿ chacun).`);
+	console.log(`\n✅ ${characters.length} joueurs seedés (${BERRYS.toLocaleString("fr-FR")} ฿ chacun).`);
 	console.log(`   Camps → Pirates ${pirate.wins}V · Marines ${marine.wins}V · Meilleur camp : ${leader}`);
 	console.log("   ⚠️  FactionStats a été réécrit avec les totaux seedés (données de démo).");
 }

@@ -135,6 +135,10 @@ export function normalizeGameState(raw: unknown): GameStatePayload | null {
 		// negative et gele l'onglet sur une valeur enorme.
 		jokersLeft: normalizeJokers(r.jokersLeft),
 		theme: typeof r.theme === "string" && r.theme.length > 0 ? r.theme : null,
+		// Negatif ou non fini -> pas de decompte plutot qu'une animation a duree absurde.
+		lockInMs: typeof r.lockInMs === "number" && Number.isFinite(r.lockInMs) && r.lockInMs >= 0
+			? r.lockInMs
+			: null,
 	};
 }
 
