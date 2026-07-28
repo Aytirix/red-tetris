@@ -212,6 +212,11 @@ export default function GameView({ state, roomName, eliminated = false, onElimin
 		// c'est un déplacement continu, pas une suite d'actions distinctes.
 		const SOFT_DROP_REPEAT_DELAY = 90;
 		const SOFT_DROP_REPEAT_RATE = 35;
+		// Déplacements latéraux (DAS/ARR dans le jargon Tetris) : délai un peu plus long
+		// que la descente pour qu'un appui bref reste précis (une case, pas deux), puis
+		// glissement rapide.
+		const MOVE_REPEAT_DELAY = 120;
+		const MOVE_REPEAT_RATE = 35;
 
 		/** Répétition d'UNE action tenue : délai initial puis cadence fixe. */
 		function makeRepeater(fire: () => void, delayMs: number, rateMs: number) {
@@ -232,15 +237,20 @@ export default function GameView({ state, roomName, eliminated = false, onElimin
 			};
 		}
 
-		const rotateRepeat = makeRepeater(() => emitGameRotate(), ROTATE_REPEAT_DELAY, ROTATE_REPEAT_RATE);
-		const softDropRepeat = makeRepeater(
-			() => emitGameMove("down"),
-			SOFT_DROP_REPEAT_DELAY,
-			SOFT_DROP_REPEAT_RATE,
-		);
+		// Toutes les actions « tenues ». Les autres (chute instantanée, joker) sont
+		// ponctuelles et ne doivent jamais se répéter.
+		const repeaters = {
+			rotate: makeRepeater(() => emitGameRotate(), ROTATE_REPEAT_DELAY, ROTATE_REPEAT_RATE),
+			softDrop: makeRepeater(() => emitGameMove("down"), SOFT_DROP_REPEAT_DELAY, SOFT_DROP_REPEAT_RATE),
+			moveLeft: makeRepeater(() => emitGameMove("left"), MOVE_REPEAT_DELAY, MOVE_REPEAT_RATE),
+			moveRight: makeRepeater(() => emitGameMove("right"), MOVE_REPEAT_DELAY, MOVE_REPEAT_RATE),
+		};
+		type HeldAction = keyof typeof repeaters;
+		function isHeldAction(action: string): action is HeldAction {
+			return action in repeaters;
+		}
 		function stopRepeats() {
-			rotateRepeat.stop();
-			softDropRepeat.stop();
+			for (const repeater of Object.values(repeaters)) repeater.stop();
 		}
 		// Alias historique imposé par le sujet: KeyX pivote aussi, tant que la touche
 		// n'a pas été réassignée à une autre action par le joueur.
@@ -255,21 +265,23 @@ export default function GameView({ state, roomName, eliminated = false, onElimin
 			const action = actionFor(e.code);
 			if (!action) return;
 
-			// Rotation et descente pilotent leur propre répétition → on ignore l'auto-repeat
+			// Les actions tenues pilotent leur propre répétition → on ignore l'auto-repeat
 			// de l'OS, qui doublerait la cadence.
-			if (action === "rotate" || action === "softDrop") {
+			if (isHeldAction(action)) {
 				e.preventDefault();
 				if (e.repeat) return;
-				(action === "rotate" ? rotateRepeat : softDropRepeat).start();
+				// Changer de direction sans relâcher : la nouvelle prend la main, sinon les
+				// deux répétitions s'annuleraient l'une l'autre.
+				if (action === "moveLeft") repeaters.moveRight.stop();
+				else if (action === "moveRight") repeaters.moveLeft.stop();
+				repeaters[action].start();
 				return;
 			}
 
 			// Chute instantanée et joker ne doivent pas se répéter si la touche reste enfoncée.
-			if (e.repeat && (action === "hardDrop" || action === "joker")) return;
+			if (e.repeat) return;
 			e.preventDefault();
 			switch (action) {
-				case "moveLeft": emitGameMove("left"); break;
-				case "moveRight": emitGameMove("right"); break;
 				// Traînée déclenchée à la frappe, pas à la réception de l'état : le
 				// serveur renvoie la pièce déjà posée, l'effet arriverait trop tard.
 				case "hardDrop": startDropTrail(); emitGameDrop(); break;
@@ -281,12 +293,11 @@ export default function GameView({ state, roomName, eliminated = false, onElimin
 		function onKeyUp(e: KeyboardEvent) {
 			if (!e.code) return;
 			const action = actionFor(e.code);
-			if (action === "rotate") rotateRepeat.stop();
-			else if (action === "softDrop") softDropRepeat.stop();
+			if (action && isHeldAction(action)) repeaters[action].stop();
 		}
 
 		// Onglet quitté (alt-tab) : le keyup n'arrive jamais, la répétition tournerait
-		// dans le vide et la pièce continuerait de descendre au retour.
+		// dans le vide et la pièce continuerait de bouger au retour.
 		function onBlur() {
 			stopRepeats();
 		}

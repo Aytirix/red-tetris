@@ -204,11 +204,59 @@ describe("GameView — mapping clavier (exigence du sujet)", () => {
 		expect(gameEvents.emitGameDrop).not.toHaveBeenCalled();
 	});
 
-	it("autorise la repetition sur les deplacements", () => {
+	// Les deplacements pilotent leur propre repetition (DAS/ARR): l'auto-repeat de l'OS
+	// est ignore, sinon les deux cadences se cumuleraient.
+	it("ignore l'auto-repeat de l'OS sur les deplacements", () => {
 		renderGameView();
 		fireEvent.keyDown(window, { code: "ArrowLeft", repeat: true });
 
-		expect(gameEvents.emitGameMove).toHaveBeenCalledWith("left");
+		expect(gameEvents.emitGameMove).not.toHaveBeenCalled();
+	});
+
+	it("maintenir un deplacement le repete, un tapotement = 1 case", () => {
+		vi.useFakeTimers();
+		try {
+			renderGameView();
+
+			fireEvent.keyDown(window, { code: "ArrowLeft" });
+			fireEvent.keyUp(window, { code: "ArrowLeft" });
+			vi.advanceTimersByTime(500);
+			expect(gameEvents.emitGameMove).toHaveBeenCalledTimes(1);
+			expect(gameEvents.emitGameMove).toHaveBeenCalledWith("left");
+
+			gameEvents.emitGameMove.mockClear();
+
+			fireEvent.keyDown(window, { code: "ArrowLeft" });
+			vi.advanceTimersByTime(120 + 35 * 4);
+			expect(gameEvents.emitGameMove.mock.calls.length).toBeGreaterThanOrEqual(5);
+
+			fireEvent.keyUp(window, { code: "ArrowLeft" });
+			const stopped = gameEvents.emitGameMove.mock.calls.length;
+			vi.advanceTimersByTime(300);
+			expect(gameEvents.emitGameMove.mock.calls.length).toBe(stopped);
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
+	// Changer de direction sans relacher: la nouvelle prend la main, sinon les deux
+	// repetitions tourneraient en meme temps et la piece ferait du surplace.
+	it("change de direction sans relacher la precedente", () => {
+		vi.useFakeTimers();
+		try {
+			renderGameView();
+			fireEvent.keyDown(window, { code: "ArrowLeft" });
+			vi.advanceTimersByTime(120 + 35 * 2);
+			fireEvent.keyDown(window, { code: "ArrowRight" });
+			gameEvents.emitGameMove.mockClear();
+
+			vi.advanceTimersByTime(120 + 35 * 4);
+
+			const directions = new Set(gameEvents.emitGameMove.mock.calls.map((call) => call[0]));
+			expect(directions).toEqual(new Set(["right"]));
+		} finally {
+			vi.useRealTimers();
+		}
 	});
 
 	it("ignore les touches non mappees", () => {
