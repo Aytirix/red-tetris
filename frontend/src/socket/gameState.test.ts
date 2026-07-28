@@ -63,6 +63,15 @@ describe("normalizeGameState — normalisation des cellules", () => {
 		expect(state!.board[0][2]).toBe("spectrum");
 	});
 
+	it("accepte les cellules de gruyere du mode cheese", () => {
+		const state = normalizeGameState({
+			board: [ROW("garbage", "garbage", 0, 0, 0, 0, 0, 0, 0, 0)],
+		});
+
+		expect(state!.board[0][0]).toBe("garbage");
+		expect(state!.board[0][2]).toBe(0);
+	});
+
 	it("accepte les 7 types de pieces", () => {
 		const state = normalizeGameState({ board: [ROW("I", "J", "L", "O", "S", "T", "Z")] });
 		expect(state!.board[0]).toEqual(["I", "J", "L", "O", "S", "T", "Z"]);
@@ -375,6 +384,26 @@ describe("normalizeGameState — sursis avant verrouillage", () => {
 	});
 });
 
+describe("normalizeGameState — compteur de gruyere", () => {
+	const base = { board: [[0, 0], [0, 0]], score: 0, level: 1 };
+
+	it("lit les rangees restant a creuser", () => {
+		expect(normalizeGameState({ ...base, mode: "cheese", garbageLeft: 14 })!.garbageLeft).toBe(14);
+		expect(normalizeGameState({ ...base, mode: "cheese", garbageLeft: 0 })!.garbageLeft).toBe(0);
+	});
+
+	it("vaut null hors du mode cheese (compteur absent du payload)", () => {
+		expect(normalizeGameState(base)!.garbageLeft).toBeNull();
+		expect(normalizeGameState({ ...base, garbageLeft: null })!.garbageLeft).toBeNull();
+	});
+
+	it("ignore les valeurs absurdes plutot que d'afficher « -3 restantes »", () => {
+		expect(normalizeGameState({ ...base, garbageLeft: -3 })!.garbageLeft).toBeNull();
+		expect(normalizeGameState({ ...base, garbageLeft: NaN })!.garbageLeft).toBeNull();
+		expect(normalizeGameState({ ...base, garbageLeft: "12" })!.garbageLeft).toBeNull();
+	});
+});
+
 describe("normalizeGameState — valeurs hostiles (audit)", () => {
 	const base = { board: [[0, 0], [0, 0]], score: 0, level: 1 };
 
@@ -389,5 +418,69 @@ describe("normalizeGameState — valeurs hostiles (audit)", () => {
 		const state = normalizeGameState({ ...base, fade: [[NaN, 1], [1, 1]] })!;
 		expect(state.fade![0][0]).toBe(1);
 		expect(Number.isNaN(state.fade![0][0])).toBe(false);
+	});
+});
+
+describe("normalizeGameState — retombée du mode Cascade", () => {
+	const base = { board: [[0, 0], [0, 0]], score: 0, level: 1 };
+
+	it("lit les cases tombées et leur distance", () => {
+		const state = normalizeGameState({
+			...base,
+			mode: "cascade",
+			cascade: { id: 7, cells: [{ x: 1, y: 1, rows: 2 }] },
+		})!;
+
+		expect(state.cascade).toEqual({ id: 7, cells: [{ x: 1, y: 1, rows: 2 }] });
+	});
+
+	it("vaut null hors cascade", () => {
+		expect(normalizeGameState(base)!.cascade).toBeNull();
+		expect(normalizeGameState({ ...base, cascade: null })!.cascade).toBeNull();
+	});
+
+	// Une case hors plateau serait animée à une position inexistante, une distance
+	// nulle ne produirait aucun mouvement: dans les deux cas on l'écarte.
+	it("ecarte les cases hors plateau ou immobiles", () => {
+		const state = normalizeGameState({
+			...base,
+			cascade: {
+				id: 1,
+				cells: [
+					{ x: 9, y: 0, rows: 1 },   // hors plateau (2 colonnes)
+					{ x: 0, y: 9, rows: 1 },   // hors plateau (2 rangées)
+					{ x: 0, y: 0, rows: 0 },   // n'a pas bougé
+					{ x: 1, y: 1, rows: 1 },   // valide
+				],
+			},
+		})!;
+
+		expect(state.cascade).toEqual({ id: 1, cells: [{ x: 1, y: 1, rows: 1 }] });
+	});
+
+	it("ignore un descripteur inexploitable", () => {
+		expect(normalizeGameState({ ...base, cascade: { cells: [] } })!.cascade).toBeNull();
+		expect(normalizeGameState({ ...base, cascade: { id: 1, cells: "non" } })!.cascade).toBeNull();
+		expect(normalizeGameState({ ...base, cascade: { id: 1, cells: [] } })!.cascade).toBeNull();
+	});
+});
+
+describe("normalizeGameState — compteur de Tetris", () => {
+	const base = { board: [[0, 0], [0, 0]], score: 0, level: 1 };
+
+	it("lit le nombre de Tetris reussis", () => {
+		expect(normalizeGameState({ ...base, tetris: 4 })!.tetris).toBe(4);
+	});
+
+	it("retombe a 0 quand il est absent ou invalide", () => {
+		expect(normalizeGameState(base)!.tetris).toBe(0);
+		expect(normalizeGameState({ ...base, tetris: "trois" })!.tetris).toBe(0);
+		expect(normalizeGameState({ ...base, tetris: -2 })!.tetris).toBe(0);
+		expect(normalizeGameState({ ...base, tetris: NaN })!.tetris).toBe(0);
+	});
+
+	// Un decimal afficherait « 3.0000001 Tetris » dans le HUD.
+	it("tronque une valeur decimale", () => {
+		expect(normalizeGameState({ ...base, tetris: 3.9 })!.tetris).toBe(3);
 	});
 });

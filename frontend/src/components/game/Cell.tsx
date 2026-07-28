@@ -8,14 +8,32 @@ type Props = {
 	ghost?: PieceType;
 	/** Mode invisible : opacité de la couche colorée (1 = pleine, 0 = invisible mais solide). */
 	opacity?: number;
+	/**
+	 * Mode Cascade : nombre de rangées que cette case vient de descendre. La case est
+	 * déjà à sa position finale ; l'animation la fait PARTIR de là où elle était.
+	 * Animer une surcouche à la place laisserait voir le bloc immobile en dessous
+	 * pendant que sa copie descend — on ne verrait donc rien tomber.
+	 */
+	fallRows?: number;
 };
 
-function Cell({ cell, size, ghost, opacity }: Props) {
+function Cell({ cell, size, ghost, opacity, fallRows }: Props) {
 	const isEmpty = cell === 0;
 	const isGhost = isEmpty && ghost != null;
+	const isFalling = !isEmpty && fallRows != null && fallRows > 0;
 	// --cs = taille de cellule → met à l'échelle le biseau/halo en CSS.
-	const style: CSSProperties | undefined = size
-		? ({ width: `${size}px`, height: `${size}px`, ["--cs"]: `${size}px` } as CSSProperties)
+	// --fall-rows / --fall-ms pilotent la chute : plus la case vient de haut, plus
+	// elle met de temps, mais borné pour ne pas figer le plateau après un gros effondrement.
+	const style: CSSProperties | undefined = size || isFalling
+		? ({
+			...(size ? { width: `${size}px`, height: `${size}px`, ["--cs"]: `${size}px` } : {}),
+			...(isFalling
+				? {
+					["--fall-rows"]: fallRows,
+					["--fall-ms"]: `${Math.min(320, 90 + fallRows * 28)}ms`,
+				}
+				: {}),
+		} as CSSProperties)
 		: undefined;
 
 	// Mode invisible : une case pleine est rendue en DEUX couches — le fond et le
@@ -38,7 +56,7 @@ function Cell({ cell, size, ghost, opacity }: Props) {
 
 	const className = isGhost
 		? "tetris-cell tetris-cell--ghost"
-		: `tetris-cell ${isEmpty ? "tetris-cell--empty" : "tetris-cell--filled"}`;
+		: `tetris-cell ${isEmpty ? "tetris-cell--empty" : "tetris-cell--filled"}${isFalling ? " tetris-cell--falling" : ""}`;
 	const dataPiece = isGhost ? ghost : isEmpty ? undefined : cell;
 
 	return <div className={className} data-piece={dataPiece} style={style} />;

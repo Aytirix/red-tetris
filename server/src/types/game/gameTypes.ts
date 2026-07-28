@@ -6,7 +6,7 @@ export const BOARD_WIDTH = 10;
 export const BOARD_HEIGHT = 20;
 
 // Modes de jeu disponibles. "classique" = regles de base (survie / dernier debout).
-export const GAME_MODES = ["classique", "sprint", "ultra", "suddendeath", "invisible"] as const;
+export const GAME_MODES = ["classique", "sprint", "ultra", "suddendeath", "invisible", "cascade", "cheese"] as const;
 export type GameMode = (typeof GAME_MODES)[number];
 
 export function isGameMode(value: string): value is GameMode {
@@ -56,6 +56,17 @@ export const INVISIBLE_REVEAL_CAP_MS = 6_000;
 export const INVISIBLE_JOKER_COUNT = 3;
 export const INVISIBLE_JOKER_REVEAL_MS = 3_000;
 
+// Cheese: nombre total de lignes de gruyere (percees d'un trou) a creuser pour
+// gagner la course.
+export const CHEESE_TOTAL_GARBAGE = 20;
+// Cheese: combien sont posees sur le plateau au coup d'envoi. Les autres attendent
+// leur tour: le plateau ne peut pas commencer avec 20 rangees sur 20.
+export const CHEESE_START_GARBAGE = 10;
+// Cheese: lignes de gruyere a creuser pour que le plateau remonte d'une rangee.
+// La cadence est plus lente que la destruction (2 pour 1): le joueur gagne du
+// terrain en avancant, sinon la course serait interminable.
+export const CHEESE_CLEARS_PER_RISE = 2;
+
 export type PieceType = "I" | "J" | "L" | "O" | "S" | "T" | "Z";
 
 export type currentPiece = {
@@ -63,7 +74,10 @@ export type currentPiece = {
 };
 
 // "spectrum": cellule du spectre envoye aux adversaires (hauteur de pile, sans couleur).
-export type Cell = 0 | PieceType | "penalty" | "spectrum";
+// "garbage" : gruyere du mode cheese. Contrairement a "penalty" (pleine et
+// indestructible), une rangee de gruyere est percee et se nettoie normalement:
+// c'est l'objectif du mode, pas une sanction.
+export type Cell = 0 | PieceType | "penalty" | "spectrum" | "garbage";
 
 export type Board = Cell [][];
 
@@ -71,6 +85,19 @@ export type OpponentBoard = {
 	username: string;
 	board: Board;
 	alive: boolean;
+};
+
+/**
+ * Mode cascade: retombee de blocs a animer par le client. Le serveur n'envoie que le
+ * plateau FINAL (les blocs y sont deja arrives): sans la distance parcourue, le client
+ * ne peut que les faire apparaitre d'un coup. `id` change a chaque nouvelle retombee,
+ * ce qui permet de ne jouer l'animation qu'une fois meme si l'info reste dans les
+ * frames suivantes.
+ */
+export type CascadeFall = {
+	id: number;
+	/** Position d'ARRIVEE de la case, et nombre de rangees qu'elle vient de descendre. */
+	cells: { x: number; y: number; rows: number }[];
 };
 
 export type PlayerGameState = {
@@ -85,6 +112,16 @@ export type PlayerGameState = {
 	// verrouillage horodate (case vide ou ligne de penalite). Sert au fondu du mode
 	// invisible; decale en meme temps que le plateau (lignes completees / penalites).
 	lockedAt: number[][];
+	// Identifiant de la PIECE qui a pose chaque cellule, aligne sur `board` (0 = case
+	// vide). Le mode cascade s'en sert pour faire retomber les pieces une par une:
+	// regrouper les cases simplement collees les unes aux autres ne marche pas, la pile
+	// d'une vraie partie ne formant qu'un seul bloc soude — plus rien ne tomberait
+	// jamais. Chaque rangee ajoutee (penalite, gruyere) recoit aussi son identifiant.
+	pieceIds: number[][];
+	// Derniere retombee de blocs (mode cascade), null si le dernier verrouillage n'en a
+	// pas produit. Reste dans les frames jusqu'au verrouillage suivant: le client s'en
+	// sert une fois, via l'identifiant.
+	cascade: CascadeFall | null;
 	// Mode invisible: jokers restants (revelation a la demande).
 	jokersLeft: number;
 	// Mode invisible: instant a partir duquel le fondu reprend. Sert de PLANCHER a
@@ -97,6 +134,11 @@ export type PlayerGameState = {
 	// le dernier tick — sinon une piece posee juste avant un tick n'aurait quasiment
 	// aucun temps d'ajustement.
 	groundedAt: number | null;
+	// Mode cheese: lignes de gruyere DETRUITES (objectif: CHEESE_TOTAL_GARBAGE) et
+	// lignes deja SERVIES, c'est-a-dire posees sur le plateau (les autres attendent
+	// leur tour en coulisse). Le client n'affiche que le reste a creuser.
+	garbageCleared: number;
+	garbageServed: number;
 	pieceIndex: number
 	player: Player;
 	isAlive: boolean;

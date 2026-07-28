@@ -3,6 +3,7 @@ import { act, cleanup, fireEvent, render, screen, within } from "@testing-librar
 import { createFakeSocket, type FakeSocket } from "../../test/fakeSocket";
 import { AlertProvider } from "../components/Alert";
 import type { NormalizedUsernameAvailability } from "../socket/userState";
+import { GAME_MODES } from "../types/game";
 
 // Le socket est injecte via le contexte: on remplace le contexte plutot que
 // socket.io-client, pour ne jamais charger le singleton reseau.
@@ -225,12 +226,12 @@ describe("GamePage — lobby", () => {
 		expect(roomEvents.emitStartGame).toHaveBeenCalledTimes(1);
 	});
 
-	it("propose les cinq modes de jeu et laisse l'admin en choisir un", () => {
+	it("propose tous les modes de jeu et laisse l'admin en choisir un", () => {
 		const { container } = renderGamePage();
 		joinLobby([{ username: "luffy", faction: "pirate" }]);
 
-		expect(container.querySelectorAll(".game-lobby__mode-btn")).toHaveLength(5);
-		for (const label of ["Classique", "Sprint", "Ultra", "Sudden Death", "Invisible"])
+		expect(container.querySelectorAll(".game-lobby__mode-btn")).toHaveLength(GAME_MODES.length);
+		for (const label of ["Classique", "Sprint", "Ultra", "Sudden Death", "Invisible", "Cascade", "Gruyère"])
 			expect(screen.getByRole("button", { name: label })).toBeInTheDocument();
 
 		fireEvent.click(screen.getByRole("button", { name: "Invisible" }));

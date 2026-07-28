@@ -6,7 +6,7 @@ export type PieceType = "I" | "J" | "L" | "O" | "S" | "T" | "Z";
 // les etoiles restantes.
 export const MAX_JOKERS = 3;
 
-export const GAME_MODES = ["classique", "sprint", "ultra", "suddendeath", "invisible"] as const;
+export const GAME_MODES = ["classique", "sprint", "ultra", "suddendeath", "invisible", "cascade", "cheese"] as const;
 export type GameMode = (typeof GAME_MODES)[number];
 
 export const GAME_MODE_LABELS: Record<GameMode, string> = {
@@ -15,6 +15,8 @@ export const GAME_MODE_LABELS: Record<GameMode, string> = {
 	ultra: "Ultra",
 	suddendeath: "Sudden Death",
 	invisible: "Invisible",
+	cascade: "Cascade",
+	cheese: "Gruyère",
 };
 
 export const GAME_MODE_HINTS: Record<GameMode, string> = {
@@ -23,6 +25,8 @@ export const GAME_MODE_HINTS: Record<GameMode, string> = {
 	ultra: "2 minutes, meilleur scorssse.",
 	suddendeath: "Vitesse maximale dès la première pièce.",
 	invisible: "Une pièce posée s'efface en 3 s… mais reste solide.",
+	cascade: "Les blocs retombent après un nettoyage : enchaîne les chaînes.",
+	cheese: "20 rangées trouées à creuser, le plateau remonte.",
 };
 
 // Nombre minimum de joueurs pour lancer un mode. Sprint est une COURSE : il n'a de sens
@@ -34,6 +38,9 @@ export const GAME_MODE_MIN_PLAYERS: Record<GameMode, number> = {
 	ultra: 1,
 	suddendeath: 1,
 	invisible: 1,
+	cascade: 1,
+	// Gruyère se joue seul (contre-la-montre) comme à plusieurs (course).
+	cheese: 1,
 };
 
 // Règles détaillées affichées dans le lobby (une puce par ligne).
@@ -65,6 +72,20 @@ export const GAME_MODE_RULES: Record<GameMode, string[]> = {
 		"Chaque ligne complétée redonne 2 s de visibilité (cumulables).",
 		"3 jokers pour révéler le plateau à la demande.",
 	],
+	cascade: [
+		"Après chaque nettoyage, les blocs qui ne reposent plus sur rien retombent.",
+		"Une retombée peut compléter de nouvelles lignes : c'est une chaîne.",
+		"Chaque maillon multiplie le score : 2ᵉ salve ×2, 3ᵉ ×3, et ainsi de suite.",
+		"Les pièces tombent entières : un pont posé garde le trou qu'il recouvre.",
+		"Une chaîne envoie autant de lignes de pénalité que son total nettoyé.",
+	],
+	cheese: [
+		"Le plateau démarre avec 10 rangées trouées d'une seule case.",
+		"Objectif : creuser les 20 rangées de la partie.",
+		"Toutes les 2 rangées creusées, le plateau remonte d'une nouvelle rangée.",
+		"Le compteur « À creuser » décompte les 20 rangées, celles en coulisse comprises.",
+		"À plusieurs, c'est une course : le premier à finir gagne.",
+	],
 };
 
 export function isGameMode(value: string): value is GameMode {
@@ -73,7 +94,9 @@ export function isGameMode(value: string): value is GameMode {
 
 // "spectrum": cellule du spectre d'un adversaire (hauteur de pile, sans couleur).
 // Un joueur ne recoit que ca de ses adversaires; un spectateur recoit les vrais plateaux.
-export type GameBoardCell = 0 | PieceType | "penalty" | "spectrum";
+// "garbage" : rangée trouée du mode Gruyère — grise comme une pénalité, mais
+// nettoyable (c'est l'objectif du mode, pas une sanction).
+export type GameBoardCell = 0 | PieceType | "penalty" | "spectrum" | "garbage";
 
 export type GameBoard = GameBoardCell[][];
 
@@ -89,6 +112,18 @@ export type GamePiece = {
 
 export type GhostCell = { x: number; y: number };
 
+/**
+ * Mode Cascade : blocs qui viennent de retomber. Le plateau reçu les montre déjà
+ * ARRIVÉS ; sans la distance parcourue on ne pourrait que les faire apparaître d'un
+ * coup. `id` ne change qu'à une nouvelle retombée : l'info reste dans les frames
+ * suivantes, et c'est lui qui évite de rejouer l'animation à chaque frame.
+ */
+export type CascadeFall = {
+	id: number;
+	/** Position d'ARRIVÉE de la case, et nombre de rangées qu'elle vient de descendre. */
+	cells: { x: number; y: number; rows: number }[];
+};
+
 export type GameStatePayload = {
 	board: GameBoard;
 	opponents: OpponentBoard[];
@@ -101,6 +136,8 @@ export type GameStatePayload = {
 	mode: GameMode;
 	/** Lignes nettoyees par le joueur affiche. */
 	lines: number;
+	/** « Tetris » réussis par le joueur affiché : 4 lignes nettoyées d'un seul coup. */
+	tetris: number;
 	/** Objectif de lignes (sprint), null sinon. */
 	linesTarget: number | null;
 	/** Temps restant en ms (ultra), null sinon. */
@@ -117,6 +154,14 @@ export type GameStatePayload = {
 	 * a un tick complet pour glisser la pièce, et bouger ne le repousse pas.
 	 */
 	lockInMs: number | null;
+	/**
+	 * Mode Gruyère : rangées trouées qu'il reste à creuser (celles déjà servies ET
+	 * celles encore en coulisse), null dans les autres modes. Ne remonte jamais :
+	 * une remontée du plateau ne fait que dévoiler du gruyère déjà compté.
+	 */
+	garbageLeft: number | null;
+	/** Mode Cascade : retombée à animer, null s'il n'y en a pas eu. */
+	cascade: CascadeFall | null;
 };
 
 export type GameOverScore = {

@@ -152,10 +152,14 @@ export function emitGameStart(state: Map<string, PlayerGameState>, game: Game) :
  * Champs specifiques au mode de jeu, ajoutes a chaque frame:
  * - mode       : le mode courant (le client adapte son HUD)
  * - lines      : lignes nettoyees par ce joueur
+ * - tetris     : nombre de « Tetris » (4 lignes d'un coup) reussis par ce joueur
  * - linesTarget: objectif (sprint) ou null
  * - timeLeftMs : temps restant (ultra) ou null
  * - fade       : opacite par cellule (invisible) ou null
  * - lockInMs   : sursis avant verrouillage de la piece posee, ou null si elle tombe
+ * - garbageLeft: rangees de gruyere restant a creuser (cheese) ou null
+ * - cascade    : blocs qui viennent de retomber et distance parcourue (cascade), pour
+ *                que le client les anime — le plateau, lui, les montre deja arrives
  * La Game est recuperee via le Player: les emetteurs ne la recoivent pas en parametre.
  */
 function getModeFields(playerState: PlayerGameState) {
@@ -164,6 +168,7 @@ function getModeFields(playerState: PlayerGameState) {
 		return {
 			mode: "classique",
 			lines: playerState.lines,
+			tetris: playerState.tetris,
 			linesTarget: null,
 			timeLeftMs: null,
 			rawFade: null,
@@ -171,6 +176,8 @@ function getModeFields(playerState: PlayerGameState) {
 			jokersLeft: playerState.jokersLeft,
 			theme: playerState.player.getTheme(),
 			lockInMs: null,
+			garbageLeft: null,
+			cascade: null,
 		};
 	}
 	const fade = game.getFadeGrid(playerState);
@@ -180,6 +187,7 @@ function getModeFields(playerState: PlayerGameState) {
 		theme: playerState.player.getTheme(),
 		mode: game.getMode(),
 		lines: playerState.lines,
+		tetris: playerState.tetris,
 		linesTarget: game.getLinesTarget(),
 		timeLeftMs: game.getTimeLeftMs(),
 		// `rawFade` sert au masquage du plateau, `fade` (assaini) part sur le reseau.
@@ -188,6 +196,11 @@ function getModeFields(playerState: PlayerGameState) {
 		jokersLeft: playerState.jokersLeft,
 		// Sursis avant verrouillage: le client en fait une jauge sur la piece posee.
 		lockInMs: game.getLockDelayMs(playerState),
+		// Cheese: compteur de rangees de gruyere encore a creuser.
+		garbageLeft: game.getGarbageLeft(playerState),
+		// Cascade: retombee a animer. Portee par toutes les frames jusqu'au verrouillage
+		// suivant; l'identifiant evite au client de la rejouer a chaque frame.
+		cascade: playerState.cascade,
 	};
 }
 

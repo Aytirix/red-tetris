@@ -128,3 +128,82 @@ describe("GameBoard — fondu du mode invisible", () => {
 		expect(container.querySelector(".tetris-cell__piece")).toBeNull();
 	});
 });
+
+describe("GameBoard — retombée du mode Cascade", () => {
+	const board: GameBoardCell[][] = [[0, 0], ["I", "T"]];
+
+	it("marque les cases qui viennent de tomber et leur distance", () => {
+		const { container } = render(
+			<GameBoard
+				board={board}
+				cellSize={20}
+				cascade={{ id: 1, cells: [{ x: 0, y: 1, rows: 3 }] }}
+			/>,
+		);
+
+		const falling = container.querySelectorAll<HTMLElement>(".tetris-cell--falling");
+		expect(falling).toHaveLength(1);
+		// La distance pilote le point de départ de l'animation en CSS.
+		expect(falling[0].style.getPropertyValue("--fall-rows")).toBe("3");
+		// Durée bornée, proportionnelle à la distance.
+		expect(falling[0].style.getPropertyValue("--fall-ms")).toBe("174ms");
+	});
+
+	it("ne marque pas les cases qui n'ont pas bougé", () => {
+		const { container } = render(
+			<GameBoard
+				board={board}
+				cellSize={20}
+				cascade={{ id: 1, cells: [{ x: 0, y: 1, rows: 3 }] }}
+			/>,
+		);
+
+		const cells = Array.from(container.querySelectorAll(".tetris-cell"));
+		expect(cells[3].className).not.toContain("falling");
+	});
+
+	it("borne la durée pour qu'un gros effondrement ne fige pas le plateau", () => {
+		const { container } = render(
+			<GameBoard
+				board={board}
+				cellSize={20}
+				cascade={{ id: 1, cells: [{ x: 0, y: 1, rows: 19 }] }}
+			/>,
+		);
+
+		const falling = container.querySelector<HTMLElement>(".tetris-cell--falling")!;
+		expect(falling.style.getPropertyValue("--fall-ms")).toBe("320ms");
+	});
+
+	// Reposer la même classe ne relance pas une animation CSS: seul un remontage
+	// (donc une `key` différente) la rejoue.
+	it("change la clé de rendu à chaque nouvelle retombée", () => {
+		const { container, rerender } = render(
+			<GameBoard board={board} cellSize={20} cascade={{ id: 1, cells: [{ x: 0, y: 1, rows: 2 }] }} />,
+		);
+		const first = container.querySelector(".tetris-cell--falling");
+
+		rerender(
+			<GameBoard board={board} cellSize={20} cascade={{ id: 2, cells: [{ x: 0, y: 1, rows: 2 }] }} />,
+		);
+		const second = container.querySelector(".tetris-cell--falling");
+
+		expect(second).not.toBe(first);
+	});
+
+	it("ne rejoue rien tant que la retombée reste la même", () => {
+		const cascade = { id: 1, cells: [{ x: 0, y: 1, rows: 2 }] };
+		const { container, rerender } = render(<GameBoard board={board} cellSize={20} cascade={cascade} />);
+		const first = container.querySelector(".tetris-cell--falling");
+
+		rerender(<GameBoard board={board} cellSize={20} cascade={cascade} />);
+
+		// Même élément du DOM: l'animation ne repart pas à chaque frame reçue.
+		expect(container.querySelector(".tetris-cell--falling")).toBe(first);
+	});
+
+	it("n'anime rien sans retombée", () => {
+		const { container } = render(<GameBoard board={board} cellSize={20} cascade={null} />);
+		expect(container.querySelector(".tetris-cell--falling")).toBeNull();
+	});
+});

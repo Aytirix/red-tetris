@@ -363,8 +363,10 @@ export default function GameView({ state, roomName, eliminated = false, onElimin
 						spectatorOf={spectatorOf}
 						mode={state.mode}
 						lines={state.lines}
+						tetris={state.tetris}
 						linesTarget={state.linesTarget}
 						timeLeftMs={state.timeLeftMs}
+						garbageLeft={state.garbageLeft}
 						jokersLeft={state.jokersLeft}
 						jokerKey={jokerKey}
 					/>
@@ -388,6 +390,10 @@ export default function GameView({ state, roomName, eliminated = false, onElimin
 								lockTimer={lockTimer && grounded
 									? { ...lockTimer, cells: state.ghost, piece: state.currentPiece?.type ?? null }
 									: null}
+								// Passé tel quel : le serveur le renvoie identique jusqu'au
+								// verrouillage suivant, et c'est la `key` (qui porte son
+								// identifiant) qui garantit que l'animation ne joue qu'une fois.
+								cascade={state.cascade}
 							/>
 						</div>
 					</div>

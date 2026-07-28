@@ -456,6 +456,59 @@ describe("gameEmitters", () => {
 
 // ─── Mode invisible : ce qui part sur le reseau (findings d'audit) ────────────
 
+describe("gameEmitters — compteurs affiches par le HUD", () => {
+	it("envoie les lignes et les Tetris a chaque frame", () => {
+		const { state } = makeState("luffy");
+		const room = new Room("salle");
+		room.addPlayer(state.player);
+		const game = new Game("classique", [state.player], room);
+		const gameState = game.getPlayerStateBySocketId(state.player.getSocketId())!;
+		gameState.currentPiece = new Piece(O, "O");
+		gameState.nextPiece = new Piece(I, "I");
+		gameState.lines = 23;
+		gameState.tetris = 4;
+
+		emitGameUpdate(gameState, game.getState());
+
+		const socket = state.player.getSocket() as FakeSocket;
+		const payload = socket.emit.mock.calls.at(-1)![1] as { lines: number; tetris: number };
+		expect(payload.lines).toBe(23);
+		expect(payload.tetris).toBe(4);
+	});
+});
+
+describe("gameEmitters — compteur de gruyere (mode cheese)", () => {
+	function cheeseSetup(mode: "cheese" | "classique") {
+		const { state } = makeState("luffy");
+		const room = new Room("salle");
+		room.addPlayer(state.player);
+		const game = new Game(mode, [state.player], room);
+		const gameState = game.getPlayerStateBySocketId(state.player.getSocketId())!;
+		gameState.currentPiece = new Piece(O, "O");
+		gameState.nextPiece = new Piece(I, "I");
+		return { game, gameState, socket: state.player.getSocket() as FakeSocket };
+	}
+
+	it("envoie les rangees restant a creuser a chaque frame", () => {
+		const { game, gameState, socket } = cheeseSetup("cheese");
+		gameState.garbageCleared = 3;
+
+		emitGameUpdate(gameState, game.getState());
+
+		const payload = socket.emit.mock.calls.at(-1)![1] as { garbageLeft: number | null };
+		expect(payload.garbageLeft).toBe(17);
+	});
+
+	it("n'envoie aucun compteur dans les autres modes", () => {
+		const { game, gameState, socket } = cheeseSetup("classique");
+
+		emitGameUpdate(gameState, game.getState());
+
+		const payload = socket.emit.mock.calls.at(-1)![1] as { garbageLeft: number | null };
+		expect(payload.garbageLeft).toBeNull();
+	});
+});
+
 describe("gameEmitters — etancheite du mode invisible", () => {
 	function invisibleSetup() {
 		const { state, socket } = makeState("luffy");

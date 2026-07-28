@@ -70,9 +70,10 @@ describe("GameHud — modes de jeu", () => {
 		expect(screen.getByText("Sprint")).toBeInTheDocument();
 	});
 
-	it("n'affiche pas d'objectif hors sprint", () => {
-		const { container } = render(<GameHud score={0} level={1} showLevel={false} />);
-		expect(container.querySelector(".tetris-hud__objective")).toBeNull();
+	it("affiche le compteur de lignes seul hors sprint (pas d'objectif)", () => {
+		const { container } = render(<GameHud score={0} level={1} showLevel={false} lines={7} />);
+
+		expect(container.querySelector(".tetris-hud__lines .tetris-hud__value")?.textContent).toBe("7");
 		expect(container.querySelector(".tetris-hud__mode")).toBeNull();
 	});
 
@@ -93,5 +94,61 @@ describe("GameHud — modes de jeu", () => {
 		expect(formatTimeLeft(1_000)).toBe("0:01");
 		expect(formatTimeLeft(120_000)).toBe("2:00");
 		expect(formatTimeLeft(-500)).toBe("0:00");
+	});
+
+	it("affiche les rangees de gruyere restantes en mode cheese", () => {
+		const { container } = render(
+			<GameHud score={0} level={1} showLevel={false} mode="cheese" garbageLeft={14} />,
+		);
+
+		expect(screen.getByText("À creuser")).toBeInTheDocument();
+		expect(container.querySelector(".tetris-hud__garbage .tetris-hud__value")?.textContent).toBe("14");
+	});
+
+	// Zero doit s'afficher (course terminee), pas disparaitre comme une valeur absente.
+	it("affiche encore le compteur a zero", () => {
+		const { container } = render(
+			<GameHud score={0} level={1} showLevel={false} mode="cheese" garbageLeft={0} />,
+		);
+		expect(container.querySelector(".tetris-hud__garbage .tetris-hud__value")?.textContent).toBe("0");
+	});
+
+	it("n'affiche aucun compteur de gruyere hors mode cheese", () => {
+		const { container } = render(<GameHud score={0} level={1} showLevel={false} />);
+		expect(container.querySelector(".tetris-hud__garbage")).toBeNull();
+	});
+});
+
+describe("GameHud — compteurs de partie", () => {
+	it("affiche les lignes et les Tetris dans tous les modes", () => {
+		const { container } = render(
+			<GameHud score={0} level={1} showLevel={false} lines={23} tetris={4} />,
+		);
+
+		expect(screen.getByText("Lignes")).toBeInTheDocument();
+		expect(screen.getByText("Tetris")).toBeInTheDocument();
+		expect(container.querySelector(".tetris-hud__lines .tetris-hud__value")?.textContent).toBe("23");
+		expect(container.querySelector(".tetris-hud__tetris .tetris-hud__value")?.textContent).toBe("4");
+	});
+
+	// Zéro doit s'afficher: un compteur qui apparaît au premier Tetris ferait bouger
+	// la largeur du HUD en pleine partie.
+	it("affiche les compteurs a zero en debut de partie", () => {
+		const { container } = render(<GameHud score={0} level={1} showLevel={false} />);
+
+		expect(container.querySelector(".tetris-hud__lines .tetris-hud__value")?.textContent).toBe("0");
+		expect(container.querySelector(".tetris-hud__tetris .tetris-hud__value")?.textContent).toBe("0");
+	});
+
+	// En sprint l'objectif se greffe sur le compteur de lignes: deux blocs « Lignes »
+	// cote a cote n'auraient aucun sens.
+	it("ne duplique pas le compteur de lignes en sprint", () => {
+		const { container } = render(
+			<GameHud score={0} level={1} showLevel={false} mode="sprint" lines={12} linesTarget={40} tetris={2} />,
+		);
+
+		expect(screen.getAllByText("Lignes")).toHaveLength(1);
+		expect(container.querySelector(".tetris-hud__lines .tetris-hud__value")?.textContent).toBe("12 / 40");
+		expect(container.querySelector(".tetris-hud__tetris .tetris-hud__value")?.textContent).toBe("2");
 	});
 });

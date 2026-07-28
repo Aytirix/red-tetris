@@ -48,12 +48,15 @@ function makeState(overrides: Partial<GameStatePayload> = {}): GameStatePayload 
 		ghost: [],
 		mode: "classique",
 		lines: 0,
+		tetris: 0,
 		linesTarget: null,
 		timeLeftMs: null,
 		fade: null,
 		jokersLeft: 0,
 		theme: null,
 		lockInMs: null,
+		garbageLeft: null,
+		cascade: null,
 		...overrides,
 	};
 }

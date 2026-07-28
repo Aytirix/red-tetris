@@ -1,6 +1,7 @@
 import {
 	isGameMode,
 	MAX_JOKERS,
+	type CascadeFall,
 	type GameBoard,
 	type GameBoardCell,
 	type GameMode,
@@ -25,6 +26,7 @@ function normalizeCell(raw: unknown): GameBoardCell {
 	if (raw === 2) return "penalty"; // compat: ancien code pénalité
 	if (raw === "penalty") return "penalty";
 	if (raw === "spectrum") return "spectrum";
+	if (raw === "garbage") return "garbage";
 	if (isPieceType(raw)) return raw;
 	return 0;
 }
@@ -82,6 +84,32 @@ function normalizeGhost(raw: unknown): GhostCell[] {
 	return out;
 }
 
+/**
+ * Retombée du mode Cascade. Une distance nulle ou absurde ne donnerait aucune
+ * animation visible : on écarte la case plutôt que d'en faire une case immobile.
+ */
+function normalizeCascade(raw: unknown, board: GameBoard): CascadeFall | null {
+	if (!raw || typeof raw !== "object") return null;
+	const id = (raw as { id?: unknown }).id;
+	const rawCells = (raw as { cells?: unknown }).cells;
+	if (typeof id !== "number" || !Number.isFinite(id)) return null;
+	if (!Array.isArray(rawCells)) return null;
+	const rows = board.length;
+	const cols = board[0]?.length ?? 0;
+	const cells: CascadeFall["cells"] = [];
+	for (const c of rawCells) {
+		if (!c || typeof c !== "object") continue;
+		const { x, y, rows: fallen } = c as { x?: unknown; y?: unknown; rows?: unknown };
+		if (typeof x !== "number" || typeof y !== "number" || typeof fallen !== "number") continue;
+		// Hors plateau: une case animée à une position inexistante décalerait l'effet.
+		if (x < 0 || x >= cols || y < 0 || y >= rows) continue;
+		if (!Number.isFinite(fallen) || fallen <= 0) continue;
+		cells.push({ x, y, rows: Math.min(rows, Math.trunc(fallen)) });
+	}
+	if (cells.length === 0) return null;
+	return { id, cells };
+}
+
 function normalizeJokers(raw: unknown): number {
 	if (typeof raw !== "number" || !Number.isFinite(raw)) return 0;
 	return Math.max(0, Math.min(MAX_JOKERS, Math.trunc(raw)));
@@ -128,6 +156,11 @@ export function normalizeGameState(raw: unknown): GameStatePayload | null {
 		ghost: normalizeGhost(r.ghost),
 		mode: normalizeMode(r.mode),
 		lines: typeof r.lines === "number" ? r.lines : 0,
+		// Compteurs d'affichage: un négatif ou un non-fini n'a pas de sens, et un
+		// décimal afficherait « 3.0000001 Tetris ».
+		tetris: typeof r.tetris === "number" && Number.isFinite(r.tetris) && r.tetris > 0
+			? Math.trunc(r.tetris)
+			: 0,
 		linesTarget: typeof r.linesTarget === "number" ? r.linesTarget : null,
 		timeLeftMs: typeof r.timeLeftMs === "number" ? r.timeLeftMs : null,
 		fade: normalizeFade(r.fade, board),
@@ -139,6 +172,12 @@ export function normalizeGameState(raw: unknown): GameStatePayload | null {
 		lockInMs: typeof r.lockInMs === "number" && Number.isFinite(r.lockInMs) && r.lockInMs >= 0
 			? r.lockInMs
 			: null,
+		// Compteur du mode Gruyère: un négatif ou un non-fini n'a aucun sens à
+		// l'affichage -> pas de compteur plutôt qu'un "-3 restantes".
+		garbageLeft: typeof r.garbageLeft === "number" && Number.isFinite(r.garbageLeft) && r.garbageLeft >= 0
+			? Math.trunc(r.garbageLeft)
+			: null,
+		cascade: normalizeCascade(r.cascade, board),
 	};
 }
 

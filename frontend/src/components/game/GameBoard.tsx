@@ -1,5 +1,5 @@
 import { useMemo, type CSSProperties } from "react";
-import type { GameBoard as Board, GhostCell, PieceType } from "../../types/game";
+import type { CascadeFall, GameBoard as Board, GhostCell, PieceType } from "../../types/game";
 import Cell from "./Cell";
 
 /** Traînée de vitesse laissée par une pièce lâchée d'un coup, dans UNE colonne. */
@@ -47,15 +47,22 @@ type Props = {
 	onDropTrailEnd?: () => void;
 	/** Décompte avant verrouillage, null tant que la pièce peut descendre. */
 	lockTimer?: LockTimer | null;
+	/** Mode Cascade : blocs qui viennent de retomber, à animer une fois. */
+	cascade?: CascadeFall | null;
 };
 
-export default function GameBoard({ board, cellSize = 30, ghost, ghostPiece, fade, dropTrail, onDropTrailEnd, lockTimer }: Props) {
+export default function GameBoard({ board, cellSize = 30, ghost, ghostPiece, fade, dropTrail, onDropTrailEnd, lockTimer, cascade }: Props) {
 	const rows = board.length;
 	const cols = board[0]?.length ?? 0;
 
 	const ghostSet = useMemo(
 		() => new Set((ghost ?? []).map((g) => `${g.y}-${g.x}`)),
 		[ghost],
+	);
+
+	const fallMap = useMemo(
+		() => new Map((cascade?.cells ?? []).map((c) => [`${c.y}-${c.x}`, c.rows])),
+		[cascade],
 	);
 
 	const grid = (
@@ -70,13 +77,18 @@ export default function GameBoard({ board, cellSize = 30, ghost, ghostPiece, fad
 				row.map((cell, x) => {
 					const isGhost = cell === 0 && ghostPiece != null && ghostSet.has(`${y}-${x}`);
 					const cellOpacity = fade?.[y]?.[x];
+					const fallRows = fallMap.get(`${y}-${x}`);
 					return (
 						<Cell
-							key={`${y}-${x}`}
+							// La `key` porte l'identifiant de la retombée pour les cases qui
+							// tombent : reposer la même classe ne relance PAS une animation CSS,
+							// il faut que React remonte l'élément.
+							key={fallRows ? `${y}-${x}-c${cascade?.id}` : `${y}-${x}`}
 							cell={cell}
 							size={cellSize}
 							ghost={isGhost ? ghostPiece : undefined}
 							opacity={cellOpacity}
+							fallRows={fallRows}
 						/>
 					);
 				}),

@@ -1,6 +1,9 @@
 import {
 	BOARD_HEIGHT,
 	BOARD_WIDTH,
+	CHEESE_CLEARS_PER_RISE,
+	CHEESE_START_GARBAGE,
+	CHEESE_TOTAL_GARBAGE,
 	INVISIBLE_FADE_MS,
 	INVISIBLE_JOKER_COUNT,
 	INVISIBLE_JOKER_REVEAL_MS,
@@ -16,6 +19,7 @@ import {
 	SUDDEN_DEATH_TICK_MS,
 	ULTRA_DURATION_MS,
 	type Board,
+	type CascadeFall,
 	type Cell,
 	type GameMode,
 	type PieceType,
@@ -28,6 +32,9 @@ import { settleGameRewards } from "../services/shopService.js";
 import { spectatorSocketStore } from "../gateways/socket/spectatorSocketStore.js";
 import { Piece } from "./Piece.js";
 import type { Room } from "./room.js";
+
+/** Amas de cellules soudees, deplace d'un bloc par la gravite du mode cascade. */
+type BlockGroup = { x: number; y: number }[];
 
 export class Game {
 	// Wall kicks a la rotation: si la forme pivotee ne tient pas en place, on tente ces
@@ -65,6 +72,16 @@ export class Game {
 	// pour qu'il puisse afficher un decompte JUSTE meme si le joueur bouge la piece
 	// entre deux ticks (bouger ne decale pas la gravite).
 	private lastTickAt: number;
+	// Mode cheese: colonne trouee de chaque ligne de gruyere, tiree UNE fois pour la
+	// partie et partagee par tous les joueurs — une course doit servir exactement le
+	// meme plateau a tout le monde, comme la file de pieces. Deux lignes consecutives
+	// n'ont jamais le meme trou, sinon une seule barre I les nettoierait ensemble.
+	private readonly garbageHoles: number[];
+	// Distributeur d'identifiants de piece (voir PlayerGameState.pieceIds). Partage par
+	// tous les joueurs: seule l'egalite de deux identifiants d'un MEME plateau compte.
+	private nextPieceId: number;
+	// Distributeur d'identifiants de retombee (voir CascadeFall).
+	private nextCascadeId: number;
 	constructor (mode: GameMode, players: Player[], room: Room) {
 		this.mode = mode;
 		this.players = players;
@@ -76,6 +93,9 @@ export class Game {
 		this.deadline = null
 		this.startedAt = Date.now()
 		this.lastTickAt = this.startedAt
+		this.garbageHoles = Game.makeGarbageHoles(CHEESE_TOTAL_GARBAGE)
+		this.nextPieceId = 0
+		this.nextCascadeId = 0
 		for (const player of players) {
 			this.state.set(player.getSocketId(), {
 					board: this.createBoard(),//fonction create board,
@@ -84,9 +104,13 @@ export class Game {
 					lines: 0,
 					tetris: 0,
 					lockedAt: this.createLockGrid(),
+					pieceIds: this.createLockGrid(),
+					cascade: null,
 					jokersLeft: INVISIBLE_JOKER_COUNT,
 					revealUntil: 0,
 					groundedAt: null,
+					garbageCleared: 0,
+					garbageServed: 0,
 					pieceIndex: 0,
 				player: player,
 				isAlive: true,
@@ -100,12 +124,28 @@ export class Game {
 		const board: Board = Array.from({length: BOARD_HEIGHT}, () => Array.from({length: BOARD_WIDTH}, () => 0))
 		return board;
 	}
-	// Grille d'horodatage alignee sur le plateau (0 = aucun verrouillage horodate).
+	// Grille d'horodatage / d'identifiants de piece alignee sur le plateau (0 = aucun).
 	createLockGrid() : number[][] {
 		return Array.from({ length: BOARD_HEIGHT }, () => Array.from({ length: BOARD_WIDTH }, () => 0))
 	}
 	createEmptyLockRow() : number[] {
 		return Array.from({ length: BOARD_WIDTH }, () => 0)
+	}
+	// Colonnes trouees du gruyere, jamais deux fois de suite la meme (voir garbageHoles).
+	private static makeGarbageHoles(count: number) : number[] {
+		const holes: number[] = []
+		let previous = -1
+		for (let i = 0; i < count; i++) {
+			// Tirage parmi les BOARD_WIDTH - 1 colonnes AUTRES que la precedente: decaler
+			// d'au moins 1 (modulo la largeur) donne exactement cette distribution.
+			const offset = previous < 0
+				? Math.floor(Math.random() * BOARD_WIDTH)
+				: 1 + Math.floor(Math.random() * (BOARD_WIDTH - 1))
+			const hole = previous < 0 ? offset : (previous + offset) % BOARD_WIDTH
+			holes.push(hole)
+			previous = hole
+		}
+		return holes
 	}
 	getMode() : GameMode {
 		return this.mode
@@ -119,6 +159,14 @@ export class Game {
 	// Objectif de lignes du mode sprint, null pour les autres modes.
 	getLinesTarget() : number | null {
 		return this.mode === "sprint" ? SPRINT_TARGET_LINES : null
+	}
+	// Lignes de gruyere encore a creuser (mode cheese), null pour les autres modes.
+	// C'est le compteur affiche par le client: il inclut celles qui attendent encore
+	// en coulisse, donc il ne remonte jamais quand le plateau se souleve.
+	getGarbageLeft(playerState: PlayerGameState) : number | null {
+		if (this.mode !== "cheese")
+			return null
+		return Math.max(0, CHEESE_TOTAL_GARBAGE - playerState.garbageCleared)
 	}
 	/**
 	 * Mode invisible: opacite de chaque cellule deja verrouillee. Une piece posee
@@ -420,13 +468,27 @@ export class Game {
 				spectatorSocketStore.delete(spectatorSocketId)
 		}
 	}
-	clearLines(playerState: PlayerGameState) : number {
-		let clearedLines = 0
+	/**
+	 * Retire les rangees completes et fait redescendre le reste d'un bloc. Renvoie le
+	 * nombre de rangees retirees et, parmi elles, combien portaient du gruyere (mode
+	 * cheese: c'est l'objectif a creuser, une rangee percee comblee par le joueur).
+	 */
+	private collapseFullRows(
+		playerState: PlayerGameState,
+		fallBy: number[][] | null = null,
+	) : { cleared: number; garbage: number } {
+		let cleared = 0
+		let garbage = 0
 		// Parcours indexe (et non filter) pour decaler la grille d'horodatage EXACTEMENT
 		// comme le plateau: sinon les opacites du mode invisible se desynchroniseraient
 		// des cellules apres chaque ligne completee.
 		const keptRows: Cell[][] = []
 		const keptLocks: number[][] = []
+		const keptIds: number[][] = []
+		// Rangee d'origine de chaque rangee conservee: la difference avec sa position
+		// finale donne de combien elle vient de descendre (info d'animation).
+		const keptFalls: number[][] = []
+		const keptY: number[] = []
 		for (let y = 0; y < playerState.board.length; y++) {
 			const row = playerState.board[y]
 			if (!row)
@@ -434,39 +496,315 @@ export class Game {
 			const hasPenalty = row.some(cell => cell === "penalty")
 			const isFull = !hasPenalty && row.every(cell => cell !== 0)
 			if (isFull) {
-				clearedLines++
+				cleared++
+				if (row.some(cell => cell === "garbage"))
+					garbage++
 				continue
 			}
 			keptRows.push(row)
 			keptLocks.push(playerState.lockedAt[y] ?? this.createEmptyLockRow())
+			keptIds.push(playerState.pieceIds[y] ?? this.createEmptyLockRow())
+			if (fallBy) {
+				keptFalls.push(fallBy[y] ?? this.createEmptyLockRow())
+				keptY.push(y)
+			}
+		}
+		if (fallBy) {
+			// Une rangee conservee finit a l'index `cleared + i`: elle a donc descendu
+			// d'autant de rangees que de lignes nettoyees SOUS elle.
+			for (let i = 0; i < keptFalls.length; i++) {
+				const shift = cleared + i - (keptY[i] ?? 0)
+				if (shift === 0)
+					continue
+				const fallRow = keptFalls[i]!
+				const boardRow = keptRows[i]!
+				for (let x = 0; x < fallRow.length; x++) {
+					if (boardRow[x] !== 0)
+						fallRow[x] = (fallRow[x] ?? 0) + shift
+				}
+			}
+			fallBy.length = 0
+			fallBy.push(
+				...Array.from({ length: cleared }, () => this.createEmptyLockRow()),
+				...keptFalls,
+			)
 		}
 		const emptyRows: Cell[][] = Array.from(
-			{ length: clearedLines },
+			{ length: cleared },
 			() => Array.from({ length: BOARD_WIDTH }, () => 0)
 		)
 		const emptyLocks: number[][] = Array.from(
-			{ length: clearedLines },
+			{ length: cleared },
 			() => this.createEmptyLockRow()
 		)
 		playerState.board = [...emptyRows, ...keptRows]
 		playerState.lockedAt = [...emptyLocks, ...keptLocks]
-		// Score AVANT la mise a jour du niveau: les lignes sont creditees a la vitesse
-		// a laquelle elles ont ete jouees, pas a celle du niveau qu'elles debloquent.
-		// Une piece ne couvre jamais plus de 4 rangees, mais on borne l'index par
-		// securite plutot que de risquer un `undefined` en score.
-		const clearIndex = Math.min(clearedLines, LINE_CLEAR_SCORES.length - 1)
-		playerState.score += LINE_CLEAR_SCORES[clearIndex]! * playerState.level
-		playerState.lines += clearedLines
-		// Un « Tetris » = 4 lignes nettoyées d'un seul coup (le maximum). On compte
-		// l'événement, pas les lignes, pour la statistique dédiée.
-		if (clearedLines === 4)
-			playerState.tetris++
-		// Mode invisible: chaque ligne completee redonne 2s de visibilite totale, qui
-		// s'estompe ensuite progressivement comme une brique posee.
-		if (clearedLines > 0)
-			this.grantReveal(playerState, clearedLines * INVISIBLE_REVEAL_PER_LINE_MS)
+		playerState.pieceIds = [
+			...Array.from({ length: cleared }, () => this.createEmptyLockRow()),
+			...keptIds,
+		]
+		return { cleared, garbage }
+	}
+	clearLines(playerState: PlayerGameState) : number {
+		let totalCleared = 0
+		// Rang du maillon de chaine (mode cascade): 1 pour la salve jouee, 2 pour celle
+		// declenchee par la retombee des blocs, etc. Hors cascade la boucle ne fait
+		// qu'un tour, le multiplicateur vaut donc toujours 1.
+		let chain = 0
+		// Distance parcourue par chaque case, alignee sur le plateau. Uniquement en
+		// cascade: c'est de l'information d'ANIMATION, les autres modes n'en ont pas
+		// l'usage et ne paient donc rien pour elle.
+		const fallBy = this.mode === "cascade" ? this.createLockGrid() : null
+		for (;;) {
+			const { cleared, garbage } = this.collapseFullRows(playerState, fallBy)
+			if (cleared === 0)
+				break
+			chain++
+			totalCleared += cleared
+			playerState.garbageCleared += garbage
+			// Score AVANT la mise a jour du niveau: les lignes sont creditees a la vitesse
+			// a laquelle elles ont ete jouees, pas a celle du niveau qu'elles debloquent.
+			// Une piece ne couvre jamais plus de 4 rangees, mais on borne l'index par
+			// securite plutot que de risquer un `undefined` en score.
+			const clearIndex = Math.min(cleared, LINE_CLEAR_SCORES.length - 1)
+			// Le rang de la chaine multiplie le bareme: c'est TOUTE la recompense du mode
+			// cascade (une meme salve vaut le double au 2e maillon, le triple au 3e).
+			playerState.score += LINE_CLEAR_SCORES[clearIndex]! * playerState.level * chain
+			// Un « Tetris » = 4 lignes nettoyées d'un seul coup (le maximum). On compte
+			// l'événement, pas les lignes, pour la statistique dédiée.
+			if (cleared === 4)
+				playerState.tetris++
+			// Mode invisible: chaque ligne completee redonne 2s de visibilite totale, qui
+			// s'estompe ensuite progressivement comme une brique posee.
+			this.grantReveal(playerState, cleared * INVISIBLE_REVEAL_PER_LINE_MS)
+			if (this.mode !== "cascade")
+				break
+			// Cascade: les blocs restes en l'air retombent, ce qui peut completer de
+			// nouvelles rangees -> on repasse par collapseFullRows pour le maillon suivant.
+			this.applyStickyGravity(playerState, fallBy)
+		}
+		// Remplace la retombee precedente, meme par `null`: sans ca un verrouillage sans
+		// chute rejouerait l'animation de la fois d'avant.
+		if (fallBy)
+			playerState.cascade = this.buildCascadeFall(playerState, fallBy)
+		playerState.lines += totalCleared
 		this.updateLevel(playerState)
-		return clearedLines
+		// Cheese: le plateau remonte au rythme des rangees creusees, jusqu'a ce que les
+		// CHEESE_TOTAL_GARBAGE aient toutes ete servies.
+		if (this.mode === "cheese")
+			this.serveCheeseGarbage(playerState)
+		return totalCleared
+	}
+	/**
+	 * Traduit la grille des distances parcourues en liste de cases a animer, ou null si
+	 * rien n'a bouge. Le plateau envoye montre deja les blocs ARRIVES: c'est cette
+	 * distance qui permet au client de les faire partir d'ou ils etaient.
+	 */
+	private buildCascadeFall(playerState: PlayerGameState, fallBy: number[][]) : CascadeFall | null {
+		const cells: CascadeFall["cells"] = []
+		for (let y = 0; y < fallBy.length; y++) {
+			const fallRow = fallBy[y]
+			const boardRow = playerState.board[y]
+			if (!fallRow || !boardRow)
+				continue
+			for (let x = 0; x < fallRow.length; x++) {
+				const rows = fallRow[x] ?? 0
+				// Une case vide n'a rien a animer: la distance qu'elle porte est le reliquat
+				// d'un bloc qui l'a quittee.
+				if (rows > 0 && boardRow[x] !== 0)
+					cells.push({ x, y, rows })
+			}
+		}
+		if (cells.length === 0)
+			return null
+		return { id: ++this.nextCascadeId, cells }
+	}
+	/**
+	 * Gravite « collante » du mode cascade: apres un nettoyage, chaque AMAS de cellules
+	 * encore soudees (4-connexite) tombe jusqu'a reposer sur quelque chose. Les amas
+	 * descendent d'un cran par passe, du plus bas au plus haut, jusqu'a stabilite.
+	 *
+	 * Par AMAS et non case par case: une gravite cellule par cellule tasserait chaque
+	 * colonne independamment et supprimerait TOUS les trous du plateau au premier
+	 * nettoyage — le jeu n'aurait plus aucune difficulte. En tombant d'un bloc, une
+	 * piece posee en pont conserve le trou qu'elle recouvre.
+	 */
+	private applyStickyGravity(playerState: PlayerGameState, fallBy: number[][] | null = null) : void {
+		for (;;) {
+			// Du plus bas au plus haut: un amas ne peut pas descendre tant que celui d'en
+			// dessous n'a pas libere la place, on economise donc des passes entieres.
+			const groups = this.findBlockGroups(playerState.board, playerState.pieceIds)
+				.sort((a, b) => Game.groupBottom(b) - Game.groupBottom(a))
+			let moved = false
+			for (const group of groups) {
+				if (!this.canGroupFall(playerState.board, group))
+					continue
+				// On se fie a ce que dropGroup a REELLEMENT deplace, pas a son intention:
+				// une boucle qui tournerait sur un amas immobile figerait le process entier
+				// (donc toutes les parties), la ou une exception n'en tuerait qu'une.
+				if (this.dropGroup(playerState, group, fallBy))
+					moved = true
+			}
+			if (!moved)
+				return
+		}
+	}
+	/** Rangee la plus basse occupee par un amas (sert a les traiter de bas en haut). */
+	private static groupBottom(group: BlockGroup) : number {
+		return group.reduce((lowest, cell) => Math.max(lowest, cell.y), -1)
+	}
+	/**
+	 * Decoupe le plateau en amas: cellules voisines issues de la MEME piece. Une piece
+	 * coupee en deux par une ligne nettoyee donne bien deux amas, chaque morceau
+	 * tombant de son cote.
+	 *
+	 * Le critere « meme piece » est indispensable. Un regroupement par simple CONTACT
+	 * souderait toute la pile en un seul bloc — dans une vraie partie tout se touche —
+	 * et il suffirait qu'une seule case repose sur du plein pour que plus rien ne tombe
+	 * jamais: le mode ne se declencherait pratiquement pas.
+	 *
+	 * La granularite en dessous (chaque case tombe seule) a ete mesuree puis ecartee:
+	 * elle fait tomber quelque chose dans 62 % des nettoyages contre 41 % ici, mais
+	 * elle rebouche TOUS les trous a chaque ligne faite, ce qui rend le mode deux fois
+	 * plus permissif que le classique. Choix de jeu: les pieces restent entieres, un
+	 * pont pose garde le trou qu'il recouvre.
+	 */
+	private findBlockGroups(board: Board, pieceIds: number[][]) : BlockGroup[] {
+		const seen = board.map((row) => row.map(() => false))
+		const isFilled = (x: number, y: number) => (board[y]?.[x] ?? 0) !== 0
+		const isSeen = (x: number, y: number) => seen[y]?.[x] === true
+		const pieceIdAt = (x: number, y: number) => pieceIds[y]?.[x] ?? 0
+		const markSeen = (x: number, y: number) => {
+			const row = seen[y]
+			if (row)
+				row[x] = true
+		}
+		const groups: BlockGroup[] = []
+		for (let y = 0; y < board.length; y++) {
+			for (let x = 0; x < BOARD_WIDTH; x++) {
+				if (!isFilled(x, y) || isSeen(x, y))
+					continue
+				const group: BlockGroup = []
+				const groupId = pieceIdAt(x, y)
+				const queue: { x: number; y: number }[] = [{ x, y }]
+				markSeen(x, y)
+				while (queue.length > 0) {
+					const cell = queue.pop()!
+					group.push(cell)
+					for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
+						const nextX = cell.x + dx
+						const nextY = cell.y + dy
+						if (nextX < 0 || nextX >= BOARD_WIDTH || nextY < 0 || nextY >= board.length)
+							continue
+						if (!isFilled(nextX, nextY) || isSeen(nextX, nextY))
+							continue
+						// Une case voisine posee par une AUTRE piece appartient a un autre amas.
+						if (pieceIdAt(nextX, nextY) !== groupId)
+							continue
+						markSeen(nextX, nextY)
+						queue.push({ x: nextX, y: nextY })
+					}
+				}
+				groups.push(group)
+			}
+		}
+		return groups
+	}
+	/** Un amas tombe si AUCUNE de ses cases n'a le sol, ou une case etrangere, dessous. */
+	private canGroupFall(board: Board, group: BlockGroup) : boolean {
+		const inGroup = new Set(group.map((cell) => `${cell.y}:${cell.x}`))
+		for (const cell of group) {
+			const belowY = cell.y + 1
+			if (belowY >= board.length)
+				return false
+			// Une case du MEME amas ne le bloque pas: il descend d'un seul tenant.
+			if (inGroup.has(`${belowY}:${cell.x}`))
+				continue
+			if ((board[belowY]?.[cell.x] ?? 0) !== 0)
+				return false
+		}
+		return true
+	}
+	/**
+	 * Descend un amas d'une rangee, horodatages compris (fondu du mode invisible).
+	 * Renvoie true si au moins une case a bouge.
+	 */
+	private dropGroup(
+		playerState: PlayerGameState,
+		group: BlockGroup,
+		fallBy: number[][] | null = null,
+	) : boolean {
+		// Du bas vers le haut: descendre d'abord la case la plus basse libere la place
+		// de celle du dessus, sinon on ecraserait une case du meme amas.
+		const cells = [...group].sort((a, b) => b.y - a.y)
+		let moved = false
+		for (const cell of cells) {
+			const fromRow = playerState.board[cell.y]
+			const toRow = playerState.board[cell.y + 1]
+			const fromLocks = playerState.lockedAt[cell.y]
+			const toLocks = playerState.lockedAt[cell.y + 1]
+			const fromIds = playerState.pieceIds[cell.y]
+			const toIds = playerState.pieceIds[cell.y + 1]
+			if (!fromRow || !toRow || !fromLocks || !toLocks || !fromIds || !toIds)
+				continue
+			toRow[cell.x] = fromRow[cell.x] ?? 0
+			fromRow[cell.x] = 0
+			toLocks[cell.x] = fromLocks[cell.x] ?? 0
+			fromLocks[cell.x] = 0
+			toIds[cell.x] = fromIds[cell.x] ?? 0
+			fromIds[cell.x] = 0
+			// La distance parcourue suit la case: elle cumule le decalage du nettoyage
+			// et chaque cran gagne par la gravite.
+			const fromFalls = fallBy?.[cell.y]
+			const toFalls = fallBy?.[cell.y + 1]
+			if (fromFalls && toFalls) {
+				toFalls[cell.x] = (fromFalls[cell.x] ?? 0) + 1
+				fromFalls[cell.x] = 0
+			}
+			cell.y++
+			moved = true
+		}
+		return moved
+	}
+	/**
+	 * Mode cheese: sert les rangees de gruyere dues au joueur. Le plateau remonte d'une
+	 * rangee toutes les CHEESE_CLEARS_PER_RISE lignes creusees, jusqu'a ce que les
+	 * CHEESE_TOTAL_GARBAGE de la partie soient toutes passees sur le plateau.
+	 */
+	private serveCheeseGarbage(playerState: PlayerGameState) : void {
+		// Toute rangee servie est soit encore sur le plateau, soit deja creusee.
+		const onBoard = playerState.garbageServed - playerState.garbageCleared
+		const target = Math.min(
+			CHEESE_TOTAL_GARBAGE,
+			Math.max(
+				CHEESE_START_GARBAGE + Math.floor(playerState.garbageCleared / CHEESE_CLEARS_PER_RISE),
+				// Soupape: la cadence « 2 creusees pour 1 servie » vide le plateau plus vite
+				// qu'elle ne le regarnit, et laisse la toute derniere rangee en coulisse —
+				// elle attendrait une destruction devenue impossible, course bloquee a 19/20.
+				// Des qu'il ne reste rien a creuser a l'ecran, on sert donc la suivante.
+				onBoard === 0 ? playerState.garbageServed + 1 : 0,
+			),
+		)
+		while (playerState.garbageServed < target) {
+			this.raiseBoard(playerState, [this.createGarbageLine(playerState.garbageServed)])
+			playerState.garbageServed++
+			// Une remontee peut pousser la pile au-dela du plafond: inutile d'en servir
+			// d'autres a un joueur deja mort.
+			if (!playerState.isAlive)
+				return
+		}
+	}
+	/** Pose les CHEESE_START_GARBAGE rangees visibles au coup d'envoi (plateau vide). */
+	private setupCheeseGarbage(playerState: PlayerGameState) : void {
+		for (let i = 0; i < CHEESE_START_GARBAGE; i++) {
+			this.raiseBoard(playerState, [this.createGarbageLine(playerState.garbageServed)])
+			playerState.garbageServed++
+		}
+	}
+	/** Rangee de gruyere: pleine sauf UN trou, et nettoyable (contrairement a "penalty"). */
+	createGarbageLine(index: number) : Cell[] {
+		const hole = this.garbageHoles[index % this.garbageHoles.length] ?? 0
+		return Array.from({ length: BOARD_WIDTH }, (_v, x) => (x === hole ? 0 : "garbage"))
 	}
 	createPenaltyLine() : Cell[] {
 		// Lignes de pénalité pleines et indestructibles (sujet) : aucune brèche.
@@ -474,45 +812,65 @@ export class Game {
 		// garantit qu'elles ne peuvent jamais être complétées ni nettoyées.
 		return Array.from({ length: BOARD_WIDTH }, () => "penalty")
 	}
-	addPenaltyLines(playerState: PlayerGameState, count: number) : void {
-		if (count <= 0)
+	/**
+	 * Fait remonter le plateau de `lines.length` rangees et pose `lines` tout en bas.
+	 * Base commune aux lignes de penalite (pleines, indestructibles) et au gruyere du
+	 * mode cheese (percees, nettoyables): meme decalage des horodatages, meme detection
+	 * de top-out, meme remontee de la piece en vol.
+	 */
+	private raiseBoard(playerState: PlayerGameState, lines: Cell[][]) : void {
+		if (lines.length === 0)
 			return
-		const penaltyCount = Math.min(count, BOARD_HEIGHT)
-		// Les `penaltyCount` lignes du HAUT sortent du terrain. Si elles portent le
-		// moindre bloc, la pile a ete poussee au-dela du plafond => top-out. Sans ca la
-		// penalite "nettoierait" gratuitement le sommet d'une pile haute au lieu d'etre
-		// punitive (une pile au plafond survivait a une salve de penalites).
+		const count = Math.min(lines.length, BOARD_HEIGHT)
+		// Les `count` lignes du HAUT sortent du terrain. Si elles portent le moindre
+		// bloc, la pile a ete poussee au-dela du plafond => top-out. Sans ca la penalite
+		// "nettoierait" gratuitement le sommet d'une pile haute au lieu d'etre punitive
+		// (une pile au plafond survivait a une salve de penalites).
 		const toppedOut = playerState.board
-			.slice(0, penaltyCount)
+			.slice(0, count)
 			.some((row) => row.some((cell) => cell !== 0))
-		const penaltyLines = Array.from(
-			{ length: penaltyCount },
-			() => this.createPenaltyLine()
-		)
 		playerState.board = [
-			...playerState.board.slice(penaltyCount),
-			...penaltyLines,
+			...playerState.board.slice(count),
+			...lines.slice(0, count),
 		]
-		// Meme decalage sur les horodatages. Les lignes de penalite n'en portent pas
-		// (0) : elles restent donc toujours visibles, meme en mode invisible.
+		// Meme decalage sur les horodatages. Les lignes ajoutees n'en portent pas (0):
+		// elles restent donc toujours visibles, meme en mode invisible.
 		playerState.lockedAt = [
-			...playerState.lockedAt.slice(penaltyCount),
-			...Array.from({ length: penaltyCount }, () => this.createEmptyLockRow()),
+			...playerState.lockedAt.slice(count),
+			...Array.from({ length: count }, () => this.createEmptyLockRow()),
+		]
+		// Une rangee ajoutee est une unite a part entiere: elle tombe d'un seul tenant
+		// en mode cascade, et ne se colle pas a la piece qui la surplombe.
+		playerState.pieceIds = [
+			...playerState.pieceIds.slice(count),
+			...lines.slice(0, count).map((line) => {
+				const lineId = ++this.nextPieceId
+				return line.map((cell) => (cell === 0 ? 0 : lineId))
+			}),
 		]
 		if (toppedOut) {
 			playerState.isAlive = false
 			return
 		}
-		// Le plateau vient de remonter de penaltyCount: la piece en vol doit remonter
-		// avec lui. Sinon elle se retrouve incrustee DANS les lignes de penalite et,
-		// au verrouillage, getRenderedBoard ecrase des cellules "penalty": la ligne
-		// perd son marqueur, redevient nettoyable par clearLines et n'est donc plus
+		// Le plateau vient de remonter de `count`: la piece en vol doit remonter avec
+		// lui. Sinon elle se retrouve incrustee DANS les lignes ajoutees et, au
+		// verrouillage, getRenderedBoard ecrase des cellules "penalty": la ligne perd
+		// son marqueur, redevient nettoyable par clearLines et n'est donc plus
 		// indestructible (et le joueur gagne des cases gratuites).
 		const piece = playerState.currentPiece
 		if (!piece)
 			return
 		while (piece.getY() > 0 && !this.canMove(playerState, 0, 0))
 			piece.translate(0, -1)
+	}
+	addPenaltyLines(playerState: PlayerGameState, count: number) : void {
+		if (count <= 0)
+			return
+		const penaltyCount = Math.min(count, BOARD_HEIGHT)
+		this.raiseBoard(
+			playerState,
+			Array.from({ length: penaltyCount }, () => this.createPenaltyLine()),
+		)
 	}
 	addPenaltyToOpponents(sourcePlayerState: PlayerGameState, penaltyCount: number) : void {
 		if (this.isSolo() || penaltyCount <= 0)
@@ -624,6 +982,10 @@ export class Game {
 		if (this.mode === "ultra")
 			this.deadline = Date.now() + ULTRA_DURATION_MS
 		for (const [, playerStat] of this.state) {
+			// Cheese: le gruyere est pose AVANT la premiere piece, sinon celle-ci
+			// apparaitrait puis se ferait remonter par le plateau qu'on souleve.
+			if (this.mode === "cheese")
+				this.setupCheeseGarbage(playerStat)
 			this.spawnPiece(playerStat)
 		}
 		emitGameStart(this.state, this)
@@ -704,6 +1066,17 @@ export class Game {
 				modeWinner = finisher.player.getName()
 			}
 		}
+		// Cheese: le premier a avoir creuse les 20 rangees de gruyere termine la course.
+		// En solo il n'y a PAS de vainqueur (comme en ultra): une partie sans adversaire
+		// compterait sinon comme une victoire dans les statistiques.
+		if (!endedByMode && this.mode === "cheese") {
+			const finisher = states.find((playerState) =>
+				playerState.isAlive && playerState.garbageCleared >= CHEESE_TOTAL_GARBAGE)
+			if (finisher) {
+				endedByMode = true
+				modeWinner = isSolo ? null : finisher.player.getName()
+			}
+		}
 		// Ultra: c'est le CHRONO qui fait foi. La regle de survie ne doit pas cloturer
 		// la partie avant l'expiration, sinon la premiere elimination sacrerait le
 		// survivant au lieu du meilleur score. On termine uniquement a l'expiration,
@@ -776,15 +1149,21 @@ export class Game {
 		// Plancher a `revealUntil`: une piece posee PENDANT une revelation doit
 		// s'effacer avec les autres, pas avant elles.
 		const now = Math.max(Date.now(), playerState.revealUntil)
+		// Meme marquage pour l'identite de la piece: les cases qu'elle vient de remplir
+		// forment desormais une unite qui tombera d'un seul tenant en mode cascade.
+		const pieceId = ++this.nextPieceId
 		for (let y = 0; y < playerState.board.length; y++) {
 			const row = playerState.board[y]
 			const previousRow = previousBoard[y]
 			const lockRow = playerState.lockedAt[y]
-			if (!row || !previousRow || !lockRow)
+			const idRow = playerState.pieceIds[y]
+			if (!row || !previousRow || !lockRow || !idRow)
 				continue
 			for (let x = 0; x < row.length; x++) {
-				if (previousRow[x] === 0 && row[x] !== 0)
+				if (previousRow[x] === 0 && row[x] !== 0) {
 					lockRow[x] = now
+					idRow[x] = pieceId
+				}
 			}
 		}
 	}
