@@ -112,8 +112,10 @@ describe("gameEmitters", () => {
 
 			const rendered = getRenderedBoard(state);
 
-			expect(rendered[0]![9]).toBe("I");
-			expect(rendered[0]!.length).toBe(BOARD_WIDTH);
+			// Boite 4x4: la barre est sur la 2e ligne de la boite, donc la rangee 1 du
+			// plateau. Debordant a droite, seule sa colonne 9 est dessinee.
+			expect(rendered[1]![9]).toBe("I");
+			expect(rendered[1]!.length).toBe(BOARD_WIDTH);
 		});
 
 		it("ignores a piece that fell below the board", () => {

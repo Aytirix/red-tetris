@@ -28,13 +28,21 @@ import { Piece } from "./Piece.js";
 import type { Room } from "./room.js";
 
 export class Game {
-	// Wall kicks a la rotation: decalages HORIZONTAUX uniquement, du plus petit au plus
-	// grand. (0,0) = rotation en place; ±1/±2/±3 en x pour decoller la piece d'un mur ou
-	// d'une pile. Seul le I (large de 4) atteint ±3; les pieces 3-larges trouvent toujours
-	// a ±2 au plus. Aucun decalage vertical: une piece ne doit jamais "sauter" vers le
-	// haut en tournant.
+	// Wall kicks a la rotation: si la forme pivotee ne tient pas en place, on tente ces
+	// decalages dans l'ordre et le premier qui passe est applique.
+	// D'abord horizontal (decoller d'un mur ou d'une pile, le cas courant), puis un ou
+	// deux crans VERS LE HAUT (floor kick). Sans ce dernier, une piece posee au sol ne
+	// pouvait tout simplement plus pivoter a la verticale: la rotation ne faisait rien,
+	// ce qui se ressent comme un bug. Le gain en hauteur est borne a 2 cases et la
+	// gravite reprend aussitot: impossible de « grimper » avec.
+	// Seul le I (long de 4) a besoin de ±3 en x.
 	private static readonly ROTATION_KICKS: ReadonlyArray<readonly [number, number]> = [
-		[0, 0], [-1, 0], [1, 0], [-2, 0], [2, 0], [-3, 0], [3, 0],
+		[0, 0],
+		[-1, 0], [1, 0],
+		[-2, 0], [2, 0],
+		[0, -1], [-1, -1], [1, -1],
+		[0, -2],
+		[-3, 0], [3, 0],
 	]
 	public mode: GameMode
 	public players: Player[];
@@ -552,8 +560,7 @@ export class Game {
 			return
 		// Wall kicks: si la forme pivotee deborde a la position actuelle (piece collee a
 		// un mur, au sol ou a une pile), on essaie de la decaler avant d'abandonner la
-		// rotation. Ordre = deplacement croissant, horizontal d'abord (le plus courant),
-		// puis un cran vers le haut. Le premier decalage qui tient est applique.
+		// rotation (table ROTATION_KICKS).
 		for (const [dx, dy] of Game.ROTATION_KICKS) {
 			if (!this.canPlaceShape(rotate, playerState, dx, dy))
 				continue

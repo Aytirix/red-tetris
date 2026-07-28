@@ -750,19 +750,79 @@ describe("Game", () => {
 			const state = states[0]!;
 			state.currentPiece = new Piece(I, "I");
 			game.rotate("sock0");
-			expect(state.currentPiece.shape).toEqual([[1], [1], [1], [1]]);
+			// Boite 4x4: la barre verticale se place en colonne 2 de la boite.
+			expect(state.currentPiece.shape).toEqual([
+				[0, 0, 1, 0],
+				[0, 0, 1, 0],
+				[0, 0, 1, 0],
+				[0, 0, 1, 0],
+			]);
 			expect(emitGameUpdate).toHaveBeenCalledTimes(1);
+		});
+
+		// La piece pivote SUR PLACE: la boite ne bouge pas, donc ni x ni y ne changent
+		// tant que la rotation tient. C'etait le defaut d'avant — la boite changeait de
+		// dimensions et la piece se decalait d'une demi-case a chaque quart de tour.
+		it("ne deplace pas la piece quand la rotation tient", () => {
+			const { game, states } = makeGame(1);
+			const state = states[0]!;
+			const piece = new Piece(pieces.T, "T");
+			piece.translate(0, 5);
+			state.currentPiece = piece;
+
+			game.rotate("sock0");
+
+			expect(state.currentPiece.getX()).toBe(4);
+			expect(state.currentPiece.getY()).toBe(5);
+		});
+
+		// Floor kick: une piece a plat sur le sol n'a pas la place de se dresser. Sans
+		// decalage vertical la rotation ne faisait RIEN, ce qui se ressent comme un bug.
+		it("souleve la piece posee au sol pour la laisser se dresser", () => {
+			const { game, states } = makeGame(1);
+			const state = states[0]!;
+			const piece = new Piece(pieces.T, "T");
+			// T a plat, ses cases sur les deux dernieres rangees du plateau.
+			piece.translate(0, BOARD_HEIGHT - 2);
+			state.currentPiece = piece;
+
+			game.rotate("sock0");
+
+			expect(state.currentPiece.getY()).toBe(BOARD_HEIGHT - 3);
+			expect(state.currentPiece.shape).toEqual([
+				[0, 1, 0],
+				[0, 1, 1],
+				[0, 1, 0],
+			]);
+		});
+
+		it("abandonne la rotation quand aucun decalage ne tient", () => {
+			const { game, states } = makeGame(1);
+			const state = states[0]!;
+			const piece = new Piece(pieces.T, "T");
+			piece.translate(0, BOARD_HEIGHT - 2);
+			state.currentPiece = piece;
+			// Tout est pris autour: ni les decalages horizontaux ni les floor kicks ne
+			// peuvent placer la barre verticale.
+			for (let y = 0; y < BOARD_HEIGHT - 2; y++)
+				for (let x = 0; x < BOARD_WIDTH; x++)
+					state.board[y]![x] = "Z";
+
+			game.rotate("sock0");
+
+			expect(state.currentPiece.shape).toEqual(pieces.T);
+			expect(state.currentPiece.getY()).toBe(BOARD_HEIGHT - 2);
 		});
 
 		it("decale la piece (wall kick) quand la rotation en place est bloquee par un obstacle", () => {
 			const { game, states } = makeGame(1);
 			const state = states[0]!;
-			// I horizontal en (x=4, y=0): la rotation verticale occuperait la colonne 4,
-			// mais (2,4) est pris. Un kick d'une case a gauche la fait tenir en colonne 3.
+			// I horizontal en (x=4, y=0): la rotation verticale occuperait la colonne 6
+			// (x + 2), mais (2,6) est pris. Un kick d'une case a gauche la fait tenir en
+			// colonne 5.
 			state.currentPiece = new Piece(I, "I");
-			state.board[2]![4] = "O";
+			state.board[2]![6] = "O";
 			game.rotate("sock0");
-			expect(state.currentPiece.shape).toEqual([[1], [1], [1], [1]]);
 			expect(state.currentPiece.getX()).toBe(3);
 			expect(state.currentPiece.getY()).toBe(0);
 			expect(emitGameUpdate).toHaveBeenCalledTimes(1);
