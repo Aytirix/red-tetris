@@ -42,6 +42,7 @@ import {
 	type PlayerGameState,
 } from "../types/game/gameTypes.js";
 import { I, O, pieces, T, type PieceShape } from "../types/game/piecesGameTypes.js";
+import { LOCK_GRACE_MIN_MS } from "../types/game/gameTypes.js";
 import {
 	emitGameOver,
 	emitGameStart,
@@ -1184,6 +1185,42 @@ describe("Game", () => {
 		});
 	});
 
+	describe("getLockGraceMs", () => {
+		// Plus confortable qu'une frame seche, mais accelere comme la chute.
+		it("laisse plus de temps qu'une frame de gravite", () => {
+			const { game } = makeGame(1);
+			expect(game.getLockGraceMs()).toBeGreaterThan(game.getTickSpeed());
+		});
+
+		it("se resserre quand le niveau monte", () => {
+			const { game, states } = makeGame(1);
+			const state = states[0]!;
+
+			state.level = 1;
+			const debut = game.getLockGraceMs();
+			state.level = 5;
+			const milieu = game.getLockGraceMs();
+
+			expect(milieu).toBeLessThan(debut);
+		});
+
+		it("ne descend pas sous un plancher jouable aux niveaux les plus rapides", () => {
+			const { game, states } = makeGame(1);
+			states[0]!.level = 50;
+
+			expect(game.getLockGraceMs()).toBe(LOCK_GRACE_MIN_MS);
+		});
+
+		// Exigence du sujet (V.1.1): la piece doit toujours survivre a la frame du contact.
+		it("reste au moins egal a une frame, a tous les niveaux", () => {
+			const { game, states } = makeGame(1);
+			for (const level of [1, 2, 5, 9, 20, 50]) {
+				states[0]!.level = level;
+				expect(game.getLockGraceMs()).toBeGreaterThanOrEqual(game.getTickSpeed());
+			}
+		});
+	});
+
 	describe("getLockDelayMs", () => {
 		// Une piece qui ne peut plus descendre n'est verrouillee qu'au tick SUIVANT: le
 		// client a besoin de ce sursis pour afficher un decompte juste.
@@ -1195,14 +1232,18 @@ describe("Game", () => {
 			expect(game.getLockDelayMs(state)).toBeNull();
 		});
 
-		it("vaut une frame complete des que la piece touche la pile", () => {
+		// Le verrouillage n'etant evalue qu'aux ticks, l'echeance annoncee est le premier
+		// tick au-dela du sursis: jamais moins que le sursis, jamais plus d'un tick de plus.
+		it("annonce au moins le sursis complet des que la piece touche la pile", () => {
 			const { game, states } = makeGame(1);
 			const state = states[0]!;
 			state.currentPiece = placedPiece(O, "O", 4, BOARD_HEIGHT - 2);
 			game.restartTickInterval();
 			game.refreshLockState(state);
 
-			expect(game.getLockDelayMs(state)).toBe(game.getTickSpeed());
+			const remaining = game.getLockDelayMs(state)!;
+			expect(remaining).toBeGreaterThanOrEqual(game.getLockGraceMs());
+			expect(remaining).toBeLessThan(game.getLockGraceMs() + game.getTickSpeed());
 		});
 
 		// Le sursis s'ecoule: bouger la piece ne le relance pas, sinon on la retiendrait
@@ -1214,9 +1255,10 @@ describe("Game", () => {
 			game.restartTickInterval();
 			game.refreshLockState(state);
 
+			const before = game.getLockDelayMs(state)!;
 			vi.advanceTimersByTime(100);
 
-			expect(game.getLockDelayMs(state)).toBe(game.getTickSpeed() - 100);
+			expect(game.getLockDelayMs(state)).toBe(before - 100);
 		});
 
 		// Le coeur du correctif: une piece posee juste avant un tick n'avait presque aucun
@@ -1232,7 +1274,8 @@ describe("Game", () => {
 			state.currentPiece = placedPiece(O, "O", 4, BOARD_HEIGHT - 2);
 			game.refreshLockState(state);
 
-			expect(game.getLockDelayMs(state)).toBeGreaterThanOrEqual(tick);
+			expect(game.getLockDelayMs(state)).toBeGreaterThanOrEqual(game.getLockGraceMs());
+			expect(tick).toBeGreaterThan(0);
 		});
 
 		// Sans gravite en cours (partie mise en pause par une fin de partie, derive de
@@ -1438,9 +1481,9 @@ describe("Game", () => {
 			const state = states[0]!;
 			state.currentPiece = placedPiece(O, "O", 4, BOARD_HEIGHT - 2);
 
-			// Contact au 1er tick, verrouillage seulement apres une frame de sursis.
+			// Contact au 1er tick, verrouillage seulement une fois le sursis ecoule.
 			game.tick();
-			vi.advanceTimersByTime(game.getTickSpeed());
+			vi.advanceTimersByTime(game.getLockGraceMs());
 			game.tick();
 
 			expect(state.board[BOARD_HEIGHT - 1]![4]).toBe("O");
@@ -1479,7 +1522,7 @@ describe("Game", () => {
 			state.currentPiece = placedPiece(O, "O", 0, BOARD_HEIGHT - 2);
 
 			game.tick();
-			vi.advanceTimersByTime(game.getTickSpeed());
+			vi.advanceTimersByTime(game.getLockGraceMs());
 			game.tick();
 
 			expect(state.isAlive).toBe(false);
@@ -1497,7 +1540,7 @@ describe("Game", () => {
 			survivor.currentPiece = new Piece(O, "O");
 
 			game.tick();
-			vi.advanceTimersByTime(game.getTickSpeed());
+			vi.advanceTimersByTime(game.getLockGraceMs());
 			game.tick();
 
 			expect(victim.isAlive).toBe(false);

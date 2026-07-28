@@ -29,6 +29,16 @@ export const HARD_DROP_POINTS_PER_CELL = 2;
 // (multi-lignes et multiplicateur de niveau), il ferait exploser la vitesse.
 export const LINES_PER_LEVEL = 5;
 
+// Sursis d'ajustement d'une piece qui vient de toucher la pile, exprime en FRACTION
+// d'une frame de gravite: il suit donc la meme acceleration que la chute (plus le
+// niveau monte, moins on a de temps), tout en restant nettement plus confortable
+// qu'une frame seche. Le sujet (V.1.1) exige au minimum la frame suivante; un facteur
+// > 1 la respecte toujours.
+export const LOCK_GRACE_FACTOR = 1.75;
+// Plancher: aux niveaux les plus rapides (frame a 80 ms), 1,75 frame ne laisserait pas
+// le temps de reagir. En dessous de ce seuil le jeu devient injouable, pas difficile.
+export const LOCK_GRACE_MIN_MS = 250;
+
 // Sprint: premier a nettoyer 40 lignes.
 export const SPRINT_TARGET_LINES = 40;
 // Ultra: 2 minutes, meilleur score.

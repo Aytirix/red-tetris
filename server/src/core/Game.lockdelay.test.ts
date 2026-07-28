@@ -93,11 +93,11 @@ describe("lock delay", () => {
 		expect(state.currentPiece).toBe(piece);
 	});
 
-	it("verrouille la piece a la frame suivante", () => {
+	it("verrouille la piece une fois le sursis ecoule", () => {
 		const { game, state, piece } = setup();
 
 		game.tick();
-		vi.advanceTimersByTime(game.getTickSpeed());
+		vi.advanceTimersByTime(game.getLockGraceMs());
 		game.tick();
 
 		// Nouvelle piece en jeu, et l'ancienne est incrustee dans le board.
@@ -123,8 +123,8 @@ describe("lock delay", () => {
 		game.tick();
 		expect(state.currentPiece).toBe(piece);
 
-		// Elle ne se fige qu'une frame apres le contact.
-		vi.advanceTimersByTime(tick);
+		// Elle ne se fige qu'une fois le sursis ecoule depuis le contact.
+		vi.advanceTimersByTime(game.getLockGraceMs());
 		game.tick();
 		expect(state.currentPiece).not.toBe(piece);
 	});

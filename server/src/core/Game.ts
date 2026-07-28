@@ -9,6 +9,8 @@ import {
 	INVISIBLE_REVEAL_PER_LINE_MS,
 	LINE_CLEAR_SCORES,
 	LINES_PER_LEVEL,
+	LOCK_GRACE_FACTOR,
+	LOCK_GRACE_MIN_MS,
 	SOFT_DROP_POINTS_PER_CELL,
 	SPRINT_TARGET_LINES,
 	SUDDEN_DEATH_TICK_MS,
@@ -289,13 +291,17 @@ export class Game {
 		this.restartTickInterval()
 	}
 	/**
-	 * Sursis accorde a une piece qui vient de toucher la pile: UNE frame complete, comme
-	 * l'exige le sujet (V.1.1, « immobile only on the next frame »). Mesure depuis le
-	 * contact et non depuis le dernier tick: une piece descendue juste avant un tick
-	 * n'aurait sinon presque aucun temps d'ajustement.
+	 * Sursis accorde a une piece qui vient de toucher la pile, mesure depuis le CONTACT
+	 * (et non depuis le dernier tick: une piece descendue juste avant un tick n'aurait
+	 * sinon presque aucun temps d'ajustement).
+	 *
+	 * Il vaut 1,75 frame de gravite: plus confortable qu'une frame seche, tout en
+	 * accelerant au meme rythme que la chute quand le niveau monte. Le facteur etant
+	 * > 1, le minimum du sujet (V.1.1 : « immobile only on the next frame ») reste
+	 * toujours respecte.
 	 */
 	getLockGraceMs() : number {
-		return this.getTickSpeed()
+		return Math.max(LOCK_GRACE_MIN_MS, Math.round(this.getTickSpeed() * LOCK_GRACE_FACTOR))
 	}
 	/**
 	 * Met a jour l'instant de contact avec la pile. Appele apres chaque action du joueur
