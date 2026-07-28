@@ -5,9 +5,11 @@ import {
 	INVISIBLE_JOKER_COUNT,
 	INVISIBLE_JOKER_REVEAL_MS,
 	INVISIBLE_REVEAL_CAP_MS,
+	HARD_DROP_POINTS_PER_CELL,
 	INVISIBLE_REVEAL_PER_LINE_MS,
 	LINE_CLEAR_SCORES,
 	LINES_PER_LEVEL,
+	SOFT_DROP_POINTS_PER_CELL,
 	SPRINT_TARGET_LINES,
 	SUDDEN_DEATH_TICK_MS,
 	ULTRA_DURATION_MS,
@@ -492,8 +494,14 @@ export class Game {
 		if (!playerState || !playerState.currentPiece || !playerState.isAlive)
 			return
 
-		while (this.canMove(playerState, 0, 1))
+		// Distance parcourue: la chute instantanee rapporte le double du soft drop par
+		// case, donc rien du tout sur une piece deja posee.
+		let dropped = 0
+		while (this.canMove(playerState, 0, 1)) {
 			playerState.currentPiece.moveDown()
+			dropped++
+		}
+		playerState.score += dropped * HARD_DROP_POINTS_PER_CELL
 		const isGameOver = this.lockAndSpawnNext(playerState)
 		if (!isGameOver && playerState.isAlive) {
 			emitGameUpdate(playerState, this.state)
@@ -509,8 +517,12 @@ export class Game {
 			playerState.currentPiece.moveLeft()
 		else if (direction === "right" && this.canMove(playerState, 1, 0))
 			playerState.currentPiece.moveRight()
-		else if (direction === "down" && this.canMove(playerState, 0, 1))
+		else if (direction === "down" && this.canMove(playerState, 0, 1)) {
 			playerState.currentPiece.moveDown()
+			// Une case DESCENDUE, pas une touche pressee: marteler la touche contre le sol
+			// ne rapporte rien.
+			playerState.score += SOFT_DROP_POINTS_PER_CELL
+		}
 
 		emitGameUpdate(playerState, this.state)
 		emitSpectatorForPlayer(playerState, this.state)

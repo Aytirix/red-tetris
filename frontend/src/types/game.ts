@@ -41,6 +41,7 @@ export const GAME_MODE_RULES: Record<GameMode, string[]> = {
 	classique: [
 		"Nettoie des lignes pour marquer des points : 100 / 300 / 500 / 800 selon que tu en fais 1, 2, 3 ou 4 d'un coup.",
 		"En solo, le niveau multiplie le score : au niveau 3, un Tetris vaut 2 400 points.",
+		"Descendre la pièce toi-même rapporte : 1 point par case, 2 si tu la lâches d'un coup.",
 		"Chaque ligne que tu nettoies envoie des lignes de pénalité aux adversaires.",
 		"Le dernier joueur encore en vie remporte la partie.",
 	],

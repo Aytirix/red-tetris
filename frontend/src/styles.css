@@ -2287,14 +2287,18 @@ a:hover {
 	transform: scale(0.06);
 	transform-origin: center;
 	will-change: transform, opacity;
-	animation: tetris-gameover-zoom 3s linear forwards;
+	/* 1,8 s : c'est aussi le délai avant la bascule (récap ou mode spectateur), qui
+	   attend la fin de l'animation. Au-delà, l'attente se fait sentir. Les temps forts
+	   restent les mêmes, l'échelle est simplement resserrée : ~0,3 s d'entrée, ~0,8 s
+	   de lecture, le reste en explosion. */
+	animation: tetris-gameover-zoom 1.8s linear forwards;
 }
 
 /* Motion réduit: on garde une animation (sinon l'événement animationend, qui
    déclenche la bascule spectateur, ne se déclencherait jamais) mais raccourcie. */
 @media (prefers-reduced-motion: reduce) {
 	.tetris-gameover-overlay__text {
-		animation-duration: 1.6s;
+		animation-duration: 1s;
 	}
 }
 

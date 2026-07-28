@@ -18,6 +18,11 @@ export function isGameMode(value: string): value is GameMode {
 // mecanique centrale du jeu: un Tetris rapporte 8x un Single, pas 4x, ce qui
 // recompense le joueur qui creuse un puits et attend la barre I au lieu d'aplanir.
 export const LINE_CLEAR_SCORES = [0, 100, 300, 500, 800] as const;
+// Points par case gagnee volontairement (bareme Guideline, NON multiplie par le
+// niveau): descendre soi-meme la piece rapporte un peu, la lacher d'un coup rapporte
+// le double — c'est ce qui recompense le joueur qui ne laisse pas la gravite faire.
+export const SOFT_DROP_POINTS_PER_CELL = 1;
+export const HARD_DROP_POINTS_PER_CELL = 2;
 // Lignes a nettoyer pour monter d'un niveau. Le niveau se calculait avant sur le
 // score (500 pts = 5 lignes a 100 pts/ligne); on garde exactement la meme cadence de
 // difficulte, mais adossee aux LIGNES: le score n'est plus proportionnel aux lignes

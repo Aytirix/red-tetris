@@ -1064,6 +1064,66 @@ describe("Game", () => {
 		});
 	});
 
+	describe("points de descente", () => {
+		// Bareme Guideline: descendre soi-meme rapporte 1 pt/case, lacher d'un coup 2.
+		it("marque 1 point par case descendue au soft drop", () => {
+			const { game, states, players } = makeGame(1);
+			const state = states[0]!;
+			state.currentPiece = placedPiece(O, "O", 4, 0);
+
+			game.move(players[0]!.getSocketId(), "down");
+
+			expect(state.score).toBe(1);
+		});
+
+		// Marteler la touche contre le sol ne doit rien rapporter: c'est la case
+		// PARCOURUE qui compte, pas l'appui.
+		it("ne marque rien quand la piece ne peut plus descendre", () => {
+			const { game, states, players } = makeGame(1);
+			const state = states[0]!;
+			state.currentPiece = placedPiece(O, "O", 4, BOARD_HEIGHT - 2);
+
+			game.move(players[0]!.getSocketId(), "down");
+			game.move(players[0]!.getSocketId(), "down");
+
+			expect(state.score).toBe(0);
+		});
+
+		it("ne marque rien sur un deplacement lateral", () => {
+			const { game, states, players } = makeGame(1);
+			const state = states[0]!;
+			state.currentPiece = placedPiece(O, "O", 4, 0);
+
+			game.move(players[0]!.getSocketId(), "left");
+			game.move(players[0]!.getSocketId(), "right");
+
+			expect(state.score).toBe(0);
+		});
+
+		it("marque 2 points par case a la chute instantanee", () => {
+			const { game, states, players } = makeGame(1);
+			const state = states[0]!;
+			state.board = emptyBoard();
+			state.currentPiece = placedPiece(O, "O", 4, 0);
+
+			game.drop(players[0]!.getSocketId());
+
+			// La piece O part de la rangee 0 et s'arrete sur le fond: 18 cases parcourues.
+			expect(state.score).toBe((BOARD_HEIGHT - 2) * 2);
+		});
+
+		it("ne marque rien en lachant une piece deja posee", () => {
+			const { game, states, players } = makeGame(1);
+			const state = states[0]!;
+			state.board = emptyBoard();
+			state.currentPiece = placedPiece(O, "O", 4, BOARD_HEIGHT - 2);
+
+			game.drop(players[0]!.getSocketId());
+
+			expect(state.score).toBe(0);
+		});
+	});
+
 	describe("getLockDelayMs", () => {
 		// Une piece qui ne peut plus descendre n'est verrouillee qu'au tick SUIVANT: le
 		// client a besoin de ce sursis pour afficher un decompte juste.

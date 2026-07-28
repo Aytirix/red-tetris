@@ -135,6 +135,61 @@ describe("GameView — mapping clavier (exigence du sujet)", () => {
 		}
 	});
 
+	it("maintenir la descente la repete rapidement, un tapotement = 1 case", () => {
+		vi.useFakeTimers();
+		try {
+			renderGameView();
+
+			// Tapotement: keydown puis keyup avant le delai -> une seule case.
+			fireEvent.keyDown(window, { code: "ArrowDown" });
+			fireEvent.keyUp(window, { code: "ArrowDown" });
+			vi.advanceTimersByTime(500);
+			expect(gameEvents.emitGameMove).toHaveBeenCalledTimes(1);
+
+			gameEvents.emitGameMove.mockClear();
+
+			// Maintien: descente immediate puis repetitions rapides.
+			fireEvent.keyDown(window, { code: "ArrowDown" });
+			expect(gameEvents.emitGameMove).toHaveBeenCalledTimes(1);
+			vi.advanceTimersByTime(90 + 35 * 4);
+			expect(gameEvents.emitGameMove.mock.calls.length).toBeGreaterThanOrEqual(5);
+
+			// Relacher stoppe la repetition.
+			fireEvent.keyUp(window, { code: "ArrowDown" });
+			const stopped = gameEvents.emitGameMove.mock.calls.length;
+			vi.advanceTimersByTime(300);
+			expect(gameEvents.emitGameMove.mock.calls.length).toBe(stopped);
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
+	// L'auto-repeat de l'OS doublerait la cadence de notre propre repetition.
+	it("ignore l'auto-repeat de l'OS sur la descente", () => {
+		renderGameView();
+		fireEvent.keyDown(window, { code: "ArrowDown", repeat: true });
+
+		expect(gameEvents.emitGameMove).not.toHaveBeenCalled();
+	});
+
+	// Alt-tab: le keyup n'arrive jamais, la piece continuerait de descendre au retour.
+	it("stoppe la descente quand la fenetre perd le focus", () => {
+		vi.useFakeTimers();
+		try {
+			renderGameView();
+			fireEvent.keyDown(window, { code: "ArrowDown" });
+			vi.advanceTimersByTime(90 + 35 * 3);
+			gameEvents.emitGameMove.mockClear();
+
+			fireEvent.blur(window);
+			vi.advanceTimersByTime(500);
+
+			expect(gameEvents.emitGameMove).not.toHaveBeenCalled();
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
 	it("Espace declenche le hard drop", () => {
 		renderGameView();
 		fireEvent.keyDown(window, { code: "Space" });

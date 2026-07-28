@@ -202,17 +202,45 @@ export default function GameView({ state, roomName, eliminated = false, onElimin
 		if (isSpectator) return;
 		const bindings = loadKeyBindings();
 
-		// Auto-répétition RAPIDE de la rotation tant que la touche est maintenue. Le jeu
-		// ne s'appuie plus sur l'auto-repeat lent de l'OS (délai initial ~500 ms) : on
-		// peut donc « spammer » la rotation en gardant la touche enfoncée. Un simple
-		// tapotement ne déclenche qu'UNE rotation (le keyup annule le timer avant le délai).
+		// Auto-répétition RAPIDE tant que la touche est maintenue. Le jeu ne s'appuie plus
+		// sur l'auto-repeat lent de l'OS (délai initial ~500 ms, cadence variable selon la
+		// machine) : on peut donc « spammer » en gardant la touche enfoncée, et un simple
+		// tapotement ne déclenche qu'UNE action (le keyup annule le timer avant le délai).
 		const ROTATE_REPEAT_DELAY = 130;
 		const ROTATE_REPEAT_RATE = 45;
-		let rotateDelay = 0;
-		let rotateInterval = 0;
-		function stopRotateRepeat() {
-			if (rotateDelay) { window.clearTimeout(rotateDelay); rotateDelay = 0; }
-			if (rotateInterval) { window.clearInterval(rotateInterval); rotateInterval = 0; }
+		// Descente: départ presque immédiat et cadence plus soutenue que la rotation —
+		// c'est un déplacement continu, pas une suite d'actions distinctes.
+		const SOFT_DROP_REPEAT_DELAY = 90;
+		const SOFT_DROP_REPEAT_RATE = 35;
+
+		/** Répétition d'UNE action tenue : délai initial puis cadence fixe. */
+		function makeRepeater(fire: () => void, delayMs: number, rateMs: number) {
+			let delayId = 0;
+			let intervalId = 0;
+			return {
+				start() {
+					this.stop();
+					fire();
+					delayId = window.setTimeout(() => {
+						intervalId = window.setInterval(fire, rateMs);
+					}, delayMs);
+				},
+				stop() {
+					if (delayId) { window.clearTimeout(delayId); delayId = 0; }
+					if (intervalId) { window.clearInterval(intervalId); intervalId = 0; }
+				},
+			};
+		}
+
+		const rotateRepeat = makeRepeater(() => emitGameRotate(), ROTATE_REPEAT_DELAY, ROTATE_REPEAT_RATE);
+		const softDropRepeat = makeRepeater(
+			() => emitGameMove("down"),
+			SOFT_DROP_REPEAT_DELAY,
+			SOFT_DROP_REPEAT_RATE,
+		);
+		function stopRepeats() {
+			rotateRepeat.stop();
+			softDropRepeat.stop();
 		}
 		// Alias historique imposé par le sujet: KeyX pivote aussi, tant que la touche
 		// n'a pas été réassignée à une autre action par le joueur.
@@ -227,25 +255,21 @@ export default function GameView({ state, roomName, eliminated = false, onElimin
 			const action = actionFor(e.code);
 			if (!action) return;
 
-			if (action === "rotate") {
-				// On pilote nous-mêmes la répétition → on ignore l'auto-repeat de l'OS.
+			// Rotation et descente pilotent leur propre répétition → on ignore l'auto-repeat
+			// de l'OS, qui doublerait la cadence.
+			if (action === "rotate" || action === "softDrop") {
 				e.preventDefault();
 				if (e.repeat) return;
-				emitGameRotate();
-				stopRotateRepeat();
-				rotateDelay = window.setTimeout(() => {
-					rotateInterval = window.setInterval(() => emitGameRotate(), ROTATE_REPEAT_RATE);
-				}, ROTATE_REPEAT_DELAY);
+				(action === "rotate" ? rotateRepeat : softDropRepeat).start();
 				return;
 			}
 
-			// Chute rapide et joker ne doivent pas se répéter si la touche reste enfoncée.
+			// Chute instantanée et joker ne doivent pas se répéter si la touche reste enfoncée.
 			if (e.repeat && (action === "hardDrop" || action === "joker")) return;
 			e.preventDefault();
 			switch (action) {
 				case "moveLeft": emitGameMove("left"); break;
 				case "moveRight": emitGameMove("right"); break;
-				case "softDrop": emitGameMove("down"); break;
 				// Traînée déclenchée à la frappe, pas à la réception de l'état : le
 				// serveur renvoie la pièce déjà posée, l'effet arriverait trop tard.
 				case "hardDrop": startDropTrail(); emitGameDrop(); break;
@@ -253,17 +277,28 @@ export default function GameView({ state, roomName, eliminated = false, onElimin
 			}
 		}
 
-		// Relâcher la touche de rotation stoppe la répétition rapide.
+		// Relâcher la touche stoppe sa répétition rapide.
 		function onKeyUp(e: KeyboardEvent) {
-			if (e.code && actionFor(e.code) === "rotate") stopRotateRepeat();
+			if (!e.code) return;
+			const action = actionFor(e.code);
+			if (action === "rotate") rotateRepeat.stop();
+			else if (action === "softDrop") softDropRepeat.stop();
+		}
+
+		// Onglet quitté (alt-tab) : le keyup n'arrive jamais, la répétition tournerait
+		// dans le vide et la pièce continuerait de descendre au retour.
+		function onBlur() {
+			stopRepeats();
 		}
 
 		window.addEventListener("keydown", onKey);
 		window.addEventListener("keyup", onKeyUp);
+		window.addEventListener("blur", onBlur);
 		return () => {
 			window.removeEventListener("keydown", onKey);
 			window.removeEventListener("keyup", onKeyUp);
-			stopRotateRepeat();
+			window.removeEventListener("blur", onBlur);
+			stopRepeats();
 		};
 	}, [isSpectator, startDropTrail]);
 
