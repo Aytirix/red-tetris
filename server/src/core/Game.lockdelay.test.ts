@@ -38,10 +38,11 @@ function emptyBoard(): Board {
  * Exigence du sujet (V.1.1): "Once a piece touches the pile, it becomes immobile
  * only on the next frame - allowing last-moment adjustments."
  *
- * Le lock delay n'est pas code explicitement, il decoule de la structure de tick():
- * le tick qui amene la piece au contact se contente de la faire descendre, et c'est
- * seulement le tick suivant qui la verrouille. Entre les deux, le joueur garde une
- * frame entiere pour ajuster. Ces tests verrouillent ce comportement.
+ * Le sursis est mesure depuis l'instant de CONTACT (playerState.groundedAt), et vaut
+ * une frame complete. Se contenter de « verrouiller au tick suivant » ne suffisait
+ * pas: une piece descendue par le joueur juste avant un tick n'avait que les
+ * quelques millisecondes restantes pour etre ajustee, la ou le sujet promet une
+ * frame entiere. Ces tests verrouillent ce comportement.
  */
 describe("lock delay", () => {
 	beforeEach(() => {
@@ -92,15 +93,40 @@ describe("lock delay", () => {
 		expect(state.currentPiece).toBe(piece);
 	});
 
-	it("verrouille la piece au tick suivant", () => {
+	it("verrouille la piece a la frame suivante", () => {
 		const { game, state, piece } = setup();
 
 		game.tick();
+		vi.advanceTimersByTime(game.getTickSpeed());
 		game.tick();
 
 		// Nouvelle piece en jeu, et l'ancienne est incrustee dans le board.
 		expect(state.currentPiece).not.toBe(piece);
 		expect(state.board.some((row) => row.some((cell) => cell !== 0))).toBe(true);
+	});
+
+	// Le defaut corrige: la piece posee par le JOUEUR (descente rapide) juste avant un
+	// tick n'avait quasiment aucun sursis, alors que la gravite, elle, en donnait un plein.
+	it("donne le meme sursis a une piece posee par le joueur qu'a une piece posee par la gravite", () => {
+		// Une case au-dessus du contact: un seul pas de descente la pose sur le fond.
+		const { game, state, socketId } = setup();
+		const piece = state.currentPiece!;
+		const tick = game.getTickSpeed();
+
+		// Le joueur descend la piece au contact juste avant la fin du cycle.
+		vi.advanceTimersByTime(tick - 20);
+		game.move(socketId, "down");
+		expect(game.canMove(state, 0, 1)).toBe(false);
+
+		// Le tick tout proche ne doit PAS la figer.
+		vi.advanceTimersByTime(20);
+		game.tick();
+		expect(state.currentPiece).toBe(piece);
+
+		// Elle ne se fige qu'une frame apres le contact.
+		vi.advanceTimersByTime(tick);
+		game.tick();
+		expect(state.currentPiece).not.toBe(piece);
 	});
 
 	it("repousse le verrouillage si l'ajustement rouvre une descente", () => {

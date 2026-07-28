@@ -81,6 +81,12 @@ export type PlayerGameState = {
 	// l'horodatage des pieces posees pendant une revelation, pour qu'elles
 	// disparaissent avec les autres et non avant.
 	revealUntil: number;
+	// Instant (ms) ou la piece courante a touche la pile, null si elle peut encore
+	// descendre. Le sujet (V.1.1) exige qu'une piece au contact ne se fige qu'a la
+	// frame SUIVANTE: on mesure donc le sursis depuis le contact reel, et non depuis
+	// le dernier tick — sinon une piece posee juste avant un tick n'aurait quasiment
+	// aucun temps d'ajustement.
+	groundedAt: number | null;
 	pieceIndex: number
 	player: Player;
 	isAlive: boolean;

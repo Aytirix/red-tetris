@@ -84,6 +84,7 @@ export class Game {
 					lockedAt: this.createLockGrid(),
 					jokersLeft: INVISIBLE_JOKER_COUNT,
 					revealUntil: 0,
+					groundedAt: null,
 					pieceIndex: 0,
 				player: player,
 				isAlive: true,
@@ -288,18 +289,55 @@ export class Game {
 		this.restartTickInterval()
 	}
 	/**
-	 * Temps restant (ms) avant que la piece courante ne se verrouille, ou null si elle
-	 * peut encore descendre. Une piece qui ne peut plus tomber est verrouillee au tick
-	 * SUIVANT (voir tick()): le joueur dispose donc d'un tick complet pour la glisser,
-	 * et le client affiche ce sursis. Bouger la piece ne reprogramme pas la gravite,
-	 * d'ou le calcul a partir du dernier tick plutot qu'une duree fixe.
+	 * Sursis accorde a une piece qui vient de toucher la pile: UNE frame complete, comme
+	 * l'exige le sujet (V.1.1, « immobile only on the next frame »). Mesure depuis le
+	 * contact et non depuis le dernier tick: une piece descendue juste avant un tick
+	 * n'aurait sinon presque aucun temps d'ajustement.
+	 */
+	getLockGraceMs() : number {
+		return this.getTickSpeed()
+	}
+	/**
+	 * Met a jour l'instant de contact avec la pile. Appele apres chaque action du joueur
+	 * et a chaque tick: une piece qui retrouve de la place sous elle (glissee au bord
+	 * d'un surplomb, pivotee) repart en chute et perd son sursis.
+	 */
+	refreshLockState(playerState: PlayerGameState) : void {
+		if (!playerState.currentPiece || this.canMove(playerState, 0, 1)) {
+			playerState.groundedAt = null
+			return
+		}
+		if (playerState.groundedAt === null)
+			playerState.groundedAt = Date.now()
+	}
+	/**
+	 * Temps restant (ms) avant verrouillage, ou null si la piece peut encore descendre.
+	 * Le verrouillage n'etant evalue qu'aux ticks, l'echeance reelle est le premier tick
+	 * au-dela du sursis: c'est cette echeance-la que le client affiche, pour que sa jauge
+	 * se remplisse exactement au moment ou la piece se fige.
 	 */
 	getLockDelayMs(playerState: PlayerGameState) : number | null {
 		if (!playerState.isAlive || !playerState.currentPiece)
 			return null
 		if (this.canMove(playerState, 0, 1))
 			return null
-		return Math.max(0, this.getTickSpeed() - (Date.now() - this.lastTickAt))
+		const now = Date.now()
+		const graceEnd = (playerState.groundedAt ?? now) + this.getLockGraceMs()
+		const tickSpeed = this.getTickSpeed()
+		const ticksAhead = Math.max(1, Math.ceil((graceEnd - this.lastTickAt) / tickSpeed))
+		return Math.max(0, this.lastTickAt + ticksAhead * tickSpeed - now)
+	}
+	/**
+	 * La piece doit-elle se figer a ce tick ? Sans piece courante, oui (il faut en faire
+	 * apparaitre une). Sinon, seulement si elle a passe une frame complete au contact.
+	 */
+	private shouldLockNow(playerState: PlayerGameState) : boolean {
+		if (!playerState.currentPiece)
+			return true
+		this.refreshLockState(playerState)
+		if (playerState.groundedAt === null)
+			return false
+		return Date.now() - playerState.groundedAt >= this.getLockGraceMs()
 	}
 	getTickSpeed() : number {
 		// Sudden death: vitesse maximale des la premiere piece, pour tout le monde.
@@ -532,6 +570,9 @@ export class Game {
 			playerState.score += SOFT_DROP_POINTS_PER_CELL
 		}
 
+		// Le sursis court depuis le contact: une piece que le joueur vient de poser lui-meme
+		// obtient une frame pleine, comme celle amenee au contact par la gravite.
+		this.refreshLockState(playerState)
 		emitGameUpdate(playerState, this.state)
 		emitSpectatorForPlayer(playerState, this.state)
 	}
@@ -566,6 +607,7 @@ export class Game {
 				continue
 			playerState.currentPiece.translate(dx, dy)
 			playerState.currentPiece.shape = rotate
+			this.refreshLockState(playerState)
 			emitGameUpdate(playerState, this.state)
 			emitSpectatorForPlayer(playerState, this.state)
 			return
@@ -610,6 +652,8 @@ export class Game {
 		const nextShape = pieces[nextType]
 		playerStat.currentPiece = new Piece(currentShape, currentType)
 		playerStat.nextPiece = new Piece(nextShape, nextType)
+		// Nouvelle piece: elle n'a rien touche, le sursis de la precedente ne la suit pas.
+		playerStat.groundedAt = null
 		if (!this.canSpawn(playerStat))
 			playerStat.isAlive = false
 	}
@@ -766,9 +810,14 @@ export class Game {
 			if (!playerState.isAlive)
 				continue
 			const currentPiece = playerState.currentPiece
-			if (currentPiece && this.canMove(playerState, 0, 1))
+			if (currentPiece && this.canMove(playerState, 0, 1)) {
 				currentPiece.moveDown()
-			else if (this.lockAndSpawnNext(playerState))
+				// Le contact est date TOUT DE SUITE si la descente vient de la poser sur la
+				// pile: sinon on ne s'en apercevrait qu'au tick suivant et elle beneficierait
+				// de deux frames au lieu d'une.
+				this.refreshLockState(playerState)
+			}
+			else if (this.shouldLockNow(playerState) && this.lockAndSpawnNext(playerState))
 				// La partie vient de se terminer: checkGameOver() a deja emis game:over
 				// et coupe la gravite. Continuer la boucle enverrait des game:update
 				// APRES le game:over — les clients restants repasseraient du recap au

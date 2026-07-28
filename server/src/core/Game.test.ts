@@ -1195,26 +1195,44 @@ describe("Game", () => {
 			expect(game.getLockDelayMs(state)).toBeNull();
 		});
 
-		it("vaut un tick complet juste apres le tick qui a pose la piece", () => {
+		it("vaut une frame complete des que la piece touche la pile", () => {
 			const { game, states } = makeGame(1);
 			const state = states[0]!;
 			state.currentPiece = placedPiece(O, "O", 4, BOARD_HEIGHT - 2);
 			game.restartTickInterval();
+			game.refreshLockState(state);
 
 			expect(game.getLockDelayMs(state)).toBe(game.getTickSpeed());
 		});
 
-		// Bouger la piece ne reprogramme PAS la gravite: le sursis continue de s'ecouler,
-		// sinon le joueur pourrait la retenir indefiniment en la faisant glisser.
-		it("decroit avec le temps ecoule depuis le dernier tick", () => {
+		// Le sursis s'ecoule: bouger la piece ne le relance pas, sinon on la retiendrait
+		// indefiniment en la faisant glisser.
+		it("decroit avec le temps ecoule depuis le contact", () => {
 			const { game, states } = makeGame(1);
 			const state = states[0]!;
 			state.currentPiece = placedPiece(O, "O", 4, BOARD_HEIGHT - 2);
 			game.restartTickInterval();
+			game.refreshLockState(state);
 
 			vi.advanceTimersByTime(100);
 
 			expect(game.getLockDelayMs(state)).toBe(game.getTickSpeed() - 100);
+		});
+
+		// Le coeur du correctif: une piece posee juste avant un tick n'avait presque aucun
+		// temps d'ajustement, alors que le sujet en promet une frame entiere.
+		it("accorde une frame pleine meme quand la piece touche juste avant un tick", () => {
+			const { game, states } = makeGame(1);
+			const state = states[0]!;
+			game.restartTickInterval();
+			vi.clearAllTimers(); // les ticks sont pilotes a la main
+			const tick = game.getTickSpeed();
+			vi.advanceTimersByTime(tick - 20);
+
+			state.currentPiece = placedPiece(O, "O", 4, BOARD_HEIGHT - 2);
+			game.refreshLockState(state);
+
+			expect(game.getLockDelayMs(state)).toBeGreaterThanOrEqual(tick);
 		});
 
 		// Sans gravite en cours (partie mise en pause par une fin de partie, derive de
@@ -1224,6 +1242,7 @@ describe("Game", () => {
 			const state = states[0]!;
 			state.currentPiece = placedPiece(O, "O", 4, BOARD_HEIGHT - 2);
 			game.restartTickInterval();
+			game.refreshLockState(state);
 			// Gravite coupee (fin de partie) : le temps passe sans qu'aucun tick ne
 			// reprogramme l'echeance.
 			vi.clearAllTimers();
@@ -1419,6 +1438,9 @@ describe("Game", () => {
 			const state = states[0]!;
 			state.currentPiece = placedPiece(O, "O", 4, BOARD_HEIGHT - 2);
 
+			// Contact au 1er tick, verrouillage seulement apres une frame de sursis.
+			game.tick();
+			vi.advanceTimersByTime(game.getTickSpeed());
 			game.tick();
 
 			expect(state.board[BOARD_HEIGHT - 1]![4]).toBe("O");
@@ -1457,6 +1479,8 @@ describe("Game", () => {
 			state.currentPiece = placedPiece(O, "O", 0, BOARD_HEIGHT - 2);
 
 			game.tick();
+			vi.advanceTimersByTime(game.getTickSpeed());
+			game.tick();
 
 			expect(state.isAlive).toBe(false);
 			expect(emitGameOver).toHaveBeenCalledTimes(1);
@@ -1473,9 +1497,11 @@ describe("Game", () => {
 			survivor.currentPiece = new Piece(O, "O");
 
 			game.tick();
+			vi.advanceTimersByTime(game.getTickSpeed());
+			game.tick();
 
 			expect(victim.isAlive).toBe(false);
-			expect(survivor.currentPiece.getY()).toBe(1);
+			expect(survivor.currentPiece.getY()).toBe(2);
 			expect(emitPlayerEliminated).toHaveBeenCalledTimes(1);
 		});
 	});
