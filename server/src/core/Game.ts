@@ -14,7 +14,6 @@ import {
 	LINES_PER_LEVEL,
 	LOCK_GRACE_FACTOR,
 	LOCK_GRACE_MIN_MS,
-	MAX_LOCK_RESETS,
 	SOFT_DROP_POINTS_PER_CELL,
 	SPRINT_TARGET_LINES,
 	SUDDEN_DEATH_TICK_MS,
@@ -91,7 +90,7 @@ export class Game {
 					jokersLeft: INVISIBLE_JOKER_COUNT,
 					revealUntil: 0,
 					groundedAt: null,
-					lockResets: 0,
+					deepestY: -1,
 					garbageCleared: 0,
 					garbageServed: 0,
 					pieceIndex: 0,
@@ -309,15 +308,19 @@ export class Game {
 			playerState.groundedAt = null
 			return
 		}
-		if (this.canMove(playerState, 0, 1)) {
-			if (playerState.groundedAt !== null) {
-				playerState.lockResets++
-				if (playerState.lockResets > MAX_LOCK_RESETS)
-					return
-			}
+		// Le sursis ne repart QUE si la piece a gagne du terrain, c'est a dire atteint une
+		// rangee ou elle n'etait jamais passee. Sans ca, pivoter une piece posee la decolle
+		// (wall kick vertical), remet le compteur a zero et la fait leviter indefiniment:
+		// la partie ne peut alors plus se terminer.
+		const y = playerState.currentPiece.getY()
+		if (y > playerState.deepestY) {
+			playerState.deepestY = y
 			playerState.groundedAt = null
-			return
 		}
+		// Une piece decollee sans avoir progresse garde son horodatage de contact: elle se
+		// verrouillera des qu'elle retouchera la pile, sans nouveau sursis.
+		if (this.canMove(playerState, 0, 1))
+			return
 		if (playerState.groundedAt === null)
 			playerState.groundedAt = Date.now()
 	}
@@ -853,7 +856,8 @@ export class Game {
 		playerStat.nextPiece = new Piece(nextShape, nextType)
 		// Nouvelle piece: elle n'a rien touche, le sursis de la precedente ne la suit pas.
 		playerStat.groundedAt = null
-		playerStat.lockResets = 0
+		// -1 et non 0: la piece apparait en y=0, qui doit compter comme une progression.
+		playerStat.deepestY = -1
 		if (!this.canSpawn(playerStat))
 			playerStat.isAlive = false
 	}

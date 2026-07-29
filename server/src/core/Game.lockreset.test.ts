@@ -21,7 +21,7 @@ import { Game } from "./Game.js";
 import { Piece } from "./Piece.js";
 import { Player } from "./Player.js";
 import { Room } from "./room.js";
-import { BOARD_HEIGHT, BOARD_WIDTH, MAX_LOCK_RESETS, type Board, type Cell } from "../types/game/gameTypes.js";
+import { BOARD_HEIGHT, BOARD_WIDTH, type Board, type Cell } from "../types/game/gameTypes.js";
 import { I } from "../types/game/piecesGameTypes.js";
 
 function makeSocket(id: string): Socket {
@@ -35,22 +35,27 @@ function emptyBoard(): Board {
 }
 
 /** Non-regression : spammer la rotation faisait leviter une piece indefiniment. */
-describe("plafond de relance du sursis de verrouillage", () => {
+describe("le sursis de verrouillage ne repart que sur une vraie descente", () => {
 	beforeEach(() => { vi.useFakeTimers(); vi.clearAllMocks(); });
 	afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); });
 
-	function groundedGame() {
+	/** Partie dont la piece I est deja tombee au contact, comme l'aurait fait la gravite. */
+	function groundedGame(board: Board = emptyBoard()) {
 		const room = new Room("salle");
 		const player = new Player("joueur", makeSocket("sock0"), "avatar", "pirate");
 		room.addPlayer(player);
 		const game = new Game("classique", [player], room);
 		const state = game.getPlayerStateBySocketId("sock0")!;
-		state.board = emptyBoard();
-		const piece = new Piece(I, "I");
-		while (game.canMove(state, 0, 1)) piece.moveDown();
-		state.currentPiece = piece;
+		state.board = board;
+		state.currentPiece = new Piece(I, "I");
+		state.deepestY = -1;
+		state.groundedAt = null;
+		while (game.canMove(state, 0, 1)) {
+			state.currentPiece.moveDown();
+			game.refreshLockState(state);
+		}
 		game.refreshLockState(state);
-		return { game, state, piece, socketId: "sock0" };
+		return { game, state, piece: state.currentPiece, socketId: "sock0" };
 	}
 
 	it("verrouille la piece meme si le joueur spamme la rotation", () => {
@@ -70,33 +75,67 @@ describe("plafond de relance du sursis de verrouillage", () => {
 		expect(state.board.some((row) => row.some((cell) => cell !== 0))).toBe(true);
 	});
 
-	it("laisse le joueur ajuster: les premieres relances restent gratuites", () => {
-		const { game, state, socketId } = groundedGame();
-
-		game.rotate(socketId);
-
-		expect(state.lockResets).toBeLessThanOrEqual(1);
-		expect(state.groundedAt).toBeNull();
-	});
-
-	it("conserve l'horodatage de contact une fois le plafond atteint", () => {
+	it("un decollage sans progression ne relance pas le sursis", () => {
 		const { game, state } = groundedGame();
-		state.lockResets = MAX_LOCK_RESETS;
 		const contact = state.groundedAt;
-		// La piece a de la place sous elle (elle vient d'etre decollee par un kick).
-		state.currentPiece!.translate(0, -2);
+		expect(contact).not.toBeNull();
+		vi.advanceTimersByTime(80);
 
+		// Le wall kick vertical decolle la piece: elle peut a nouveau descendre, mais elle
+		// n'a atteint aucune rangee inedite.
+		state.currentPiece!.translate(0, -2);
 		game.refreshLockState(state);
 
 		expect(state.groundedAt).toBe(contact);
 	});
 
-	it("rend son budget de relances a chaque nouvelle piece", () => {
+	it("se verrouille des le retour au contact, sans nouveau sursis", () => {
 		const { game, state } = groundedGame();
-		state.lockResets = MAX_LOCK_RESETS;
+		const contact = state.groundedAt;
+		state.currentPiece!.translate(0, -2);
+		game.refreshLockState(state);
+		vi.advanceTimersByTime(2_000);
+
+		// La gravite la ramene sur les rangees qu'elle occupait deja.
+		while (game.canMove(state, 0, 1)) {
+			state.currentPiece!.moveDown();
+			game.refreshLockState(state);
+		}
+
+		expect(state.groundedAt).toBe(contact);
+		expect(game.getLockDelayMs(state)).toBe(0);
+	});
+
+	it("relance le sursis quand la piece atteint une rangee inedite", () => {
+		// Colonnes 4 a 9 bouchees sur les 3 dernieres rangees, colonnes 0 a 3 libres:
+		// la piece I se pose a droite, puis trouve le puits a gauche.
+		const board = emptyBoard();
+		for (let y = BOARD_HEIGHT - 3; y < BOARD_HEIGHT; y++)
+			for (let x = 4; x < BOARD_WIDTH; x++)
+				board[y]![x] = "I";
+		const { game, state, socketId } = groundedGame(board);
+		const contact = state.groundedAt;
+		const posee = state.deepestY;
+		expect(contact).not.toBeNull();
+
+		// Glisser au-dessus du puits ne suffit pas: la piece n'est pas encore descendue.
+		for (let i = 0; i < 4; i++)
+			game.move(socketId, "left");
+		expect(state.groundedAt).toBe(contact);
+
+		vi.advanceTimersByTime(100);
+		game.move(socketId, "down");
+
+		expect(state.deepestY).toBeGreaterThan(posee);
+		expect(state.groundedAt).toBeNull();
+	});
+
+	it("chaque nouvelle piece repart avec un sursis neuf", () => {
+		const { game, state } = groundedGame();
 
 		game.spawnPiece(state);
 
-		expect(state.lockResets).toBe(0);
+		expect(state.groundedAt).toBeNull();
+		expect(state.deepestY).toBe(-1);
 	});
 });

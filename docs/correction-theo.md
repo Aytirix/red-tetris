@@ -52,10 +52,10 @@ Répartition indicative en lignes encore présentes dans le code :
   verticaux** (floor kicks), dans `Game.ts`.
 - **Lock delay + lock grace** — une pièce au contact ne se fige pas instantanément, elle
   a un sursis (`getLockGraceMs()`), ce que le sujet exige.
-- **Plafond de relances du sursis** (`MAX_LOCK_RESETS = 15`) — le fix du bug de la
-  rotation spammée : sans lui, le kick vertical relançait le sursis à l'infini et la
-  pièce ne se verrouillait **jamais**. Test de non-régression :
-  `core/Game.lockreset.test.ts`.
+- **Détection du sur-place** (`deepestY`) — le fix du bug de la rotation spammée : le
+  kick vertical décollait la pièce et relançait le sursis à l'infini, elle ne se
+  verrouillait **jamais**. Le sursis ne repart maintenant que si la pièce atteint une
+  rangée où elle n'était jamais passée. Test : `core/Game.lockreset.test.ts`.
 - **Auto-repeat DAS/ARR** sur les déplacements tenus.
 - **Score de descente** : 1 point/case en soft drop, 2 en hard drop.
 - **Les 7 modes** — classique, sprint, ultra, sudden death, invisible, cascade, gruyère.

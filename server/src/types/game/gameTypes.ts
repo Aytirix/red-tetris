@@ -20,7 +20,6 @@ export const LOCK_GRACE_FACTOR = 1.75;
 // Plancher: aux niveaux les plus rapides (frame a 80 ms), 1,75 frame ne laisserait pas
 // le temps de reagir. En dessous de ce seuil le jeu devient injouable, pas difficile.
 export const LOCK_GRACE_MIN_MS = 250;
-export const MAX_LOCK_RESETS = 15;
 
 // Sprint: premier a nettoyer 40 lignes.
 export const SPRINT_TARGET_LINES = 40;
@@ -84,8 +83,9 @@ export type PlayerGameState = {
 	jokersLeft: number;
 	revealUntil: number;
 	groundedAt: number | null;
-	// Sursis deja consommes par la piece courante (voir MAX_LOCK_RESETS).
-	lockResets: number;
+	// Rangee la plus basse jamais atteinte par la piece courante. Sert a distinguer une
+	// vraie descente d'un sur-place: seule la premiere relance le sursis.
+	deepestY: number;
 	garbageCleared: number;
 	garbageServed: number;
 	pieceIndex: number
