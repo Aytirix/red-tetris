@@ -22,7 +22,7 @@ export const GAME_MODE_LABELS: Record<GameMode, string> = {
 export const GAME_MODE_HINTS: Record<GameMode, string> = {
 	classique: "Règles de base : le dernier debout gagne.",
 	sprint: "Premier à 40 lignes.",
-	ultra: "2 minutes, meilleur scorssse.",
+	ultra: "2 minutes, meilleur score.",
 	suddendeath: "Vitesse maximale dès la première pièce.",
 	invisible: "Une pièce posée s'efface en 3 s… mais reste solide.",
 	cascade: "Les blocs retombent après un nettoyage : enchaîne les chaînes.",
@@ -55,7 +55,7 @@ export const GAME_MODE_RULES: Record<GameMode, string[]> = {
 	sprint: [
 		"Objectif : être le premier à nettoyer 40 lignes.",
 		"⚠ Nécessite au moins 2 joueurs (c'est une course).",
-		"La vitesse de chute augmente avec le niveau.",
+		"Vitesse de chute constante : à égalité pour tout le monde.",
 	],
 	ultra: [
 		"Partie chronométrée : 2 minutes.",
@@ -77,7 +77,7 @@ export const GAME_MODE_RULES: Record<GameMode, string[]> = {
 		"Une retombée peut compléter de nouvelles lignes : c'est une chaîne.",
 		"Chaque maillon multiplie le score : 2ᵉ salve ×2, 3ᵉ ×3, et ainsi de suite.",
 		"Les pièces tombent entières : un pont posé garde le trou qu'il recouvre.",
-		"Une chaîne envoie autant de lignes de pénalité que son total nettoyé.",
+		"Les lignes de toute la chaîne comptent ensemble pour la pénalité envoyée.",
 	],
 	cheese: [
 		"Le plateau démarre avec 10 rangées trouées d'une seule case.",

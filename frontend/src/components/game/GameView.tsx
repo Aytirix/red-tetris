@@ -218,23 +218,28 @@ export default function GameView({ state, roomName, eliminated = false, onElimin
 		const MOVE_REPEAT_DELAY = 120;
 		const MOVE_REPEAT_RATE = 35;
 
-		/** Répétition d'UNE action tenue : délai initial puis cadence fixe. */
+		/**
+		 * Répétition d'UNE action tenue : délai initial puis cadence fixe.
+		 *
+		 * `stop` est une fonction NOMMÉE, appelée directement par `start` : le sujet
+		 * interdit le mot-clé de réception d'objet côté client, donc pas d'appel de
+		 * méthode sur l'objet renvoyé — deux closures qui partagent les mêmes timers.
+		 */
 		function makeRepeater(fire: () => void, delayMs: number, rateMs: number) {
 			let delayId = 0;
 			let intervalId = 0;
-			return {
-				start() {
-					this.stop();
-					fire();
-					delayId = window.setTimeout(() => {
-						intervalId = window.setInterval(fire, rateMs);
-					}, delayMs);
-				},
-				stop() {
-					if (delayId) { window.clearTimeout(delayId); delayId = 0; }
-					if (intervalId) { window.clearInterval(intervalId); intervalId = 0; }
-				},
+			const stop = () => {
+				if (delayId) { window.clearTimeout(delayId); delayId = 0; }
+				if (intervalId) { window.clearInterval(intervalId); intervalId = 0; }
 			};
+			const start = () => {
+				stop();
+				fire();
+				delayId = window.setTimeout(() => {
+					intervalId = window.setInterval(fire, rateMs);
+				}, delayMs);
+			};
+			return { start, stop };
 		}
 
 		// Toutes les actions « tenues ». Les autres (chute instantanée, joker) sont

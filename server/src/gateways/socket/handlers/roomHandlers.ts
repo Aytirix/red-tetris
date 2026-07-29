@@ -1,5 +1,5 @@
 import type { Socket } from "socket.io";
-import { isValidRoomJoinPayload, isValidRoomKickPayload, isValidRoomModePayload, isValidRoomName, isValidRoomSetPrivatePayload, isValidSubscribeSpectatorPayload } from "../validators/validateRoomEvent.js";
+import { isEmptyPayload, isValidRoomJoinPayload, isValidRoomKickPayload, isValidRoomModePayload, isValidRoomName, isValidRoomSetPrivatePayload, isValidSubscribeSpectatorPayload } from "../validators/validateRoomEvent.js";
 import { emitError } from "../emitters/systemEmitters.js";
 import { roomSocketStore } from "../roomSocketStore.js";
 import { createRoom, getRoom } from "../../../services/roomService.js";
@@ -107,7 +107,7 @@ export async function handlerRoomJoin(socket: Socket, payload: unknown): Promise
 		}
 
 export function handlerRoomSubscribe(socket: Socket, payload: unknown) : void {
-	if (!payload) {
+	if (isEmptyPayload(payload)) {
 		const session = userSocketStore.get(socket.id)
 		if (session)
 			session.subscribe = true;
@@ -116,7 +116,7 @@ export function handlerRoomSubscribe(socket: Socket, payload: unknown) : void {
 }
 
 export function handlerRoomUnsubscribe(socket: Socket, payload: unknown) : void {
-	if (!payload) {
+	if (isEmptyPayload(payload)) {
 		const session = userSocketStore.get(socket.id)
 		if (session)
 			session.subscribe = false
@@ -143,7 +143,7 @@ function leaveRoom(socket: Socket, room: Room) : boolean {
 }
 
 export function handlerRoomLeave(socket: Socket, payload: unknown) : void {
-	if (!payload) {
+	if (isEmptyPayload(payload)) {
 		const room = getRoom(socket)
 		if (!room)
 			return
@@ -296,7 +296,7 @@ function startGameWithCountdown(room: Room) : void {
 }
 
 export function handleRoomStart(socket: Socket, payload: unknown) : void {
-	if (!payload) {
+	if (isEmptyPayload(payload)) {
 		const room = getRoom(socket)
 		if (!room)
 			return
@@ -325,7 +325,7 @@ export function handleRoomStart(socket: Socket, payload: unknown) : void {
 // a room:start, fonctionne meme si une partie tourne deja: on l'arrete proprement (sans
 // game:over) puis on redemarre avec le meme mode. Reserve a l'hote (le joueur solo l'est).
 export function handleRoomRestart(socket: Socket, payload: unknown) : void {
-	if (payload)
+	if (!isEmptyPayload(payload))
 		return
 	const room = getRoom(socket)
 	if (!room)
@@ -374,7 +374,7 @@ export function handleMove(socket: Socket, payload: unknown) : void {
 export function handleJoker(socket: Socket, payload: unknown) : void {
 	if (spectatorSocketStore.has(socket.id))
 		return
-	if (payload)
+	if (!isEmptyPayload(payload))
 		return
 	const room = getRoom(socket)
 	if (!room)
@@ -394,7 +394,7 @@ export function handleJoker(socket: Socket, payload: unknown) : void {
 export function handleRotate(socket: Socket, payload: unknown) : void {
 	if (spectatorSocketStore.has(socket.id))
 		return
-	if (!payload) {
+	if (isEmptyPayload(payload)) {
 		const room = getRoom(socket)
 		if (!room)
 			return
@@ -408,7 +408,7 @@ export function handleRotate(socket: Socket, payload: unknown) : void {
 export function handleDrop(socket: Socket, payload: unknown) : void {
 	if (spectatorSocketStore.has(socket.id))
 		return
-	if (!payload) {
+	if (isEmptyPayload(payload)) {
 		const room = getRoom(socket)
 		if (!room)
 			return
@@ -506,6 +506,6 @@ export function handleSubscribeSpectator(socket: Socket, payload: unknown) : voi
 }
 
 export function handleUnsubscribeSpectator(socket: Socket, payload: unknown) : void {
-	if (!payload)
+	if (isEmptyPayload(payload))
 		spectatorSocketStore.delete(socket.id)
 }

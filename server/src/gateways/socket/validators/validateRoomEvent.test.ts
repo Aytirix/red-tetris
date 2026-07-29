@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+	isEmptyPayload,
 	isValidRoomJoinPayload,
 	isValidRoomKickPayload,
 	isValidRoomModePayload,
@@ -9,6 +10,25 @@ import {
 } from "./validateRoomEvent.js";
 
 describe("validateRoomEvent", () => {
+	describe("isEmptyPayload", () => {
+		it("accepte les trois formes d'un evenement sans argument", () => {
+			expect(isEmptyPayload(undefined)).toBe(true);
+			expect(isEmptyPayload(null)).toBe(true);
+			// `socket.emit("room:start", {})` est aussi legitime que `socket.emit("room:start")`:
+			// un objet vide ne porte aucune donnee, il ne doit plus etre rejete en silence.
+			expect(isEmptyPayload({})).toBe(true);
+		});
+
+		it("refuse tout payload porteur de donnees", () => {
+			expect(isEmptyPayload({ anything: true })).toBe(false);
+			expect(isEmptyPayload([])).toBe(false);
+			expect(isEmptyPayload([1])).toBe(false);
+			expect(isEmptyPayload("start")).toBe(false);
+			expect(isEmptyPayload(0)).toBe(false);
+			expect(isEmptyPayload(false)).toBe(false);
+		});
+	});
+
 	describe("isValidRoomName", () => {
 		it("accepts alphanumeric names and underscores up to 15 chars", () => {
 			expect(isValidRoomName("salle1")).toBe(true);

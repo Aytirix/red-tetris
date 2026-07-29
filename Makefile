@@ -11,7 +11,7 @@ export GID
 
 BACKEND_DEV := backend-dev
 
-.PHONY: help dev dev-build dev-down dev-logs prod prod-build prod-down prod-logs down clean test test-server test-front test-watch-server test-watch-front node_modules-server node_modules-front db-reset db-seed db-seed-berrys
+.PHONY: help dev dev-build dev-down dev-logs prod prod-build prod-down prod-logs down clean test test-server test-front test-watch-server test-watch-front node_modules-server node_modules-front prisma-client db-reset db-seed db-seed-berrys
 
 help: ## Affiche cette aide
 	@printf "\n"
@@ -75,7 +75,7 @@ test: ## Lance les deux suites de tests + couverture (serveur puis frontend)
 	@$(MAKE) --no-print-directory test-front
 	@printf "\n\033[1;32mLes deux suites sont vertes.\033[0m\n"
 
-test-server: node_modules-server ## Tests + couverture du serveur uniquement
+test-server: node_modules-server prisma-client ## Tests + couverture du serveur uniquement
 	@printf "\n\033[1;38;5;216m>>> Tests serveur\033[0m\n"
 	cd server && npm run test:coverage
 
@@ -83,7 +83,7 @@ test-front: node_modules-front ## Tests + couverture du frontend uniquement
 	@printf "\n\033[1;38;5;216m>>> Tests frontend\033[0m\n"
 	cd frontend && npm run test:coverage
 
-test-watch-server: node_modules-server ## Tests du serveur en mode watch
+test-watch-server: node_modules-server prisma-client ## Tests du serveur en mode watch
 	cd server && npm run test:watch
 
 test-watch-front: node_modules-front ## Tests du frontend en mode watch
@@ -96,6 +96,13 @@ node_modules-server:
 
 node_modules-front:
 	@[ -d frontend/node_modules ] || (printf "Installation des dependances frontend...\n" && cd frontend && npm ci)
+
+# Le client Prisma est GENERE dans server/src/generated (non versionne, comme tout code
+# genere). Sans lui, `import ... from "../generated/prisma/client.js"` ne resout pas et
+# TOUTE la suite serveur echoue sur un clone frais. `npm ci` le produit desormais via le
+# postinstall, mais pas quand node_modules est deja la: on le regenere donc au besoin.
+prisma-client: node_modules-server
+	@[ -d server/src/generated/prisma ] || (printf "Generation du client Prisma...\n" && cd server && npx prisma generate)
 
 db-reset: ## Reset la base (drop + rejoue les migrations) puis la repeuple avec le seed
 	@printf "\n\033[1;38;5;216m>>> Reset de la base + seed\033[0m\n"
