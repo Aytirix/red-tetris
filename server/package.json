@@ -6,7 +6,6 @@
     "node": ">=22.12"
   },
   "scripts": {
-    "postinstall": "prisma generate",
     "dev": "tsx watch src/server.ts",
     "start": "tsx src/server.ts",
     "build": "tsc",

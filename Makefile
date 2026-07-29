@@ -99,8 +99,9 @@ node_modules-front:
 
 # Le client Prisma est GENERE dans server/src/generated (non versionne, comme tout code
 # genere). Sans lui, `import ... from "../generated/prisma/client.js"` ne resout pas et
-# TOUTE la suite serveur echoue sur un clone frais. `npm ci` le produit desormais via le
-# postinstall, mais pas quand node_modules est deja la: on le regenere donc au besoin.
+# TOUTE la suite serveur echoue sur un clone frais. On ne peut pas le generer via un
+# postinstall: dans les images Docker, `npm install` tourne AVANT que prisma/schema.prisma
+# ne soit copie, et le build echoue. On le genere donc ici, une fois les sources presentes.
 prisma-client: node_modules-server
 	@[ -d server/src/generated/prisma ] || (printf "Generation du client Prisma...\n" && cd server && npx prisma generate)
 

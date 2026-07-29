@@ -212,5 +212,8 @@ requête ne touche la base pendant le jeu.
 
 - **[GAMEPLAY.md](GAMEPLAY.md)** — mécaniques détaillées, 7 modes de jeu, barème de
   points, pénalités, boutique, statistiques.
+- **[docs/correction-gab.md](docs/correction-gab.md)** et
+  **[docs/correction-theo.md](docs/correction-theo.md)** — qui a fait quoi, technos et
+  questions attendues en soutenance.
 - `server/ws-docs.json` — protocole websocket complet (rendu dans l'app en dev).
 - `sujet/fr.subject.pdf`, `sujet/en.subject.pdf` — l'énoncé.
