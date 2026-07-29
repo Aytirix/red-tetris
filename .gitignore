@@ -28,3 +28,8 @@ server/coverage
 .DS_Store
 graphify-out/
 .graphifyignore
+
+CLAUDE.md
+AGENTS.md
+.claude/
+.codex/
