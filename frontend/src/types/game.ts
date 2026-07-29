@@ -56,35 +56,40 @@ export const GAME_MODE_RULES: Record<GameMode, string[]> = {
 		"Objectif : être le premier à nettoyer 40 lignes.",
 		"⚠ Nécessite au moins 2 joueurs (c'est une course).",
 		"La vitesse de chute augmente avec le niveau.",
+		"Nettoyer n lignes d'un coup envoie n-1 lignes de pénalité aux adversaires.",
 	],
 	ultra: [
 		"Partie chronométrée : 2 minutes.",
 		"Le meilleur score à la fin du temps l'emporte.",
 		"Vise les Tetris (4 lignes d'un coup) : 800 points, contre 400 pour les mêmes lignes faites une par une.",
+		"Aucune ligne de pénalité n'est envoyée aux adversaires : chacun joue son plateau.",
 	],
 	suddendeath: [
 		"Vitesse maximale dès la première pièce.",
 		"Une seule vie : le plus endurant gagne.",
 		"Réflexes indispensables.",
+		"Aucune ligne de pénalité n'est envoyée aux adversaires : chacun joue son plateau.",
 	],
 	invisible: [
 		"Une pièce posée s'efface après 3 s… mais reste solide.",
 		"Chaque ligne complétée redonne 2 s de visibilité (cumulables).",
 		"3 jokers pour révéler le plateau à la demande.",
+		"Aucune ligne de pénalité n'est envoyée aux adversaires : chacun joue son plateau.",
 	],
 	cascade: [
 		"Après chaque nettoyage, les blocs qui ne reposent plus sur rien retombent.",
 		"Une retombée peut compléter de nouvelles lignes : c'est une chaîne.",
 		"Chaque maillon multiplie le score : 2ᵉ salve ×2, 3ᵉ ×3, et ainsi de suite.",
 		"Les pièces tombent entières : un pont posé garde le trou qu'il recouvre.",
-		"Une chaîne envoie autant de lignes de pénalité que son total nettoyé.",
+		"Aucune ligne de pénalité n'est envoyée aux adversaires : chacun joue son plateau.",
 	],
 	cheese: [
-		"Le plateau démarre avec 10 rangées trouées d'une seule case.",
+		"Le plateau démarre avec 5 rangées trouées d'une seule case.",
 		"Objectif : creuser les 20 rangées de la partie.",
 		"Toutes les 2 rangées creusées, le plateau remonte d'une nouvelle rangée.",
 		"Le compteur « À creuser » décompte les 20 rangées, celles en coulisse comprises.",
 		"À plusieurs, c'est une course : le premier à finir gagne.",
+		"Aucune ligne de pénalité n'est envoyée aux adversaires : chacun creuse son plateau.",
 	],
 };
 

@@ -340,7 +340,7 @@ describe("mode cascade", () => {
 		});
 	});
 
-	it("envoie a l'adversaire les lignes de TOUTE la chaine", () => {
+	it("n'envoie AUCUNE ligne de penalite, meme sur une chaine entiere", () => {
 		const room = new Room("salle");
 		const players = [
 			new Player("joueur0", makeSocket("sock0"), "avatar", "pirate"),
@@ -360,8 +360,9 @@ describe("mode cascade", () => {
 		const cleared = game.clearLines(attacker);
 		game.addPenaltyToOpponents(attacker, cleared - 1);
 
-		// 2 lignes au total sur la chaine -> 1 ligne de penalite (regle n-1 du sujet).
-		expect(victim.board[BOARD_HEIGHT - 1]!.every((cell) => cell === "penalty")).toBe(true);
-		expect(victim.board[BOARD_HEIGHT - 2]!.every((cell) => cell === 0)).toBe(true);
+		// La chaine nettoie bien 2 lignes (donc n-1 = 1 en mode classique), mais cascade
+		// ne fait pas partie de PENALTY_SENDING_MODES: le plateau adverse reste vierge.
+		expect(cleared).toBe(2);
+		expect(victim.board.every((row) => row.every((cell) => cell === 0))).toBe(true);
 	});
 });

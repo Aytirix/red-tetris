@@ -13,6 +13,19 @@ export function isGameMode(value: string): value is GameMode {
 	return (GAME_MODES as readonly string[]).includes(value);
 }
 
+// Modes ou nettoyer n lignes en envoie n-1 chez les adversaires. Les AUTRES (ultra,
+// suddendeath, invisible, cascade, cheese) se jouent sur son propre plateau: leur
+// enjeu est le chrono, l'endurance, la memoire, la chaine ou le creusage, et une
+// pile poussee par un adversaire ne ferait que brouiller cette mesure. Leurs regles
+// annoncees dans le lobby disent explicitement qu'aucune ligne n'est envoyee: cette
+// liste est ce qui rend cette promesse vraie, et doit donc rester alignee sur
+// GAME_MODE_RULES (frontend/src/types/game.ts).
+export const PENALTY_SENDING_MODES: readonly GameMode[] = ["classique", "sprint"];
+
+export function sendsPenaltyLines(mode: GameMode): boolean {
+	return PENALTY_SENDING_MODES.includes(mode);
+}
+
 // Bareme de score du Tetris Guideline (indexe par nombre de lignes nettoyees d'un
 // SEUL coup, 0 a 4), multiplie par le niveau. La prime aux multi-lignes est la
 // mecanique centrale du jeu: un Tetris rapporte 8x un Single, pas 4x, ce qui
@@ -60,8 +73,11 @@ export const INVISIBLE_JOKER_REVEAL_MS = 3_000;
 // gagner la course.
 export const CHEESE_TOTAL_GARBAGE = 20;
 // Cheese: combien sont posees sur le plateau au coup d'envoi. Les autres attendent
-// leur tour: le plateau ne peut pas commencer avec 20 rangees sur 20.
-export const CHEESE_START_GARBAGE = 10;
+// leur tour: le plateau ne peut pas commencer avec 20 rangees sur 20. A 10 la pile
+// occupait la moitie de l'ecran des la premiere piece — plus assez de hauteur pour
+// manoeuvrer une I a la verticale; 5 laisse un plateau jouable tout en gardant la
+// pression du mode.
+export const CHEESE_START_GARBAGE = 5;
 // Cheese: lignes de gruyere a creuser pour que le plateau remonte d'une rangee.
 // La cadence est plus lente que la destruction (2 pour 1): le joueur gagne du
 // terrain en avancant, sinon la course serait interminable.

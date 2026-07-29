@@ -15,6 +15,7 @@ import {
 	LOCK_GRACE_FACTOR,
 	LOCK_GRACE_MIN_MS,
 	SOFT_DROP_POINTS_PER_CELL,
+	sendsPenaltyLines,
 	SPRINT_TARGET_LINES,
 	SUDDEN_DEATH_TICK_MS,
 	ULTRA_DURATION_MS,
@@ -873,7 +874,10 @@ export class Game {
 		)
 	}
 	addPenaltyToOpponents(sourcePlayerState: PlayerGameState, penaltyCount: number) : void {
-		if (this.isSolo() || penaltyCount <= 0)
+		// Le filtre par mode est ICI et non chez l'appelant: c'est le seul point d'entree
+		// de l'attaque, donc la seule garantie qu'aucun chemin (present ou futur) ne
+		// puisse envoyer des lignes dans un mode qui promet le contraire.
+		if (!sendsPenaltyLines(this.mode) || this.isSolo() || penaltyCount <= 0)
 			return
 		// Une penalite peut TUER (pile poussee au-dela du plafond): on collecte les
 		// victimes pour les notifier comme n'importe quelle elimination.
@@ -1171,7 +1175,8 @@ export class Game {
 		this.lockPiece(playerState)
 		const clearedLines = this.clearLines(playerState)
 		// Sujet : les adversaires reçoivent n-1 lignes de pénalité (0 pour 1 ligne
-		// complétée). Le garde `<= 0` dans addPenaltyToOpponents absorbe le cas 0.
+		// complétée). Le garde `<= 0` dans addPenaltyToOpponents absorbe le cas 0, et
+		// son garde de mode les modes qui n'envoient rien (voir PENALTY_SENDING_MODES).
 		this.addPenaltyToOpponents(playerState, clearedLines - 1)
 		playerState.pieceIndex ++
 		this.spawnPiece(playerState)

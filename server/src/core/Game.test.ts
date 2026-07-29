@@ -652,6 +652,39 @@ describe("Game", () => {
 			expect(emitPlayerEliminated).toHaveBeenCalled();
 		});
 
+		it.each(["ultra", "suddendeath", "invisible", "cascade", "cheese"] as const)(
+			"n'envoie aucune ligne de penalite en mode %s",
+			(mode) => {
+				const { game, states } = makeGame(2, mode);
+				const [attacker, victim] = states as [PlayerGameState, PlayerGameState];
+				attacker.board = emptyBoard();
+				attacker.board[BOARD_HEIGHT - 1] = fullRow([4, 5]);
+				attacker.board[BOARD_HEIGHT - 2] = fullRow([4, 5]);
+				attacker.currentPiece = placedPiece(O, "O", 4, BOARD_HEIGHT - 2);
+				victim.board = emptyBoard();
+
+				game.lockAndSpawnNext(attacker);
+
+				// 2 lignes completees -> 1 penalite en classique, 0 ici: ces modes se jouent
+				// sur son propre plateau (regles annoncees au lobby).
+				expect(victim.board.every((row) => row.every((cell) => cell === 0))).toBe(true);
+			},
+		);
+
+		it("envoie les penalites en mode sprint (course avec attaques)", () => {
+			const { game, states } = makeGame(2, "sprint");
+			const [attacker, victim] = states as [PlayerGameState, PlayerGameState];
+			attacker.board = emptyBoard();
+			attacker.board[BOARD_HEIGHT - 1] = fullRow([4, 5]);
+			attacker.board[BOARD_HEIGHT - 2] = fullRow([4, 5]);
+			attacker.currentPiece = placedPiece(O, "O", 4, BOARD_HEIGHT - 2);
+			victim.board = emptyBoard();
+
+			game.lockAndSpawnNext(attacker);
+
+			expect(victim.board[BOARD_HEIGHT - 1]!.every((cell) => cell === "penalty")).toBe(true);
+		});
+
 		it("does not send penalty in solo mode", () => {
 			const { game, states } = makeGame(1);
 			const state = states[0]!;

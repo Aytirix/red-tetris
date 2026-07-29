@@ -15,6 +15,15 @@ type TransitionContextValue = {
 
 const TransitionContext = createContext<TransitionContextValue | null>(null);
 
+// Les nuages de DÉMARRAGE (index.html) recouvrent déjà l'écran au premier chargement
+// et ne sont retirés du DOM qu'une fois leur ouverture terminée. Tant qu'ils sont là,
+// rejouer un cycle complet ferait DEUX animations pour une seule arrivée sur le site
+// (cas typique: une URL qui redirige aussitôt — pseudo pris, partie privée…).
+function bootCloudsStillOnScreen(): boolean {
+	if (typeof document === "undefined") return false;
+	return document.getElementById("boot-clouds") !== null;
+}
+
 export function TransitionProvider({ children }: { children: ReactNode }) {
 	const navigate = useNavigate();
 	const [phase, setPhase] = useState<TransitionPhase>("idle");
@@ -29,11 +38,30 @@ export function TransitionProvider({ children }: { children: ReactNode }) {
 	}, []);
 
 	const navigateWithClouds = useCallback((to: To, options?: NavigateOptions) => {
-		// Une transition déjà en cours ne doit pas en déclencher une autre.
-		if (phaseRef.current !== "idle") return;
+		// Écran déjà masqué par les nuages de démarrage: on navigue DESSOUS, sans
+		// rejouer de cycle. L'utilisateur ne voit qu'une seule animation.
+		if (bootCloudsStillOnScreen()) {
+			navigate(to, options);
+			return;
+		}
+		// Couverture en cours: elle navigue à sa fin, il suffit de lui changer sa
+		// destination. Repartir de zéro rejouerait l'animation depuis le début.
+		if (phaseRef.current === "cover") {
+			pending.current = { to, options };
+			return;
+		}
+		// Dissipation en cours: la page qu'on veut déjà quitter vient d'être montée
+		// sous les nuages. On la remplace SOUS eux, tant qu'ils masquent encore.
+		// Sans ça la demande était purement et simplement perdue — c'est ce qui
+		// laissait un joueur bloqué sur une room refusée (privée / pleine) après une
+		// redirection depuis l'écran de pseudo.
+		if (phaseRef.current === "reveal") {
+			navigate(to, options);
+			return;
+		}
 		pending.current = { to, options };
 		setPhaseSafe("cover");
-	}, [setPhaseSafe]);
+	}, [navigate, setPhaseSafe]);
 
 	// Fin de la couverture : l'écran est masqué, on effectue la vraie navigation
 	// puis on lance la dissipation.

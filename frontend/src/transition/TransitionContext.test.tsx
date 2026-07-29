@@ -8,13 +8,21 @@ function Probe() {
 	return <button onClick={() => go("/next")}>go</button>;
 }
 
+// Bouton présent sur /next: sert à demander une navigation ALORS QUE la dissipation
+// est encore en cours (cas d'une room refusée juste après l'arrivée sur la page).
+function ProbeAway() {
+	const go = useCloudNavigate();
+	return <button onClick={() => go("/away")}>quitter</button>;
+}
+
 function setup() {
 	return render(
 		<MemoryRouter initialEntries={["/"]}>
 			<TransitionProvider>
 				<Routes>
 					<Route path="/" element={<><Probe /><p>home</p></>} />
-					<Route path="/next" element={<p>next</p>} />
+					<Route path="/next" element={<><ProbeAway /><p>next</p></>} />
+					<Route path="/away" element={<p>away</p>} />
 				</Routes>
 			</TransitionProvider>
 		</MemoryRouter>,
@@ -60,5 +68,41 @@ describe("TransitionProvider / useCloudNavigate", () => {
 
 		fireEvent.animationEnd(veil(container));
 		expect(screen.getByText("next")).toBeInTheDocument();
+	});
+
+	it("navigue quand même si la demande arrive pendant la dissipation", () => {
+		const { container } = setup();
+
+		fireEvent.click(screen.getByText("go"));
+		fireEvent.animationEnd(veil(container));
+		expect(container.querySelector(".cloud-transition--reveal")).not.toBeNull();
+
+		// Demande émise sous les nuages qui s'écartent (room refusée, expulsion…):
+		// elle doit aboutir, pas être avalée.
+		fireEvent.click(screen.getByText("quitter"));
+		expect(screen.getByText("away")).toBeInTheDocument();
+		expect(screen.queryByText("next")).toBeNull();
+
+		fireEvent.animationEnd(veil(container));
+		expect(container.querySelector(".cloud-transition")).toBeNull();
+		expect(screen.getByText("away")).toBeInTheDocument();
+	});
+
+	it("ne rejoue pas de cycle tant que les nuages de démarrage sont à l'écran", () => {
+		const boot = document.createElement("div");
+		boot.id = "boot-clouds";
+		document.body.appendChild(boot);
+		try {
+			const { container } = setup();
+
+			fireEvent.click(screen.getByText("go"));
+
+			// L'écran est déjà masqué par l'overlay de démarrage: navigation immédiate,
+			// aucune seconde animation.
+			expect(screen.getByText("next")).toBeInTheDocument();
+			expect(container.querySelector(".cloud-transition")).toBeNull();
+		} finally {
+			boot.remove();
+		}
 	});
 });
