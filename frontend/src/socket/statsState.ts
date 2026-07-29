@@ -1,6 +1,3 @@
-// Revalidation défensive du payload `stats:State` (back -> front). On ne fait jamais
-// confiance à la forme reçue : chaque champ manquant/invalide retombe sur une valeur
-// sûre pour que l'UI ne casse jamais.
 
 export type FactionName = "marine" | "pirate";
 

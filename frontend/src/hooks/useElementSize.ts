@@ -2,16 +2,7 @@ import { useEffect, useState, type RefObject } from "react";
 
 export type ElementSize = { width: number; height: number };
 
-/**
- * Taille intérieure (content box) d'un élément, suivie via ResizeObserver.
- *
- * Sert à dimensionner le plateau sur la place RÉELLEMENT disponible plutôt que sur
- * une estimation en dur du HUD et des marges : quel que soit l'écran, le plateau
- * tient sans faire défiler la page.
- *
- * Renvoie `null` tant que rien n'a été mesuré (premier rendu) ou si l'environnement
- * n'a pas de ResizeObserver (jsdom, SSR) — l'appelant retombe alors sur son estimation.
- */
+/** Taille intérieure (content box) d'un élément, suivie via ResizeObserver. */
 export function useElementSize<T extends Element>(ref: RefObject<T | null>): ElementSize | null {
 	const [size, setSize] = useState<ElementSize | null>(null);
 

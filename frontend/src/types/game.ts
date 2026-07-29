@@ -1,9 +1,4 @@
 export type PieceType = "I" | "J" | "L" | "O" | "S" | "T" | "Z";
-
-// Modes de jeu (doit rester aligne sur GAME_MODES cote serveur).
-// Nombre de jokers du mode invisible. DOIT rester aligne sur INVISIBLE_JOKER_COUNT
-// (server/src/types/game/gameTypes.ts): sert a borner la valeur recue et a afficher
-// les etoiles restantes.
 export const MAX_JOKERS = 3;
 
 export const GAME_MODES = ["classique", "sprint", "ultra", "suddendeath", "invisible", "cascade", "cheese"] as const;
@@ -28,10 +23,6 @@ export const GAME_MODE_HINTS: Record<GameMode, string> = {
 	cascade: "Les blocs retombent après un nettoyage : enchaîne les chaînes.",
 	cheese: "20 rangées trouées à creuser, le plateau remonte.",
 };
-
-// Nombre minimum de joueurs pour lancer un mode. Sprint est une COURSE : il n'a de sens
-// qu'à plusieurs. Le serveur applique la même règle (autoritatif) ; ceci ne fait que
-// désactiver le bouton côté client. DOIT rester aligné sur le serveur.
 export const GAME_MODE_MIN_PLAYERS: Record<GameMode, number> = {
 	classique: 1,
 	sprint: 2,
@@ -91,11 +82,6 @@ export const GAME_MODE_RULES: Record<GameMode, string[]> = {
 export function isGameMode(value: string): value is GameMode {
 	return (GAME_MODES as readonly string[]).includes(value);
 }
-
-// "spectrum": cellule du spectre d'un adversaire (hauteur de pile, sans couleur).
-// Un joueur ne recoit que ca de ses adversaires; un spectateur recoit les vrais plateaux.
-// "garbage" : rangée trouée du mode Gruyère — grise comme une pénalité, mais
-// nettoyable (c'est l'objectif du mode, pas une sanction).
 export type GameBoardCell = 0 | PieceType | "penalty" | "spectrum" | "garbage";
 
 export type GameBoard = GameBoardCell[][];
@@ -112,12 +98,7 @@ export type GamePiece = {
 
 export type GhostCell = { x: number; y: number };
 
-/**
- * Mode Cascade : blocs qui viennent de retomber. Le plateau reçu les montre déjà
- * ARRIVÉS ; sans la distance parcourue on ne pourrait que les faire apparaître d'un
- * coup. `id` ne change qu'à une nouvelle retombée : l'info reste dans les frames
- * suivantes, et c'est lui qui évite de rejouer l'animation à chaque frame.
- */
+/** Mode Cascade : retombee de blocs a animer. */
 export type CascadeFall = {
 	id: number;
 	/** Position d'ARRIVÉE de la case, et nombre de rangées qu'elle vient de descendre. */
@@ -148,17 +129,9 @@ export type GameStatePayload = {
 	jokersLeft: number;
 	/** Cosmetique du proprietaire du plateau affiche (thème de pièces), null si inconnu. */
 	theme: string | null;
-	/**
-	 * Sursis (ms) avant que la pièce posée sur la pile ne se verrouille, null si elle
-	 * peut encore descendre. Le serveur le calcule depuis son dernier tick : le joueur
-	 * a un tick complet pour glisser la pièce, et bouger ne le repousse pas.
-	 */
+	/** Sursis (ms) avant que la pièce posée sur la pile ne se verrouille, null si elle peut encore descendre. */
 	lockInMs: number | null;
-	/**
-	 * Mode Gruyère : rangées trouées qu'il reste à creuser (celles déjà servies ET
-	 * celles encore en coulisse), null dans les autres modes. Ne remonte jamais :
-	 * une remontée du plateau ne fait que dévoiler du gruyère déjà compté.
-	 */
+	/** Mode Gruyere : rangees restant a creuser, null dans les autres modes. */
 	garbageLeft: number | null;
 	/** Mode Cascade : retombée à animer, null s'il n'y en a pas eu. */
 	cascade: CascadeFall | null;

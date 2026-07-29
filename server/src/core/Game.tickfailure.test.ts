@@ -1,10 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { Socket } from "socket.io";
-
-// B3: un throw depuis le callback de setInterval n'a aucun appelant pour le
-// rattraper -> uncaughtException -> process tue -> TOUTES les parties simultanees
-// tombent. On force donc un emitter a lever et on verifie que la panne reste
-// confinee a la partie fautive.
 vi.mock("../gateways/socket/emitters/gameEmitters.js", async (importOriginal) => {
 	const actual = await importOriginal<typeof import("../gateways/socket/emitters/gameEmitters.js")>();
 	return {
@@ -36,10 +31,6 @@ function makeSocket(id: string): Socket {
 		leave: vi.fn(),
 	} as unknown as Socket;
 }
-
-// `prefix` isole les socketId d'une partie a l'autre: deux parties simultanees ne
-// doivent PAS partager d'identifiants, sinon le test de confinement ci-dessous ne
-// distinguerait pas la partie fautive de la partie saine.
 function makeGame(playerCount = 2, prefix = "sock") {
 	const room = new Room(`salle-${prefix}`);
 	const players = Array.from(
@@ -115,11 +106,6 @@ describe("Game — resilience du tick (B3)", () => {
 
 		expect(emitGameOver).toHaveBeenCalledWith(expect.anything(), null);
 	});
-
-	// Regression: checkGameOver() emet le bon game:over (avec vainqueur) puis LEVE
-	// dans son try/finally sans catch. L'exception remontait jusqu'au catch du tick,
-	// qui reemettait un game:over sans vainqueur: le recap « X gagne » deja affiche
-	// etait ecrase, alors que les berrys avaient bien ete credites a X.
 	it("ne reemet PAS de game:over quand la partie etait deja terminee", () => {
 		const { game, players } = makeGame();
 		// P1 mort: le verrouillage de P0 termine la partie -> checkGameOver s'execute.
@@ -136,11 +122,6 @@ describe("Game — resilience du tick (B3)", () => {
 
 		expect(vi.mocked(emitGameOver).mock.calls).toHaveLength(1);
 	});
-
-	// Regression (BAA it.2): la purge etait faite AVANT l'emission (via stop()), or
-	// emitGameOver itere spectatorSocketStore pour notifier les spectateurs PURS
-	// (jamais presents dans game.state). Vide, ils ne recevaient plus rien et restaient
-	// geles sur un plateau mort. L'ordre correct est emettre PUIS purger.
 	it("notifie les spectateurs purs AVANT de purger leurs abonnements", () => {
 		const { game, players } = makeGame();
 		let spectateursAuMomentDeLEmission = -1;

@@ -17,19 +17,7 @@ function toFaction(value: string | null): Faction | null {
 	return isFactionName(value) ? value : null;
 }
 
-/**
- * Enregistre le résultat d'une partie pour un joueur, DANS UNE TRANSACTION :
- *  1. insère la ligne GameRecord (source de vérité, jamais modifiée ensuite) ;
- *  2. met à jour les agrégats de cache du User (totaux, meilleur score, ratio) ;
- *  3. met à jour les agrégats de la faction (upsert, car la ligne peut manquer).
- *
- * Règle victoires/défaites : on n'incrémente `wins`/`losses` que pour une partie
- * DÉCISIVE (`hadWinner`). Une partie solo ou sans vainqueur compte dans les totaux
- * (parties jouées, lignes, tetris, meilleur score) mais pas dans le ratio.
- *
- * L'utilisateur doit exister (créé à l'inscription). Si `where: { username }` ne
- * matche pas, Prisma lève et l'appelant (best-effort) journalise sans planter la partie.
- */
+/** Enregistre le resultat d'une partie pour un joueur, dans une transaction. */
 export async function recordGameResult(input: GameResultInput): Promise<void> {
 	const faction = toFaction(input.faction);
 	const wonDecisive = input.hadWinner && input.won;
@@ -61,9 +49,6 @@ export async function recordGameResult(input: GameResultInput): Promise<void> {
 				totalLines: { increment: input.lines },
 				totalTetris: { increment: input.tetris },
 				playtimeMs: { increment: input.durationMs },
-				// Spreads conditionnels : on N'AJOUTE la clé que si nécessaire (une clé à
-				// `undefined` est interdite par exactOptionalPropertyTypes, et ne servirait
-				// qu'à « ne rien changer »). wins/losses seulement sur partie décisive.
 				...(wonDecisive ? { wins: { increment: 1 } } : {}),
 				...(lostDecisive ? { losses: { increment: 1 } } : {}),
 				// Prisma n'a pas de MAX atomique : on compare au meilleur score lu dans la
@@ -137,11 +122,6 @@ type LeaderRow = { username: string; faction: Faction | null };
 function toEntry(row: LeaderRow, value: number): LeaderboardEntry {
 	return { username: row.username, faction: toFaction(row.faction), value };
 }
-
-// Un classement = top N joueurs sur un champ agrégé, en ne gardant que les valeurs > 0
-// (un joueur à 0 tetris n'a rien à faire dans le classement tetris). Les quatre requêtes
-// sont écrites explicitement plutôt qu'avec une clé dynamique, pour rester bien typées
-// face aux types stricts générés par Prisma.
 export async function getLeaderboards(): Promise<Leaderboards> {
 	const base = { take: LEADERBOARD_SIZE } as const;
 	const [byScore, byWins, byTetris, byLines] = await Promise.all([

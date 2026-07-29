@@ -108,10 +108,6 @@ type AvatarCrop = {
 	positionY: number;
 	zoom: number;
 };
-
-// Recadrage des avatars: les valeurs sont pre-calculees hors ligne par
-// `npm run generate:avatar-crops` (analyse des pixels alpha des PNG). Le sujet
-// interdit Canvas cote client, ce calcul ne peut donc pas tourner dans le navigateur.
 const avatarCropCache = new Map<string, AvatarCrop>(
 	Object.entries(avatarCrops as Record<string, AvatarCrop>),
 );
@@ -870,9 +866,6 @@ function RegisterStep({ username, onSubmit, sceneEnterActive = false }: {
 											? CHEVRON_GEOMETRY.pirate.endX
 											: CHEVRON_GEOMETRY.marine.endX;
 										return (
-											// Groupe d'opacite: les 3 elements de la couche sont peints
-											// opaques puis la transparence est appliquee une seule fois,
-											// comme un trace SVG unique (pas de cumul d'alpha au linecap).
 											<span
 												key={layer.color}
 												style={{ position: "absolute", inset: 0, opacity: layer.opacity }}

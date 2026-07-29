@@ -57,11 +57,7 @@ function setup(mode: GameMode = "cascade"): { game: Game; state: PlayerGameState
 	return { game, state };
 }
 
-/**
- * Pose une rangee en la rattachant a une piece. Poser des cases SANS identifiant les
- * laisserait toutes rattachees a « aucune piece », donc soudees entre elles: le test
- * ne dirait plus rien du decoupage en pieces, qui est tout l'enjeu de la cascade.
- */
+/** Pose une rangee en la rattachant a une piece. */
 function putRow(state: PlayerGameState, y: number, row: Cell[], pieceId: number): void {
 	state.board[y] = [...row];
 	state.pieceIds[y] = row.map((cell) => (cell === 0 ? 0 : pieceId));
@@ -79,11 +75,7 @@ function filledColumns(state: PlayerGameState, y: number): number[] {
 	return row.flatMap((cell, x) => (cell !== 0 ? [x] : []));
 }
 
-/**
- * Mode cascade: apres un nettoyage, les blocs qui ne reposent plus sur rien retombent
- * — par PIECE entiere, pas case par case — et peuvent completer de nouvelles rangees.
- * Chaque maillon de la chaine multiplie le bareme.
- */
+/** Retombee des blocs apres un nettoyage, et chaines qui en decoulent. */
 describe("mode cascade", () => {
 	beforeEach(() => {
 		vi.useFakeTimers();
@@ -136,10 +128,6 @@ describe("mode cascade", () => {
 		const single = LINE_CLEAR_SCORES[1]!;
 		expect(state.score).toBe(single * 1 + single * 2);
 	});
-
-	// Le choix de jeu du mode: une piece tombe ENTIERE. Une granularite a la case
-	// reboucherait tous les trous a chaque ligne faite et rendrait le mode deux fois
-	// plus permissif que le classique.
 	it("garde le trou qu'un bloc recouvre: une piece tombe d'un seul tenant", () => {
 		const { game, state } = setup();
 		// Un pont horizontal de 3 cases pose sur deux piliers, avec un vide dessous.
@@ -157,12 +145,7 @@ describe("mode cascade", () => {
 		expect(filledColumns(state, BOARD_HEIGHT - 2)).toEqual([]);
 	});
 
-	/**
-	 * Une rangee de penalite est une unite au meme titre qu'une piece. Disloquee, ses
-	 * cases se repartiraient sur plusieurs rangees — et comme clearLines refuse toute
-	 * rangee contenant une case de penalite, une seule salve en condamnerait quatre au
-	 * lieu d'une. Indestructible, pas contagieuse.
-	 */
+	/** Une rangee de penalite est une unite au meme titre qu'une piece. */
 	it("garde une rangee de penalite d'un seul tenant", () => {
 		const { game, state } = setup();
 		// Sol troue en colonne 5, rangee pleine juste au-dessus (elle part), puis la
@@ -181,15 +164,7 @@ describe("mode cascade", () => {
 		expect(state.board[penaltyRows[0]!]!.every((cell) => cell === "penalty")).toBe(true);
 	});
 
-	/**
-	 * Non-regression: la cascade ne se declenchait quasiment jamais en partie reelle.
-	 *
-	 * Les amas etaient decoupes par simple CONTACT entre cases. Or dans une vraie
-	 * partie la pile est un unique bloc soude: il suffisait qu'UNE case de ce bloc
-	 * repose sur du plein pour que tout soit immobilise. Ici, deux morceaux de pieces
-	 * DIFFERENTES sont cote a cote: celui de gauche est retenu, celui de droite
-	 * surplombe un trou et doit tomber sans lui.
-	 */
+	/** Non-regression : un amas retenu ne doit pas retenir ses voisins. */
 	it("fait tomber un morceau de piece meme colle a un morceau qui, lui, est retenu", () => {
 		const { game, state } = setup();
 		// Derniere rangee trouee en colonne 9; celle du dessus est pleine (elle part).
@@ -237,11 +212,6 @@ describe("mode cascade", () => {
 		expect(state.lockedAt[BOARD_HEIGHT - 1]![3]).toBe(1234);
 		expect(state.lockedAt[0]![3]).toBe(0);
 	});
-
-	// Les tests ci-dessus appellent clearLines directement. Celui-ci passe par le VRAI
-	// chemin de jeu (chute instantanee -> verrouillage -> nettoyage -> cascade ->
-	// piece suivante): c'est lui qui prouve que le mode fonctionne en partie, et pas
-	// seulement quand on appelle la fonction a la main.
 	it("enchaine pour de vrai quand le joueur lache une piece", () => {
 		const { game, state } = setup();
 		// Rangee du bas trouee en colonne 5, celle du dessus trouee en colonnes 0-1.
@@ -256,10 +226,6 @@ describe("mode cascade", () => {
 		state.nextPiece = new Piece(O, "O");
 
 		game.drop("sock0");
-
-		// 1er maillon: le O bouche les colonnes 0-1 et complete l'avant-derniere rangee.
-		// 2e maillon: la case en l'air retombe dans le trou laisse en colonne 5 et
-		// complete la derniere. Sans cascade, une seule ligne serait partie.
 		expect(state.lines).toBe(2);
 		// Il ne reste que la moitie haute du O, posee au sol.
 		expect(filledColumns(state, BOARD_HEIGHT - 1)).toEqual([0, 1]);
@@ -268,10 +234,6 @@ describe("mode cascade", () => {
 		expect(state.currentPiece).toBeDefined();
 		expect(state.isAlive).toBe(true);
 	});
-
-	// Le plateau envoye au client montre les blocs DEJA arrives: sans la distance
-	// parcourue, ils apparaitraient d'un coup a leur nouvelle place. Ces tests
-	// verrouillent l'information d'animation.
 	describe("information d'animation", () => {
 		it("indique de combien de rangees chaque case est tombee", () => {
 			const { game, state } = setup();

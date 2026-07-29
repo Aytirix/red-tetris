@@ -6,20 +6,7 @@ import { useClearCurrentUserFaction } from "../contexts/WsStateContext";
 import { emitCheckUsernameAvailable } from "../socket/events/user";
 import { normalizeUsernameAvailability } from "../socket/userState";
 
-/**
- * Global auth guard — runs in RootLayout on every page.
- *
- * On mount (and on manual localStorage "username" edits):
- *  - If no username in localStorage → nothing.
- *  - Emits user:CheckUsernameAvailable.
- *  - On response, if NOT on "/": handles redirect.
- *    (When on "/", HomePage handles the response itself.)
- *
- * Redirects:
- *  - available=false → "/" + alert
- *  - available=true, no faction yet → "/" with state { step:"register", returnTo: current path }
- *  - available=true, faction already assigned → stay
- */
+/** Global auth guard — runs in RootLayout on every page. */
 export function useAuthGuard() {
 	const { socket } = useSocket();
 	const navigate = useNavigate();

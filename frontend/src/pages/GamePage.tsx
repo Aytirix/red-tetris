@@ -323,9 +323,6 @@ export default function GamePage() {
 	// de distinguer un mort-devenu-spectateur d'un simple spectateur au moment de partir.
 	const wasPlayerRef = useRef(false);
 	const lastPlayerLevelRef = useRef(1);
-	// Vrai dès qu'on a reçu game:eliminated: ce client a DÉJÀ vu son zoom "GAME OVER".
-	// À game:over on ne le lui rejoue pas (récap direct). Le gagnant et les spectateurs,
-	// eux, ne l'ont jamais vu → on joue le zoom puis on affiche le récap.
 	const hasSeenGameOverRef = useRef(false);
 	// Récap mis en attente pendant le zoom de fin de partie (gagnant/spectateur), affiché
 	// à la fin de l'animation. Distingue le zoom "fin de partie" du zoom "élimination".
@@ -519,16 +516,9 @@ export default function GamePage() {
 				danger: true,
 			});
 		}
-
-		// Un join REFUSÉ par le serveur (nom de salle invalide, etc.) n'envoie jamais
-		// room:joined: sans ce garde-fou la page reste bloquée à vie sur l'écran
-		// « Connexion à la room… ».
 		function handleJoinError(data: unknown) {
 			const error = data as { event?: unknown; message?: unknown } | null;
 			if (!error || error.event !== "room:join") return;
-			// Strictement borne a la phase de connexion: une erreur tardive ne doit
-			// jamais ejecter un joueur deja installe. On se base sur la RECEPTION de
-			// room:joined, et non sur hasJoinedRoomRef qui n'atteste que de l'emission.
 			if (hasEnteredRoomRef.current) return;
 			hasLeftRoomRef.current = true;
 			hasJoinedRoomRef.current = false;
@@ -572,13 +562,6 @@ export default function GamePage() {
 			setGameOver(null);
 			setView("game");
 		}
-		// Une NOUVELLE partie commence: purger tout reliquat de la précédente. Sans ça
-		// l'overlay "GAME OVER" du gagnant (5 s) reste collé par-dessus la nouvelle
-		// partie, et à la fin de son animation handleEliminationDone prend la branche
-		// pendingOverRef et éjecte le joueur vers le lobby alors qu'il est en train de
-		// jouer. Réinitialise aussi hasSeenGameOverRef pour que le zoom rejoue en manche
-		// suivante. Volontairement PAS fait dans handleStateUpdate: un game:update
-		// pendant le zoom d'élimination annulerait la bascule spectateur.
 		function resetEndOfGameOverlay() {
 			pendingOverRef.current = null;
 			hasSeenGameOverRef.current = false;
@@ -599,10 +582,6 @@ export default function GamePage() {
 			setCountdown(value);
 		}
 		function handleOver(raw: unknown) {
-			// En quittant, le serveur renvoie game:over au partant. React Router v7
-			// navigue via startTransition (basse priorite): sans ce garde, le setView
-			// urgent ci-dessous passerait devant la navigation et ferait clignoter le
-			// lobby avant le dashboard. hasLeftRoomRef est deja pose par leaveRoomOnce.
 			if (hasLeftRoomRef.current) return;
 			const payload = normalizeGameOver(raw);
 			const nextPayload = payload && payload.scores.length === 1
@@ -614,10 +593,6 @@ export default function GamePage() {
 					}],
 				}
 				: payload;
-
-			// Morts déjà "GAME OVER"-és → récap direct. Gagnant / spectateur (n'ont jamais
-			// vu le zoom) → on joue d'abord l'overlay zoom, le récap s'affiche à la fin de
-			// l'animation (handleEliminationDone via pendingOverRef).
 			if (!hasSeenGameOverRef.current && gameStateRef.current) {
 				pendingOverRef.current = nextPayload;
 				setEliminated(true);
@@ -632,10 +607,6 @@ export default function GamePage() {
 		}
 		function handleEliminated(raw: unknown) {
 			if (hasLeftRoomRef.current) return;
-			// Le backend n'envoie ce signal qu'au joueur qui vient de topper alors
-			// que la partie continue. On garde l'écran de jeu (dernière frame) et on
-			// laisse l'overlay "GAME OVER" jouer; la bascule spectateur se fait à la
-			// fin de l'animation (handleEliminationDone).
 			const p = (raw ?? {}) as { spectate?: unknown };
 			eliminateSpectateRef.current = typeof p.spectate === "string" ? p.spectate : null;
 			isSpectatorRef.current = true;
@@ -674,10 +645,6 @@ export default function GamePage() {
 	// Fin de l'animation "GAME OVER": on s'abonne comme spectateur d'un joueur
 	// encore vivant (nom fourni par le backend) et on retire l'overlay.
 	function handleEliminationDone() {
-		// On quitte la room: l'animation peut se terminer AVANT le démontage (navigation
-		// différée par la transition nuages). Sans ce garde on se ré-abonnerait comme
-		// spectateur d'une room quittée (le serveur bloquerait alors move/rotate/drop
-		// dans la partie suivante), ou on ferait flasher lobby+récap devant le dashboard.
 		if (hasLeftRoomRef.current) return;
 		// Zoom de FIN DE PARTIE (gagnant/spectateur): afficher le récap, pas d'abonnement.
 		if (pendingOverRef.current) {

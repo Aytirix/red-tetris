@@ -760,10 +760,6 @@ describe("Game", () => {
 			]);
 			expect(emitGameUpdate).toHaveBeenCalledTimes(1);
 		});
-
-		// La piece pivote SUR PLACE: la boite ne bouge pas, donc ni x ni y ne changent
-		// tant que la rotation tient. C'etait le defaut d'avant — la boite changeait de
-		// dimensions et la piece se decalait d'une demi-case a chaque quart de tour.
 		it("ne deplace pas la piece quand la rotation tient", () => {
 			const { game, states } = makeGame(1);
 			const state = states[0]!;
@@ -818,9 +814,6 @@ describe("Game", () => {
 		it("decale la piece (wall kick) quand la rotation en place est bloquee par un obstacle", () => {
 			const { game, states } = makeGame(1);
 			const state = states[0]!;
-			// I horizontal en (x=4, y=0): la rotation verticale occuperait la colonne 6
-			// (x + 2), mais (2,6) est pris. Un kick d'une case a gauche la fait tenir en
-			// colonne 5.
 			state.currentPiece = new Piece(I, "I");
 			state.board[2]![6] = "O";
 			game.rotate("sock0");
@@ -844,9 +837,6 @@ describe("Game", () => {
 		it("ne monte jamais la piece pour tourner (pas de floor kick)", () => {
 			const { game, states } = makeGame(1);
 			const state = states[0]!;
-			// I horizontal pose sur le sol: le tourner verticalement traverserait le sol,
-			// et aucun decalage horizontal ne l'en empeche -> la rotation est refusee,
-			// la piece ne remonte pas.
 			state.currentPiece = placedPiece(I, "I", 4, BOARD_HEIGHT - 1);
 			game.rotate("sock0");
 			expect(state.currentPiece.shape).toEqual(I);
@@ -1606,10 +1596,6 @@ describe("Game", () => {
 			expect(game.getTimeLeftMs()).toBe(ULTRA_DURATION_MS);
 			expect(makeGame(1, "classique").game.getTimeLeftMs()).toBeNull();
 		});
-
-		// setSystemTime (et non advanceTimersByTime): on veut avancer l'HORLOGE sans
-		// executer les ticks de gravite, qui simuleraient 2 minutes de jeu et
-		// termineraient la partie par top-out avant l'expiration testee.
 		it("termine la partie a l'expiration du chrono, meilleur score vainqueur", () => {
 			const { game, states, players } = makeGame(2, "ultra");
 			game.start();
@@ -1745,10 +1731,6 @@ describe("Game", () => {
 
 			vi.advanceTimersByTime(INVISIBLE_FADE_MS / 2);
 			game.clearLines(state);
-
-			// Le O (2 rangees) est descendu d'une ligne, ses horodatages AUSSI: ils
-			// occupent desormais les deux dernieres rangees, et la rangee liberee
-			// au-dessus n'en porte plus.
 			expect(state.board[BOARD_HEIGHT - 1]![0]).toBe("O");
 			expect(state.lockedAt[BOARD_HEIGHT - 1]![0]).not.toBe(0);
 			expect(state.lockedAt[BOARD_HEIGHT - 2]![0]).not.toBe(0);

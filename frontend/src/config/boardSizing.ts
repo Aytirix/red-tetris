@@ -1,28 +1,8 @@
-/**
- * Dimensionnement du plateau en fonction de la place réellement disponible.
- *
- * Le plateau était figé à 38 px/cellule, soit ~888 px de hauteur nécessaire une
- * fois le HUD et les marges comptés. La majorité des écrans de PC portable
- * n'offrent que 640–790 px de viewport : le plateau débordait donc en bas.
- *
- * Deux niveaux :
- *  - `fitCellSize` : la vraie source de vérité, alimentée par la MESURE de la
- *    zone du plateau (ResizeObserver côté GameView). Aucune constante à deviner,
- *    donc aucune dérive possible entre le CSS et le calcul.
- *  - `computeMainCellSize` : estimation de repli à partir du viewport, utilisée
- *    au tout premier rendu (avant la première mesure) et hors navigateur (tests,
- *    SSR). Elle retranche une approximation du « chrome » (HUD, marges).
- *
- * Module volontairement pur (aucun accès au DOM) pour rester testable.
- */
+/** Dimensionnement du plateau en fonction de la place réellement disponible. */
 
 /** Taille historique : plafond, pour ne rien changer sur les grands écrans. */
 export const MAIN_CELL_MAX = 38;
-/**
- * Plancher : en dessous le plateau devient illisible. Volontairement bas — sur une
- * fenêtre minuscule, un plateau petit reste préférable à un plateau tronqué, la
- * scène ne défilant plus (`overflow: hidden`).
- */
+/** Plancher : en dessous le plateau devient illisible. */
 export const MAIN_CELL_MIN = 10;
 
 /** `gap` de `.tetris-board` (entre cellules). */
@@ -48,10 +28,7 @@ type FitInput = {
 	cols: number;
 };
 
-/**
- * Plus grande cellule tenant dans la boîte donnée, cadre et gouttières compris,
- * bornée à [MAIN_CELL_MIN, MAIN_CELL_MAX].
- */
+/** Plus grande cellule tenant dans la boîte donnée, cadre et gouttières compris, bornée à [MAIN_CELL_MIN, MAIN_CELL_MAX]. */
 export function fitCellSize({ availableWidth, availableHeight, rows, cols }: FitInput): number {
 	// Un plateau vide (avant réception du premier état) ne doit pas diviser par zéro.
 	if (rows <= 0 || cols <= 0) return MAIN_CELL_MAX;
@@ -70,11 +47,7 @@ type CellSizeInput = {
 	cols: number;
 };
 
-/**
- * Estimation de repli à partir du viewport, utilisée tant que la zone du plateau
- * n'a pas été mesurée. La hauteur est presque toujours la contrainte active ; la
- * largeur ne mord que sur les écrans très étroits.
- */
+/** Estimation de repli à partir du viewport, utilisée tant que la zone du plateau n'a pas été mesurée. */
 export function computeMainCellSize({ viewportWidth, viewportHeight, rows, cols }: CellSizeInput): number {
 	return fitCellSize({
 		availableWidth: viewportWidth - sideColumnWidth(viewportWidth) * 2 - HORIZONTAL_CHROME,
@@ -84,10 +57,7 @@ export function computeMainCellSize({ viewportWidth, viewportHeight, rows, cols 
 	});
 }
 
-/**
- * Taille des mini-plateaux adverses, proportionnelle au plateau principal
- * (0.26 → 10 px quand le plateau est à 38 px, la valeur historique).
- */
+/** Taille des mini-plateaux adverses, proportionnelle au plateau principal (0.26 → 10 px quand le plateau est à 38 px, la valeur historique). */
 export function computeMiniCellSize(mainCellSize: number): number {
 	return Math.max(5, Math.round(mainCellSize * 0.26));
 }

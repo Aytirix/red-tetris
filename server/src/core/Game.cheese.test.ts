@@ -50,10 +50,7 @@ function garbageRows(state: PlayerGameState): number[] {
 	return state.board.flatMap((row, y) => (row.some((cell) => cell === "garbage") ? [y] : []));
 }
 
-/**
- * Bouche le trou de la rangee de gruyere la plus BASSE et la nettoie, comme le ferait
- * une piece posee dedans. Renvoie false s'il n'y a plus rien a creuser.
- */
+/** Bouche le trou de la rangee de gruyere la plus BASSE et la nettoie, comme le ferait une piece posee dedans. */
 function digOneRow(game: Game, state: PlayerGameState): boolean {
 	const rows = garbageRows(state);
 	const y = rows[rows.length - 1];
@@ -68,10 +65,7 @@ function digOneRow(game: Game, state: PlayerGameState): boolean {
 	return true;
 }
 
-/**
- * Mode cheese: 20 rangees percees a creuser, dont 10 seulement sont posees au depart.
- * Le plateau remonte au rythme des destructions jusqu'a les avoir toutes servies.
- */
+/** Rangees de gruyere : pose initiale, remontee du plateau, condition de victoire. */
 describe("mode cheese", () => {
 	beforeEach(() => {
 		vi.useFakeTimers();

@@ -4,10 +4,6 @@ import { emitError } from "../emitters/systemEmitters.js";
 
 
 export function registerRoomSocket(socket: Socket) : void {
-	// SEUL handler asynchrone du domaine (acces Prisma via createPlayer). Sans ce
-	// .catch, une base indisponible produit un rejet non gere: le client n'obtient ni
-	// room:joined ni system:Error et reste bloque a vie sur « Connexion a la room… ».
-	// On repond donc explicitement, comme le font deja user/shop/stats.
 	socket.on("room:join", (msg) => {
 		handlerRoomJoin(socket, msg).catch((error) => {
 			console.error("room:join failed:", error)

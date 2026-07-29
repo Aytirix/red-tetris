@@ -5,10 +5,6 @@ type Props = {
 	onCoverDone: () => void;
 	onRevealDone: () => void;
 };
-
-// Overlay de transition « nuages », 100% CSS (aucun canvas/SVG) :
-// deux bancs de nuages (haut + bas) qui se rejoignent pour recouvrir l'écran puis
-// s'écartent, plus un voile qui pilote le timing (son animationend fait avancer la phase).
 export default function CloudTransition({ phase, onCoverDone, onRevealDone }: Props) {
 	if (phase === "idle") return null;
 	return (

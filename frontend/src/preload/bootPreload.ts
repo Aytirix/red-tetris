@@ -1,10 +1,5 @@
 import avatarCrops from "../config/avatarCrops.json";
 import { SCENE_THEMES } from "../components/DashboardParallaxScene/themes";
-
-// Images du premier parcours (accueil → choix de faction → dashboard) préchargées
-// derrière l'écran « nuages » au tout premier chargement, pour éviter le pop-in.
-// Le dossier public/img/**/origin/ (sources lourdes non servies) est volontairement
-// EXCLU : on ne référence que les fichiers réellement affichés.
 const HOME_IMAGES = [
 	"/img/Luffy-vs-Akainu.jpg",
 	"/img/choix-faction/affrontement.jpg",
@@ -27,10 +22,6 @@ const AVATAR_IMAGES = Object.keys(avatarCrops as Record<string, unknown>);
 export const BOOT_PRELOAD_IMAGES: string[] = [
 	...new Set([...HOME_IMAGES, ...DASHBOARD_IMAGES, ...AVATAR_IMAGES]),
 ];
-
-// Charge une image ; résout au chargement OU en erreur (une image manquante ne doit
-// jamais bloquer le démarrage). Attend le décodage quand l'API est dispo pour éviter
-// un « jank » au moment de l'affichage.
 function preloadOne(src: string): Promise<void> {
 	return new Promise((resolve) => {
 		const image = new Image();
@@ -51,11 +42,7 @@ function preloadOne(src: string): Promise<void> {
 	});
 }
 
-/**
- * Précharge toutes les images de démarrage en signalant la progression dans [0, 1].
- * Ne rejette jamais. `timeoutMs` garantit qu'on n'attend pas indéfiniment si une
- * requête reste bloquée : au-delà, on considère le préchargement terminé.
- */
+/** Précharge toutes les images de démarrage en signalant la progression dans [0, 1]. */
 export function preloadBootImages(
 	onProgress?: (ratio: number) => void,
 	timeoutMs = 30_000,

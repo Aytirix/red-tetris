@@ -5,11 +5,6 @@ import os from "node:os";
 import path from "node:path";
 import type { AddressInfo } from "node:net";
 import { createApp } from "./app.js";
-
-// Ces tests envoient de VRAIES requetes HTTP sur le serveur. Les tests qui se
-// contentent d'introspecter app.router.stack ne verifient pas express.static:
-// on peut le supprimer sans qu'aucun d'eux ne rougisse, alors que le sujet impose
-// que le serveur serve lui-meme index.html, le bundle et les assets.
 let server: http.Server;
 let baseUrl: string;
 let staticDir: string;

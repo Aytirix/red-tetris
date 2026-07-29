@@ -31,10 +31,6 @@ export function validateCheckUsername(
 		&& payload !== null
 		&& Object.keys(payload).length === 1
 		&& "username" in payload
-		// Le controle de type est INDISPENSABLE: isValidUsername() teste une RegExp,
-		// qui coercit son argument en chaine. `{username: 12345}` passerait donc la
-		// validation de format et atteindrait la requete Prisma et le userSocketStore
-		// avec une valeur non-string.
 		&& typeof payload.username === "string"
 	if (!isValid)
 		return false;

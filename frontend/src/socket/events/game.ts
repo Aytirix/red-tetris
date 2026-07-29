@@ -1,9 +1,5 @@
 import { socket } from "../socket";
 
-// --- Emitters (appelables depuis n'importe quel composant) ---
-// Les listeners de partie sont branchés par `GamePage`, qui possède l'état: il n'y a
-// volontairement aucun listener global ici.
-
 export function emitGameMove(direction: "left" | "right" | "down") {
 	socket.emit("game:move", { direction });
 }

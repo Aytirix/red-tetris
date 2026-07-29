@@ -18,11 +18,6 @@ declare global {
 export default function RootLayout() {
 	const { pathname } = useLocation();
 	useAuthGuard();
-
-	// Après le tout premier paint de React (double rAF = commit + peinture effective),
-	// on PRÉCHARGE toutes les images du premier parcours en affichant la progression
-	// sur les nuages, PUIS on ouvre l'overlay. Le site n'apparaît donc qu'une fois les
-	// images en cache : plus de pop-in au fil de la navigation.
 	useEffect(() => {
 		let cancelled = false;
 		let raf2 = 0;

@@ -1,9 +1,5 @@
 import { socket } from "../socket";
 
-// --- Emitters (appelables depuis n'importe quel composant) ---
-// Les listeners de room sont branchés par `GamePage` / `DashboardPage`, qui possèdent
-// l'état: il n'y a volontairement aucun listener global ici.
-
 export function emitJoinRoom(roomId: string) {
 	socket.emit("room:join", { roomId });
 }

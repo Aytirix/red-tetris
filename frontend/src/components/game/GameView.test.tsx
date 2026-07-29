@@ -329,10 +329,6 @@ describe("GameView — plateau et HUD", () => {
 		// 20 lignes + gouttieres + cadre doivent tenir sous le HUD et les marges.
 		expect(20 * cell + 19 * 2 + 22).toBeLessThanOrEqual(700 - 132);
 	});
-
-	// Le dimensionnement ne se fie plus a une estimation du HUD et des marges: il
-	// MESURE la zone reservee au plateau (ResizeObserver), absente de jsdom — on la
-	// simule ici pour verifier que la cellule suit la place reellement disponible.
 	it("dimensionne la cellule sur la zone mesuree, pas sur le viewport", () => {
 		const observers: Array<(entries: unknown[]) => void> = [];
 		vi.stubGlobal("ResizeObserver", class {

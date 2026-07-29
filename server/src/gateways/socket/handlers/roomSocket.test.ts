@@ -78,10 +78,6 @@ describe("registerRoomSocket", () => {
 
 		expect(handlers[handlerName]).toHaveBeenCalledWith(socket, payload);
 	});
-
-	// Regression: handlerRoomJoin est async et n'etait ni attendu ni rattrape. Une
-	// base indisponible produisait un rejet non gere -> le client n'obtenait NI
-	// room:joined NI system:Error et restait bloque a vie sur « Connexion a la room… ».
 	it("repond system:Error quand room:join rejette", async () => {
 		const { socket, events } = makeSocket("s1");
 		vi.spyOn(console, "error").mockImplementation(() => undefined);

@@ -2,11 +2,6 @@ import type { Socket } from "socket.io";
 import type { Game } from "./Game.js";
 import type { Player } from "./Player.js";
 import { isGameMode, type GameMode } from "../types/game/gameTypes.js";
-
-// Capacite d'une room. Cette valeur etait deja ANNONCEE aux clients par room:list
-// (et affichee « 2/4 » sur le dashboard) sans jamais etre appliquee: un 5e joueur
-// entrait et l'interface affichait « 5/4 ». Une seule source de verite desormais,
-// partagee entre la regle d'entree et ce qui est annonce.
 export const MAX_PLAYERS_PER_ROOM = 4;
 
 export class Room {
@@ -19,9 +14,6 @@ export class Room {
 	private game: Game | null;
 	// Timer du decompte 3-2-1 entre room:start et le vrai demarrage de la partie.
 	private countdownTimer: NodeJS.Timeout | null;
-	// Appartenance par pseudo (unique par compte): survit a la deconnexion/reconnexion
-	// d'un socket. Sert a autoriser un membre a revenir dans une room privee et a
-	// distinguer un membre d'un inconnu pour le join ET le spectateur.
 	private memberNames: Set<string>;
 	constructor (name: string) {
 		this.name = name;
@@ -39,9 +31,6 @@ export class Room {
 	isSolo() : boolean {
 		return this.name.startsWith("sologame_")
 	}
-	// Un pseudo ayant deja rejoint la room reste membre tant que la room vit (meme
-	// apres un disconnect): il peut donc revenir dans une room privee, contrairement
-	// a un inconnu qui forcerait l'URL.
 	isMember(username: string) : boolean {
 		return this.memberNames.has(username)
 	}
@@ -59,9 +48,6 @@ export class Room {
 	addPlayer(player: Player) : boolean {
 		if (!this.canJoin())
 			return (false);
-		// Un meme socket ne doit jamais figurer deux fois: la Game indexe son state par
-		// socketId, donc un doublon desynchronise players (N) et state (1) et fait finir
-		// la partie des le premier verrouillage.
 		if (this.players.some((current) => current.getSocketId() === player.getSocketId()))
 			return (false);
 		if (!this.hostPlayerId)
@@ -155,10 +141,6 @@ export class Room {
 		
 		return this.removePlayer(playerToRemove);
 	}
-	// Kick (host uniquement): retire le joueur ET révoque son appartenance. Un kické
-	// n'est donc plus un « membre »: il redevient un inconnu et ne peut plus revenir
-	// dans une room privée (contrairement à un simple départ/refresh qui conserve
-	// l'appartenance via removePlayerBySocketId).
 	removePlayerByName(socketId: string, username: string) : boolean {
 		if (this.getHostId() === socketId) {
 			const players = this.getPlayers()

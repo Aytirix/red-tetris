@@ -34,13 +34,7 @@ function emptyBoard(): Board {
 	);
 }
 
-/**
- * Defaut corrige: le wall kick vertical decolle une piece posee, ce qui la rendait a
- * nouveau "en vol" et remettait son sursis de verrouillage a zero. Spammer la rotation
- * (le client repete la touche toutes les 45 ms) suffisait donc a faire leviter une
- * piece indefiniment: elle ne se verrouillait JAMAIS, et la partie ne pouvait plus
- * finir. MAX_LOCK_RESETS plafonne ces relances.
- */
+/** Non-regression : spammer la rotation faisait leviter une piece indefiniment. */
 describe("plafond de relance du sursis de verrouillage", () => {
 	beforeEach(() => { vi.useFakeTimers(); vi.clearAllMocks(); });
 	afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); });

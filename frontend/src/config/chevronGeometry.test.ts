@@ -8,13 +8,6 @@ import {
 	CHEVRON_SCALE,
 	getChevronArm,
 } from "./chevronGeometry";
-
-// Reference: le SVG d'origine, avant sa suppression (le sujet interdit SVG).
-//   pirate : <path d="M10 5 L17 12 L10 19" stroke-width="7" puis "3.8"
-//   marine : <path d="M14 5 L7 12 L14 19" ... />
-//   viewBox 0 0 24 24, rendu dans une boite de 38px, linecap/linejoin "round".
-// Les valeurs attendues ci-dessous sont derivees a la main de ce trace, jamais du
-// code teste: si la geometrie derive, ces tests tombent.
 const S = 38 / 24;
 const PIRATE_APEX = { x: 17 * S, y: 12 * S };
 const MARINE_APEX = { x: 7 * S, y: 12 * S };

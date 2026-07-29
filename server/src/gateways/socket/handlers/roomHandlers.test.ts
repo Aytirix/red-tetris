@@ -132,11 +132,6 @@ describe("roomHandlers", () => {
 			expect(roomSocketStore.get("salle1")!.countPlayer()).toBe(2);
 			expect(lastEmit(socket, "room:joined")).toBeDefined();
 		});
-
-		// Regression: le handler retournait en SILENCE quand createPlayer renvoyait null
-		// (socket sans pseudo, compte inexistant ou sans faction). Le client n'attend
-		// que room:joined ou system:Error: il restait bloque a vie sur
-		// « Connexion a la room… ».
 		it("signale l'erreur sur une room existante quand le joueur ne peut pas etre cree", async () => {
 			const { room } = seedRoom("salle1", ["luffy"]);
 			const socket = makeSocket("s2");
@@ -186,16 +181,8 @@ describe("roomHandlers", () => {
 
 			expect(room.countPlayer()).toBe(MAX_PLAYERS_PER_ROOM);
 			expect(lastEmit(detrop, "room:denied")).toEqual(["room:denied", { reason: "full" }]);
-			// Le refus doit etre EXPLICITE: sans lui, emitRoomJoined renverrait
-			// `joined: true` (calcule sur le seul statut) alors que le joueur n'a pas
-			// ete ajoute — le client se croirait dans une room ou il ne figure pas.
 			expect(lastEmit(detrop, "room:joined")).toBeUndefined();
 		});
-
-		// Regression: le garde de capacite etait purement numerique et ignorait
-		// isMember(). Apres une coupure non gracieuse le socket mort occupe encore une
-		// place (le disconnect peut tarder jusqu'au pingTimeout socket.io): un membre
-		// revenant se faisait ejecter de SA PROPRE room avec « Salle complete ».
 		it("laisse revenir un membre dont l'ancien socket occupe encore sa place", async () => {
 			const { room } = seedRoom("salle1", ["luffy", "zoro", "nami", "usopp"]);
 			const ancienSocketId = room.findPlayerByName("usopp")!.getSocketId();
@@ -690,12 +677,6 @@ describe("roomHandlers", () => {
 			expect(secondGame).not.toBe(firstGame);
 			expect(room.getStatus()).toBe("playing");
 		});
-
-		// Regression: `stop()` (chemin Rejouer) ne purgeait PAS spectatorSocketStore,
-		// contrairement a checkGameOver/abortOnFailure. Un joueur elimine s'abonne en
-		// spectateur puis redevient JOUEUR de la partie relancee (il n'a jamais quitte
-		// la room): son abonnement survivant faisait sortir immediatement
-		// handleMove/Rotate/Drop/Joker — il regardait sa piece tomber sans pouvoir agir.
 		it("purge les abonnements spectateur de l'ancienne partie", () => {
 			const { room, sockets } = seedRoom("salle1", ["luffy", "zoro"]);
 			handleRoomStart(sockets.get("luffy")!, undefined);

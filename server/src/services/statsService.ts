@@ -35,11 +35,7 @@ async function getFactionStandings(): Promise<FactionStandings> {
 	return { factions, leader: pickLeader(factions) };
 }
 
-/**
- * Enregistre les résultats de fin de partie, joueur par joueur, en BEST-EFFORT : un
- * échec d'écriture (DB indisponible, joueur invité sans compte…) est journalisé mais
- * ne bloque ni la partie ni les autres enregistrements.
- */
+/** Enregistre les resultats de fin de partie, joueur par joueur, en best-effort. */
 export async function recordGameResults(entries: GameResultInput[]): Promise<void> {
 	for (const entry of entries) {
 		try {
@@ -50,10 +46,7 @@ export async function recordGameResults(entries: GameResultInput[]): Promise<voi
 	}
 }
 
-/**
- * État complet des statistiques pour un socket : `me` (null si non authentifié) plus
- * les données globales (classements, factions, modes), lues en parallèle.
- */
+/** Etat complet des statistiques pour un socket. */
 export async function getStatsState(username: string | null): Promise<StatsState> {
 	const [me, leaderboards, factions, modes] = await Promise.all([
 		username ? getUserStats(username) : Promise.resolve(null),

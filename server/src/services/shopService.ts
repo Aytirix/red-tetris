@@ -20,11 +20,7 @@ function ownedThemesOf(row: { ownedThemes?: string[] | null } | null): Set<strin
 	return owned;
 }
 
-/**
- * Thème réellement équipé: un thème non possédé (retiré du catalogue, données
- * incohérentes) retombe sur le défaut. Partagé entre l'état boutique et le thème
- * embarqué sur le Player (cosmétique vu par les spectateurs).
- */
+/** Theme equipe, ou le theme par defaut si celui enregistre n'est pas possede. */
 export function resolveEquippedTheme(
 	row: { equippedTheme?: string | null; ownedThemes?: string[] | null } | null,
 ): string {
@@ -67,12 +63,6 @@ export async function equipThemeForUser(username: string, themeId: string): Prom
 // Entrée de règlement de fin de partie : les données de stats (GameResultInput) plus
 // le socket, nécessaire pour repousser le portefeuille à jour au joueur concerné.
 export type GameSettlementEntry = GameResultInput & { socket: Socket };
-
-// Fin de partie: crédite chaque joueur de son score final, pousse le portefeuille à
-// jour à son socket (solde live), PUIS enregistre les statistiques de la partie.
-// Best-effort, ne bloque pas la partie. Appelé UNE seule fois par partie (checkGameOver).
-// Le crédit et les stats sont isolés (try séparés) : un échec de stats ne doit pas
-// priver le joueur de son butin, et inversement.
 export async function settleGameRewards(entries: GameSettlementEntry[]): Promise<void> {
 	for (const entry of entries) {
 		try {
@@ -84,12 +74,6 @@ export async function settleGameRewards(entries: GameSettlementEntry[]): Promise
 			console.error(`settleGameRewards failed for ${entry.username}:`, err);
 		}
 	}
-	// GameSettlementEntry contient tous les champs de GameResultInput (+ socket, ignoré
-	// ici) : on passe directement les entrées au record.
-	// Protégé comme la boucle ci-dessus : l'appelant (`Game.checkGameOver`) lance cette
-	// promesse sans l'attendre, donc un rejet ici ne serait rattrapé par personne et
-	// abattrait le process — pour de simples statistiques, alors que la partie est
-	// terminée et les berrys déjà crédités.
 	try {
 		await recordGameResults(entries);
 	} catch (err) {

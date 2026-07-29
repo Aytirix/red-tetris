@@ -6,10 +6,6 @@ import { wsDocsRouter } from "./routes/wsDocs.js";
 import { corsMiddleware } from "./middlewares/cors.js";
 
 const currentDir = path.dirname(fileURLToPath(import.meta.url));
-
-// Le sujet impose que le serveur serve lui-meme index.html, le bundle JS et les assets
-// statiques via HTTP. STATIC_DIR permet de pointer le build en Docker; sinon on retombe
-// sur frontend/dist du depot (meme chemin relatif que l'on tourne via tsx ou via dist/).
 function resolveStaticDir(): string | null {
 	const candidates = [
 		process.env.STATIC_DIR,
@@ -28,27 +24,6 @@ export function createApp(): express.Express {
 	app.use((corsMiddleware));
 	app.use(express.json());
 
-	// app.get("/", (_req, res) => {
-	// 	res.send(`
-	// 		<!DOCTYPE html>
-	// 		<html>
-	// 			<head>
-	// 				<title>Socket test</title>
-	// 			</head>
-	// 			<body>
-	// 				<h1>Socket test</h1>
-	// 				<script src="/socket.io/socket.io.js"></script>
-	// 				<script>
-	// 					const socket = io();
-	// 					socket.on("connect", () => {
-	// 						console.log("connected:", socket.id);
-	// 					});
-	// 				</script>
-	// 			</body>
-	// 		</html>
-	// 	`);
-	// });
-
 
 	if (process.env.NODE_ENV === "development") {
 		app.use(wsDocsRouter);
@@ -64,9 +39,6 @@ export function createApp(): express.Express {
 				return next();
 			if (req.path.startsWith("/socket.io"))
 				return next();
-			// Un asset introuvable doit finir en 404, pas en index.html: sinon le
-			// navigateur recoit du text/html la ou il attend un module JS et l'app
-			// tombe en page blanche ("expected a JavaScript module script").
 			if (path.extname(req.path) !== "")
 				return next();
 			res.sendFile(path.join(staticDir, "index.html"));

@@ -1,12 +1,6 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-
-// `styles.css` n'est importe que par main.tsx, donc aucun test de composant ne le
-// charge: sans ce garde-fou textuel, supprimer une regle ne fait rougir personne.
-// C'est exactement ce qui etait arrive au spectre, rendu en cyan de piece I parce
-// qu'aucune regle `data-piece="spectrum"` n'existait et que le defaut
-// `.tetris-cell--filled { --c: var(--piece-i) }` s'appliquait.
 const css = readFileSync(resolve(process.cwd(), "src/styles.css"), "utf-8");
 
 /** Selecteurs de "recipe" (theme de pieces equipe) qui repeignent les cellules. */

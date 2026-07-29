@@ -1,11 +1,6 @@
 import { createContext, useCallback, useContext, useRef, useState, type ReactNode } from "react";
 import { useNavigate, type NavigateOptions, type To } from "react-router-dom";
 import CloudTransition from "../components/CloudTransition";
-
-// Phase de la transition « nuages » entre deux pages :
-// - idle    : rien à l'écran, navigation instantanée possible.
-// - cover   : les nuages roulent pour recouvrir tout l'écran (ancienne page dessous).
-// - reveal  : la nouvelle page est montée sous les nuages, qui se dissipent.
 export type TransitionPhase = "idle" | "cover" | "reveal";
 
 type TransitionContextValue = {

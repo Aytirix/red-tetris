@@ -75,7 +75,7 @@ dépendances et génère le client Prisma si nécessaire — un clone frais suff
 
 | Suite | Fichiers | Tests | Statements | Branches | Functions | Lines |
 |---|---|---|---|---|---|---|
-| Serveur | 38 | 677 | **96,4 %** | **92,2 %** | **99,7 %** | **96,2 %** |
+| Serveur | 39 | 681 | **96,3 %** | **92,1 %** | **99,7 %** | **96,1 %** |
 | Frontend | 47 | 644 | **90,4 %** | **88,8 %** | **89,4 %** | **92,3 %** |
 | *Seuils sujet* | | | *70 %* | *50 %* | *70 %* | *70 %* |
 
