@@ -14,6 +14,7 @@ import {
 	LINES_PER_LEVEL,
 	LOCK_GRACE_FACTOR,
 	LOCK_GRACE_MIN_MS,
+	MAX_LOCK_RESETS,
 	SOFT_DROP_POINTS_PER_CELL,
 	SPRINT_TARGET_LINES,
 	SUDDEN_DEATH_TICK_MS,
@@ -109,6 +110,7 @@ export class Game {
 					jokersLeft: INVISIBLE_JOKER_COUNT,
 					revealUntil: 0,
 					groundedAt: null,
+					lockResets: 0,
 					garbageCleared: 0,
 					garbageServed: 0,
 					pieceIndex: 0,
@@ -357,7 +359,19 @@ export class Game {
 	 * d'un surplomb, pivotee) repart en chute et perd son sursis.
 	 */
 	refreshLockState(playerState: PlayerGameState) : void {
-		if (!playerState.currentPiece || this.canMove(playerState, 0, 1)) {
+		if (!playerState.currentPiece) {
+			playerState.groundedAt = null
+			return
+		}
+		if (this.canMove(playerState, 0, 1)) {
+			// Une piece qui redecolle apres avoir touche la pile consomme un sursis. Au
+			// dela du plafond on GARDE son horodatage de contact: elle retombera et se
+			// verrouillera des l'atterrissage, au lieu de leviter tant qu'on la pivote.
+			if (playerState.groundedAt !== null) {
+				playerState.lockResets++
+				if (playerState.lockResets > MAX_LOCK_RESETS)
+					return
+			}
 			playerState.groundedAt = null
 			return
 		}
@@ -1022,6 +1036,7 @@ export class Game {
 		playerStat.nextPiece = new Piece(nextShape, nextType)
 		// Nouvelle piece: elle n'a rien touche, le sursis de la precedente ne la suit pas.
 		playerStat.groundedAt = null
+		playerStat.lockResets = 0
 		if (!this.canSpawn(playerStat))
 			playerStat.isAlive = false
 	}

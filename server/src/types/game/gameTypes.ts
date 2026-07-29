@@ -38,6 +38,11 @@ export const LOCK_GRACE_FACTOR = 1.75;
 // Plancher: aux niveaux les plus rapides (frame a 80 ms), 1,75 frame ne laisserait pas
 // le temps de reagir. En dessous de ce seuil le jeu devient injouable, pas difficile.
 export const LOCK_GRACE_MIN_MS = 250;
+// Nombre de fois qu'une piece peut reprendre sa chute apres avoir touche la pile (et
+// donc relancer son sursis). Sans ce plafond, spammer la rotation d'une piece posee
+// suffit a la faire leviter indefiniment: le wall kick vertical la decolle, le sursis
+// repart, elle ne se verrouille jamais. 15, comme le Tetris Guideline.
+export const MAX_LOCK_RESETS = 15;
 
 // Sprint: premier a nettoyer 40 lignes.
 export const SPRINT_TARGET_LINES = 40;
@@ -134,6 +139,8 @@ export type PlayerGameState = {
 	// le dernier tick — sinon une piece posee juste avant un tick n'aurait quasiment
 	// aucun temps d'ajustement.
 	groundedAt: number | null;
+	// Sursis deja consommes par la piece courante (voir MAX_LOCK_RESETS).
+	lockResets: number;
 	// Mode cheese: lignes de gruyere DETRUITES (objectif: CHEESE_TOTAL_GARBAGE) et
 	// lignes deja SERVIES, c'est-a-dire posees sur le plateau (les autres attendent
 	// leur tour en coulisse). Le client n'affiche que le reste a creuser.
