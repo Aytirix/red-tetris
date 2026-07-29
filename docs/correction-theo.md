@@ -2,7 +2,7 @@
 
 > Antisèche perso pour la soutenance. Ce que **tu** as construit, où ça vit, et les
 > questions qui vont tomber dessus.
-> Vue d'ensemble : [README](../README.md) · mécaniques : [GAMEPLAY](../GAMEPLAY.md)
+> Vue d'ensemble : [README](../README.md) · mécaniques : [GAMEPLAY](GAMEPLAY.md)
 
 ---
 
@@ -76,7 +76,7 @@ Répartition indicative en lignes encore présentes dans le code :
 
 ### Tests & infra
 
-- **1 325 tests** au total (681 serveur + 644 frontend), seuils de couverture imposés
+- **1 326 tests** au total (682 serveur + 644 frontend), seuils de couverture imposés
   dans les deux `vitest.config.ts` : la commande échoue d'elle-même sous les minima.
 - **`build.production.test.ts`** — le test le plus malin du repo : il relance un vrai
   `vite build` et grep le bundle pour prouver qu'il ne contient **ni canvas, ni SVG, ni

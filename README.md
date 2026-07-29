@@ -8,7 +8,7 @@ pièces** que ses adversaires. Nettoyer *n* lignes envoie *n − 1* lignes de p�
 indestructibles au bas du plateau des autres. Le **dernier joueur en vie gagne**.
 
 > Pour le détail des mécaniques, des 7 modes de jeu et du barème de points :
-> **[GAMEPLAY.md](GAMEPLAY.md)**.
+> **[GAMEPLAY.md](docs/GAMEPLAY.md)**.
 
 ---
 
@@ -75,7 +75,7 @@ dépendances et génère le client Prisma si nécessaire — un clone frais suff
 
 | Suite | Fichiers | Tests | Statements | Branches | Functions | Lines |
 |---|---|---|---|---|---|---|
-| Serveur | 39 | 681 | **96,3 %** | **92,1 %** | **99,7 %** | **96,1 %** |
+| Serveur | 39 | 682 | **96,3 %** | **92,1 %** | **99,7 %** | **96,1 %** |
 | Frontend | 47 | 644 | **90,4 %** | **88,8 %** | **89,4 %** | **92,3 %** |
 | *Seuils sujet* | | | *70 %* | *50 %* | *70 %* | *70 %* |
 
@@ -210,7 +210,7 @@ requête ne touche la base pendant le jeu.
 
 ## 6. Documentation
 
-- **[GAMEPLAY.md](GAMEPLAY.md)** — mécaniques détaillées, 7 modes de jeu, barème de
+- **[GAMEPLAY.md](docs/GAMEPLAY.md)** — mécaniques détaillées, 7 modes de jeu, barème de
   points, pénalités, boutique, statistiques.
 - **[docs/correction-gab.md](docs/correction-gab.md)** et
   **[docs/correction-theo.md](docs/correction-theo.md)** — qui a fait quoi, technos et

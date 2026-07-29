@@ -2,7 +2,7 @@
 
 > Antisèche perso pour la soutenance. Ce que **tu** as construit, où ça vit, et les
 > questions qui vont tomber dessus.
-> Vue d'ensemble : [README](../README.md) · mécaniques : [GAMEPLAY](../GAMEPLAY.md)
+> Vue d'ensemble : [README](../README.md) · mécaniques : [GAMEPLAY](GAMEPLAY.md)
 
 ---
 
