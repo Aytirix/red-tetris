@@ -84,10 +84,7 @@ function normalizeGhost(raw: unknown): GhostCell[] {
 	return out;
 }
 
-/**
- * Retombée du mode Cascade. Une distance nulle ou absurde ne donnerait aucune
- * animation visible : on écarte la case plutôt que d'en faire une case immobile.
- */
+/** Retombée du mode Cascade. */
 function normalizeCascade(raw: unknown, board: GameBoard): CascadeFall | null {
 	if (!raw || typeof raw !== "object") return null;
 	const id = (raw as { id?: unknown }).id;

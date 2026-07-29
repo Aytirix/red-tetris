@@ -37,9 +37,6 @@ export default function GameView({ state, roomName, eliminated = false, onElimin
 	const showLevel = isSolo;
 
 	const { equipped } = useShop();
-	// En spectateur, on affiche le cosmétique DU JOUEUR OBSERVÉ (envoyé par le serveur),
-	// pas le nôtre. Sur son propre plateau on garde le thème local, qui reflète
-	// immédiatement un changement fait à la boutique en cours de session.
 	const pieceTheme = getPieceTheme(isSpectator ? (state.theme ?? equipped) : equipped);
 	// Touche du joker affichée dans le HUD, dans la disposition réelle du joueur.
 	// La lecture localStorage est mémoïsée: sans ça elle repartirait à CHAQUE frame.
@@ -49,11 +46,6 @@ export default function GameView({ state, roomName, eliminated = false, onElimin
 
 	const boardRows = state.board.length;
 	const boardCols = state.board[0]?.length ?? 0;
-	// Le plateau s'adapte à l'écran : la scène occupe exactement la hauteur du
-	// viewport et ne défile pas, donc le plateau doit tenir dans la place qui reste
-	// sous le HUD. On MESURE cette place (`boardAreaRef`) au lieu de la deviner :
-	// une estimation en dur du HUD et des marges finit toujours par dériver du CSS,
-	// et le plateau repassait alors sous le bas de la fenêtre.
 	const boardAreaRef = useRef<HTMLDivElement>(null);
 	const boardArea = useElementSize(boardAreaRef);
 	// Repli tant que rien n'est mesuré (premier rendu, environnement sans
@@ -81,11 +73,6 @@ export default function GameView({ state, roomName, eliminated = false, onElimin
 	const mainBoardHeightPx = boardRows * mainCellSize + Math.max(0, boardRows - 1) * 2;
 	// Largeur du plateau, cadre compris : le HUD s'y aligne (--stage-board-width).
 	const mainBoardWidthPx = boardCols * mainCellSize + Math.max(0, boardCols - 1) * 2 + 22;
-
-	// Secousse du plateau quand le joueur encaisse des lignes de pénalité.
-	// Une ligne de pénalité est une rangée entièrement composée de cellules "penalty"
-	// (les lignes serveur sont pleines) : la pièce en chute ne peut jamais en former
-	// une, donc ce comptage est fiable.
 	const penaltyRows = useMemo(
 		() => state.board.filter((row) => row.length > 0 && row.every((cell) => cell === "penalty")).length,
 		[state.board]
@@ -96,9 +83,6 @@ export default function GameView({ state, roomName, eliminated = false, onElimin
 	// null au premier rendu : sert de valeur de référence, aucune secousse à l'entrée
 	// (utile si on rejoint/spectate un plateau déjà pénalisé).
 	const prevPenaltyRows = useRef<number | null>(null);
-	// Le plateau AFFICHÉ peut changer d'identité (bascule spectateur / clic sur un
-	// mini-plateau) : on rebase alors le compteur, sinon passer sur un adversaire déjà
-	// pénalisé déclencherait une secousse alors qu'on n'a rien encaissé.
 	const watchedBoard = state.spectator;
 	const prevWatchedBoard = useRef(watchedBoard);
 	useEffect(() => {
@@ -112,13 +96,6 @@ export default function GameView({ state, roomName, eliminated = false, onElimin
 			setShakePhase((phase) => (phase === 1 ? 2 : 1));
 		prevPenaltyRows.current = penaltyRows;
 	}, [penaltyRows, watchedBoard]);
-
-	// ── Traînée de vitesse de la chute instantanée ──────────────────────────────
-	// La pièce est téléportée en bas par le serveur : sans repère visuel, on ne voit
-	// pas la chute. On dessine donc des lignes de vitesse dans le sillage, depuis
-	// quelques rangées au-dessus du point d'atterrissage (la projection fantôme).
-	// En mode invisible le serveur n'envoie PAS le fantôme : la traînée y est donc
-	// absente d'elle-même, et c'est voulu — elle trahirait la position d'atterrissage.
 	const [dropTrail, setDropTrail] = useState<DropTrail | null>(null);
 	// Le gestionnaire clavier est monté une fois : il lirait un `state` figé au montage.
 	// Ces refs lui donnent accès au fantôme et à la pièce du rendu courant.
@@ -129,16 +106,6 @@ export default function GameView({ state, roomName, eliminated = false, onElimin
 		ghostRef.current = state.ghost;
 		currentPieceRef.current = state.currentPiece?.type ?? null;
 	}, [state.ghost, state.currentPiece]);
-
-	// ── Décompte avant verrouillage ─────────────────────────────────────────────
-	// Une pièce qui ne peut plus descendre n'est verrouillée qu'au tick SUIVANT : le
-	// joueur dispose d'un tick complet pour la glisser, sans rien pour le lui dire.
-	// On remplit donc la pièce de bas en haut sur la durée exacte du sursis, envoyée
-	// par le serveur (`lockInMs`) — la calculer ici dupliquerait la cadence de la
-	// gravité, et bouger la pièce ne repousse PAS l'échéance.
-	// Les cases de la pièce posée sont exactement sa projection : quand elle touche,
-	// le fantôme coïncide avec elle. En mode invisible le fantôme n'est pas envoyé,
-	// il n'y a donc pas de jauge (ce mode assume de ne rien montrer).
 	const [lockTimer, setLockTimer] = useState<LockTimer | null>(null);
 	const lockSeqRef = useRef(0);
 	const grounded = state.lockInMs !== null && state.ghost.length > 0;
@@ -173,10 +140,6 @@ export default function GameView({ state, roomName, eliminated = false, onElimin
 			right: state.opponents.slice(fitLeft),
 		};
 	}, [state.opponents, mainBoardHeightPx, miniCellSize]);
-
-	// Sillage à dessiner : une bande par colonne du fantôme, s'arrêtant juste au-dessus
-	// de la case d'atterrissage la plus haute de cette colonne. Une pièce qui atterrit
-	// tout en haut (colonne pleine) ne laisse aucune traînée : il n'y a pas de sillage.
 	const startDropTrail = useCallback(() => {
 		const ghost = ghostRef.current;
 		if (!ghost || ghost.length === 0) return;
@@ -194,47 +157,34 @@ export default function GameView({ state, roomName, eliminated = false, onElimin
 		dropCountRef.current += 1;
 		setDropTrail({ id: dropCountRef.current, streaks, piece: currentPieceRef.current });
 	}, []);
-
-	// Keyboard input — only for player (non-spectator).
-	// Les touches sont personnalisables (menu « Touches » du dashboard) ; on les lit
-	// au montage de la partie, la config ne changeant pas en cours de jeu.
 	useEffect(() => {
 		if (isSpectator) return;
 		const bindings = loadKeyBindings();
-
-		// Auto-répétition RAPIDE tant que la touche est maintenue. Le jeu ne s'appuie plus
-		// sur l'auto-repeat lent de l'OS (délai initial ~500 ms, cadence variable selon la
-		// machine) : on peut donc « spammer » en gardant la touche enfoncée, et un simple
-		// tapotement ne déclenche qu'UNE action (le keyup annule le timer avant le délai).
 		const ROTATE_REPEAT_DELAY = 130;
 		const ROTATE_REPEAT_RATE = 45;
 		// Descente: départ presque immédiat et cadence plus soutenue que la rotation —
 		// c'est un déplacement continu, pas une suite d'actions distinctes.
 		const SOFT_DROP_REPEAT_DELAY = 90;
 		const SOFT_DROP_REPEAT_RATE = 35;
-		// Déplacements latéraux (DAS/ARR dans le jargon Tetris) : délai un peu plus long
-		// que la descente pour qu'un appui bref reste précis (une case, pas deux), puis
-		// glissement rapide.
 		const MOVE_REPEAT_DELAY = 120;
 		const MOVE_REPEAT_RATE = 35;
 
-		/** Répétition d'UNE action tenue : délai initial puis cadence fixe. */
+		/** Repetition d'une action tenue : delai initial puis cadence fixe. */
 		function makeRepeater(fire: () => void, delayMs: number, rateMs: number) {
 			let delayId = 0;
 			let intervalId = 0;
-			return {
-				start() {
-					this.stop();
-					fire();
-					delayId = window.setTimeout(() => {
-						intervalId = window.setInterval(fire, rateMs);
-					}, delayMs);
-				},
-				stop() {
-					if (delayId) { window.clearTimeout(delayId); delayId = 0; }
-					if (intervalId) { window.clearInterval(intervalId); intervalId = 0; }
-				},
+			const stop = () => {
+				if (delayId) { window.clearTimeout(delayId); delayId = 0; }
+				if (intervalId) { window.clearInterval(intervalId); intervalId = 0; }
 			};
+			const start = () => {
+				stop();
+				fire();
+				delayId = window.setTimeout(() => {
+					intervalId = window.setInterval(fire, rateMs);
+				}, delayMs);
+			};
+			return { start, stop };
 		}
 
 		// Toutes les actions « tenues ». Les autres (chute instantanée, joker) sont
@@ -390,9 +340,6 @@ export default function GameView({ state, roomName, eliminated = false, onElimin
 								lockTimer={lockTimer && grounded
 									? { ...lockTimer, cells: state.ghost, piece: state.currentPiece?.type ?? null }
 									: null}
-								// Passé tel quel : le serveur le renvoie identique jusqu'au
-								// verrouillage suivant, et c'est la `key` (qui porte son
-								// identifiant) qui garantit que l'animation ne joue qu'une fois.
 								cascade={state.cascade}
 							/>
 						</div>

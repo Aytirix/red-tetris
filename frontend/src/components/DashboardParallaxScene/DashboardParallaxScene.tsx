@@ -1,9 +1,4 @@
-/**
- * DashboardParallaxScene
- *
- * Full-viewport layered parallax background.
- * Dashboard content is passed as children and rendered above all layers.
- */
+/** DashboardParallaxScene Full-viewport layered parallax background. */
 
 import type { CSSProperties, ReactNode } from "react";
 import { useEffect, useRef } from "react";

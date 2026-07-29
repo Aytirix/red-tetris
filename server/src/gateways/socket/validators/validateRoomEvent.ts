@@ -6,6 +6,15 @@ export function isValidRoomName(roomId: string): boolean {
 	return ROOM_ID_REGEX.test(roomId);
 }
 
+/** Evenements SANS argument (room:start, room:leave, game:rotate, game:drop...). */
+export function isEmptyPayload(payload: unknown) : boolean {
+	if (payload === undefined || payload === null)
+		return true;
+	if (typeof payload !== "object" || Array.isArray(payload))
+		return false;
+	return Object.keys(payload).length === 0;
+}
+
 export function isValidRoomJoinPayload(payload: unknown) : payload is RoomJoinPayload {
 	return (
 		typeof payload === "object" &&

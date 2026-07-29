@@ -80,9 +80,6 @@ export default function GameBoard({ board, cellSize = 30, ghost, ghostPiece, fad
 					const fallRows = fallMap.get(`${y}-${x}`);
 					return (
 						<Cell
-							// La `key` porte l'identifiant de la retombée pour les cases qui
-							// tombent : reposer la même classe ne relance PAS une animation CSS,
-							// il faut que React remonte l'élément.
 							key={fallRows ? `${y}-${x}-c${cascade?.id}` : `${y}-${x}`}
 							cell={cell}
 							size={cellSize}
@@ -95,11 +92,6 @@ export default function GameBoard({ board, cellSize = 30, ghost, ghostPiece, fad
 			)}
 		</div>
 	);
-
-	// La traînée est posée en SURCOUCHE absolue, pas dans la grille : un enfant placé
-	// explicitement dans un `grid-template` plein décalerait les cellules auto-placées.
-	// La couche est TOUJOURS rendue, même vide : la faire apparaître seulement pendant
-	// la chute remonterait la grille (et ses ~200 cellules) à chaque pièce lâchée.
 	const pitch = cellSize + BOARD_GAP;
 	return (
 		<div className="tetris-board-layer">

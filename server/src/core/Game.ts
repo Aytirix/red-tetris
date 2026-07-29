@@ -38,14 +38,6 @@ import type { Room } from "./room.js";
 type BlockGroup = { x: number; y: number }[];
 
 export class Game {
-	// Wall kicks a la rotation: si la forme pivotee ne tient pas en place, on tente ces
-	// decalages dans l'ordre et le premier qui passe est applique.
-	// D'abord horizontal (decoller d'un mur ou d'une pile, le cas courant), puis un ou
-	// deux crans VERS LE HAUT (floor kick). Sans ce dernier, une piece posee au sol ne
-	// pouvait tout simplement plus pivoter a la verticale: la rotation ne faisait rien,
-	// ce qui se ressent comme un bug. Le gain en hauteur est borne a 2 cases et la
-	// gravite reprend aussitot: impossible de « grimper » avec.
-	// Seul le I (long de 4) a besoin de ±3 en x.
 	private static readonly ROTATION_KICKS: ReadonlyArray<readonly [number, number]> = [
 		[0, 0],
 		[-1, 0], [1, 0],
@@ -60,23 +52,12 @@ export class Game {
 	private state: Map<string, PlayerGameState>;
 	private pieceQueue: PieceType[];
 	private intervalId: NodeJS.Timeout | null;
-	// checkGameOver() est appelable depuis plusieurs chemins (verrouillage de piece,
-	// depart d'un joueur): ce drapeau garantit qu'une partie ne se termine qu'une fois,
-	// donc pas de double game:over ni de double credit de berrys.
 	private isOver: boolean;
 	// Mode ultra: instant (ms) de fin de la partie. null pour les autres modes.
 	private deadline: number | null;
 	// Horodatage de création de la partie : sert à calculer la durée jouée (stats).
 	private readonly startedAt: number;
-	// Instant du dernier tick de gravite. Sert a dire au client combien de temps il
-	// reste avant qu'une piece posee sur la pile ne se verrouille (au tick suivant),
-	// pour qu'il puisse afficher un decompte JUSTE meme si le joueur bouge la piece
-	// entre deux ticks (bouger ne decale pas la gravite).
 	private lastTickAt: number;
-	// Mode cheese: colonne trouee de chaque ligne de gruyere, tiree UNE fois pour la
-	// partie et partagee par tous les joueurs — une course doit servir exactement le
-	// meme plateau a tout le monde, comme la file de pieces. Deux lignes consecutives
-	// n'ont jamais le meme trou, sinon une seule barre I les nettoierait ensemble.
 	private readonly garbageHoles: number[];
 	// Distributeur d'identifiants de piece (voir PlayerGameState.pieceIds). Partage par
 	// tous les joueurs: seule l'egalite de deux identifiants d'un MEME plateau compte.
@@ -110,6 +91,7 @@ export class Game {
 					jokersLeft: INVISIBLE_JOKER_COUNT,
 					revealUntil: 0,
 					groundedAt: null,
+					deepestY: -1,
 					garbageCleared: 0,
 					garbageServed: 0,
 					pieceIndex: 0,
@@ -161,20 +143,12 @@ export class Game {
 	getLinesTarget() : number | null {
 		return this.mode === "sprint" ? SPRINT_TARGET_LINES : null
 	}
-	// Lignes de gruyere encore a creuser (mode cheese), null pour les autres modes.
-	// C'est le compteur affiche par le client: il inclut celles qui attendent encore
-	// en coulisse, donc il ne remonte jamais quand le plateau se souleve.
 	getGarbageLeft(playerState: PlayerGameState) : number | null {
 		if (this.mode !== "cheese")
 			return null
 		return Math.max(0, CHEESE_TOTAL_GARBAGE - playerState.garbageCleared)
 	}
-	/**
-	 * Mode invisible: opacite de chaque cellule deja verrouillee. Une piece posee
-	 * s'efface progressivement et devient invisible au bout de INVISIBLE_FADE_MS,
-	 * tout en restant solide. Les cases sans horodatage (vides, lignes de penalite)
-	 * et la piece en chute restent pleinement visibles.
-	 */
+	/** Opacite de chaque cellule verrouillee (mode invisible), null dans les autres modes. */
 	getFadeGrid(playerState: PlayerGameState) : number[][] | null {
 		if (this.mode !== "invisible")
 			return null
@@ -182,26 +156,15 @@ export class Game {
 		return playerState.lockedAt.map((row) => row.map((lockedAt) => {
 			if (lockedAt === 0)
 				return 1
-			// Un horodatage dans le FUTUR = revelation en cours: opacite plafonnee a 1
-			// jusqu'a cet instant, puis fondu normal. C'est ce qui rend la disparition
-			// progressive apres une revelation, au lieu d'une coupure nette.
 			return Math.min(1, Math.max(0, 1 - (now - lockedAt) / INVISIBLE_FADE_MS))
 		}))
 	}
 
-	/**
-	 * Rend visibles toutes les pieces deja posees pendant `durationMs`, puis les laisse
-	 * s'estomper progressivement EXACTEMENT comme une brique fraichement posee: on
-	 * repousse simplement le depart du fondu. Les cases vides et les lignes de penalite
-	 * (horodatage 0) ne sont pas concernees, elles restent toujours visibles.
-	 */
+	/** Rend le plateau visible pendant `durationMs`, puis laisse le fondu reprendre. */
 	grantReveal(playerState: PlayerGameState, durationMs: number) : void {
 		if (this.mode !== "invisible" || durationMs <= 0)
 			return
 		const now = Date.now()
-		// Une revelation en cours est PROLONGEE (et non ecrasee), mais la banque est
-		// PLAFONNEE: sans cap, enchainer les lignes garderait le plateau visible en
-		// continu et neutraliserait le mode.
 		const extended = Math.max(playerState.revealUntil, now) + durationMs
 		const fadeStart = Math.min(extended, now + INVISIBLE_REVEAL_CAP_MS)
 		playerState.revealUntil = fadeStart
@@ -220,9 +183,6 @@ export class Game {
 			return false
 		if (this.mode !== "invisible" || playerState.jokersLeft <= 0)
 			return false
-		// Ne pas gaspiller un joker dont le gain serait rogne par le plafond: on compare
-		// ce que grantReveal produirait a la banque actuelle. Un simple test "banque au
-		// plafond" serait inerte, la banque se vidant en continu.
 		const now = Date.now()
 		const current = Math.max(playerState.revealUntil, now)
 		const granted = Math.min(current + INVISIBLE_JOKER_REVEAL_MS, now + INVISIBLE_REVEAL_CAP_MS)
@@ -339,38 +299,33 @@ export class Game {
 		playerState.level = nextLevel
 		this.restartTickInterval()
 	}
-	/**
-	 * Sursis accorde a une piece qui vient de toucher la pile, mesure depuis le CONTACT
-	 * (et non depuis le dernier tick: une piece descendue juste avant un tick n'aurait
-	 * sinon presque aucun temps d'ajustement).
-	 *
-	 * Il vaut 1,75 frame de gravite: plus confortable qu'une frame seche, tout en
-	 * accelerant au meme rythme que la chute quand le niveau monte. Le facteur etant
-	 * > 1, le minimum du sujet (V.1.1 : « immobile only on the next frame ») reste
-	 * toujours respecte.
-	 */
+	/** Sursis accorde a une piece qui vient de toucher la pile, mesure depuis le contact. */
 	getLockGraceMs() : number {
 		return Math.max(LOCK_GRACE_MIN_MS, Math.round(this.getTickSpeed() * LOCK_GRACE_FACTOR))
 	}
-	/**
-	 * Met a jour l'instant de contact avec la pile. Appele apres chaque action du joueur
-	 * et a chaque tick: une piece qui retrouve de la place sous elle (glissee au bord
-	 * d'un surplomb, pivotee) repart en chute et perd son sursis.
-	 */
+	/** Met a jour l'instant de contact avec la pile. */
 	refreshLockState(playerState: PlayerGameState) : void {
-		if (!playerState.currentPiece || this.canMove(playerState, 0, 1)) {
+		if (!playerState.currentPiece) {
 			playerState.groundedAt = null
 			return
 		}
+		// Le sursis ne repart QUE si la piece a gagne du terrain, c'est a dire atteint une
+		// rangee ou elle n'etait jamais passee. Sans ca, pivoter une piece posee la decolle
+		// (wall kick vertical), remet le compteur a zero et la fait leviter indefiniment:
+		// la partie ne peut alors plus se terminer.
+		const y = playerState.currentPiece.getY()
+		if (y > playerState.deepestY) {
+			playerState.deepestY = y
+			playerState.groundedAt = null
+		}
+		// Une piece decollee sans avoir progresse garde son horodatage de contact: elle se
+		// verrouillera des qu'elle retouchera la pile, sans nouveau sursis.
+		if (this.canMove(playerState, 0, 1))
+			return
 		if (playerState.groundedAt === null)
 			playerState.groundedAt = Date.now()
 	}
-	/**
-	 * Temps restant (ms) avant verrouillage, ou null si la piece peut encore descendre.
-	 * Le verrouillage n'etant evalue qu'aux ticks, l'echeance reelle est le premier tick
-	 * au-dela du sursis: c'est cette echeance-la que le client affiche, pour que sa jauge
-	 * se remplisse exactement au moment ou la piece se fige.
-	 */
+	/** Temps restant (ms) avant verrouillage, ou null si la piece peut encore descendre. */
 	getLockDelayMs(playerState: PlayerGameState) : number | null {
 		if (!playerState.isAlive || !playerState.currentPiece)
 			return null
@@ -382,10 +337,7 @@ export class Game {
 		const ticksAhead = Math.max(1, Math.ceil((graceEnd - this.lastTickAt) / tickSpeed))
 		return Math.max(0, this.lastTickAt + ticksAhead * tickSpeed - now)
 	}
-	/**
-	 * La piece doit-elle se figer a ce tick ? Sans piece courante, oui (il faut en faire
-	 * apparaitre une). Sinon, seulement si elle a passe une frame complete au contact.
-	 */
+	/** La piece doit-elle se figer a ce tick ? Sans piece courante, oui (il faut en faire apparaitre une). */
 	private shouldLockNow(playerState: PlayerGameState) : boolean {
 		if (!playerState.currentPiece)
 			return true
@@ -416,9 +368,6 @@ export class Game {
 		// Le compte a rebours du prochain tick repart de maintenant.
 		this.lastTickAt = Date.now()
 		this.intervalId = setInterval(() => {
-			// Une exception levee dans un callback de setInterval n'a AUCUN appelant pour
-			// la rattraper: elle remonte en uncaughtException et tue le process, donc
-			// TOUTES les parties simultanees. On isole la panne a la partie fautive.
 			try {
 				this.tick()
 			} catch (error) {
@@ -426,32 +375,13 @@ export class Game {
 			}
 		}, this.getTickSpeed())
 	}
-	// Sortie de secours quand un tick leve (etat impossible cote emitters, par ex.).
-	// Meme demontage que checkGameOver() — gravite stoppee, room rouverte, abonnements
-	// spectateur purges — mais SANS credit de berrys ni enregistrement de stats: la
-	// partie n'a pas de resultat exploitable. Les joueurs recoivent game:over (sans
-	// vainqueur) pour ne pas rester bloques sur un plateau fige.
 	private abortOnFailure(error: unknown) : void {
 		console.error(`Game tick failed in room "${this.room.name}":`, error)
-		// LU AVANT stop(), qui pose isOver. Cas reel: checkGameOver() emet le bon
-		// game:over (avec vainqueur) puis LEVE dans son try/finally sans catch;
-		// l'exception remonte jusqu'ici. Reemettre un game:over sans vainqueur
-		// ecraserait le recap deja affiche chez les joueurs deja notifies, alors que
-		// les berrys, eux, ont bien ete credites au vainqueur.
 		const wasAlreadyOver = this.isOver
-		// `haltGravity()` et NON `stop()`: `stop()` purge les spectateurs, or
-		// `emitGameOver` a besoin de `spectatorSocketStore` pour notifier les
-		// spectateurs PURS (jamais joueurs). Purger avant l'emission les laisserait
-		// gelés sur un plateau mort, sans recap ni retour lobby — exactement ce que
-		// cette methode cherche a eviter. La purge a donc lieu APRES, comme dans
-		// checkGameOver().
 		this.haltGravity()
 		this.room.setStatus("waiting")
 		this.room.setGame(null)
 		if (!wasAlreadyOver) {
-			// L'emission peut lever pour la meme raison que le tick: elle ne doit pas
-			// empecher la purge des abonnements, sinon les sockets concernes resteraient
-			// rattaches a une partie morte a la partie suivante.
 			try {
 				emitGameOver(this.state, null)
 			} catch (emitError) {
@@ -460,29 +390,19 @@ export class Game {
 		}
 		this.purgeSpectators()
 	}
-	// Detache les spectateurs de CETTE partie. Un abonnement survivant fait sortir
-	// immediatement handleMove/Rotate/Drop/Joker: le socket concerne serait gele
-	// (il regarde sa piece tomber sans pouvoir agir) a la partie suivante.
 	private purgeSpectators() : void {
 		for (const [spectatorSocketId, subscription] of spectatorSocketStore) {
 			if (subscription.game === this)
 				spectatorSocketStore.delete(spectatorSocketId)
 		}
 	}
-	/**
-	 * Retire les rangees completes et fait redescendre le reste d'un bloc. Renvoie le
-	 * nombre de rangees retirees et, parmi elles, combien portaient du gruyere (mode
-	 * cheese: c'est l'objectif a creuser, une rangee percee comblee par le joueur).
-	 */
+	/** Retire les rangees completes et fait redescendre le reste d'un bloc. */
 	private collapseFullRows(
 		playerState: PlayerGameState,
 		fallBy: number[][] | null = null,
 	) : { cleared: number; garbage: number } {
 		let cleared = 0
 		let garbage = 0
-		// Parcours indexe (et non filter) pour decaler la grille d'horodatage EXACTEMENT
-		// comme le plateau: sinon les opacites du mode invisible se desynchroniseraient
-		// des cellules apres chaque ligne completee.
 		const keptRows: Cell[][] = []
 		const keptLocks: number[][] = []
 		const keptIds: number[][] = []
@@ -548,13 +468,7 @@ export class Game {
 	}
 	clearLines(playerState: PlayerGameState) : number {
 		let totalCleared = 0
-		// Rang du maillon de chaine (mode cascade): 1 pour la salve jouee, 2 pour celle
-		// declenchee par la retombee des blocs, etc. Hors cascade la boucle ne fait
-		// qu'un tour, le multiplicateur vaut donc toujours 1.
 		let chain = 0
-		// Distance parcourue par chaque case, alignee sur le plateau. Uniquement en
-		// cascade: c'est de l'information d'ANIMATION, les autres modes n'en ont pas
-		// l'usage et ne paient donc rien pour elle.
 		const fallBy = this.mode === "cascade" ? this.createLockGrid() : null
 		for (;;) {
 			const { cleared, garbage } = this.collapseFullRows(playerState, fallBy)
@@ -563,10 +477,6 @@ export class Game {
 			chain++
 			totalCleared += cleared
 			playerState.garbageCleared += garbage
-			// Score AVANT la mise a jour du niveau: les lignes sont creditees a la vitesse
-			// a laquelle elles ont ete jouees, pas a celle du niveau qu'elles debloquent.
-			// Une piece ne couvre jamais plus de 4 rangees, mais on borne l'index par
-			// securite plutot que de risquer un `undefined` en score.
 			const clearIndex = Math.min(cleared, LINE_CLEAR_SCORES.length - 1)
 			// Le rang de la chaine multiplie le bareme: c'est TOUTE la recompense du mode
 			// cascade (une meme salve vaut le double au 2e maillon, le triple au 3e).
@@ -596,11 +506,7 @@ export class Game {
 			this.serveCheeseGarbage(playerState)
 		return totalCleared
 	}
-	/**
-	 * Traduit la grille des distances parcourues en liste de cases a animer, ou null si
-	 * rien n'a bouge. Le plateau envoye montre deja les blocs ARRIVES: c'est cette
-	 * distance qui permet au client de les faire partir d'ou ils etaient.
-	 */
+	/** Traduit la grille des distances parcourues en liste de cases a animer, ou null si rien n'a bouge. */
 	private buildCascadeFall(playerState: PlayerGameState, fallBy: number[][]) : CascadeFall | null {
 		const cells: CascadeFall["cells"] = []
 		for (let y = 0; y < fallBy.length; y++) {
@@ -620,16 +526,7 @@ export class Game {
 			return null
 		return { id: ++this.nextCascadeId, cells }
 	}
-	/**
-	 * Gravite « collante » du mode cascade: apres un nettoyage, chaque AMAS de cellules
-	 * encore soudees (4-connexite) tombe jusqu'a reposer sur quelque chose. Les amas
-	 * descendent d'un cran par passe, du plus bas au plus haut, jusqu'a stabilite.
-	 *
-	 * Par AMAS et non case par case: une gravite cellule par cellule tasserait chaque
-	 * colonne independamment et supprimerait TOUS les trous du plateau au premier
-	 * nettoyage — le jeu n'aurait plus aucune difficulte. En tombant d'un bloc, une
-	 * piece posee en pont conserve le trou qu'elle recouvre.
-	 */
+	/** Mode cascade : chaque amas encore soude retombe jusqu'a reposer sur quelque chose. */
 	private applyStickyGravity(playerState: PlayerGameState, fallBy: number[][] | null = null) : void {
 		for (;;) {
 			// Du plus bas au plus haut: un amas ne peut pas descendre tant que celui d'en
@@ -640,9 +537,6 @@ export class Game {
 			for (const group of groups) {
 				if (!this.canGroupFall(playerState.board, group))
 					continue
-				// On se fie a ce que dropGroup a REELLEMENT deplace, pas a son intention:
-				// une boucle qui tournerait sur un amas immobile figerait le process entier
-				// (donc toutes les parties), la ou une exception n'en tuerait qu'une.
 				if (this.dropGroup(playerState, group, fallBy))
 					moved = true
 			}
@@ -654,22 +548,7 @@ export class Game {
 	private static groupBottom(group: BlockGroup) : number {
 		return group.reduce((lowest, cell) => Math.max(lowest, cell.y), -1)
 	}
-	/**
-	 * Decoupe le plateau en amas: cellules voisines issues de la MEME piece. Une piece
-	 * coupee en deux par une ligne nettoyee donne bien deux amas, chaque morceau
-	 * tombant de son cote.
-	 *
-	 * Le critere « meme piece » est indispensable. Un regroupement par simple CONTACT
-	 * souderait toute la pile en un seul bloc — dans une vraie partie tout se touche —
-	 * et il suffirait qu'une seule case repose sur du plein pour que plus rien ne tombe
-	 * jamais: le mode ne se declencherait pratiquement pas.
-	 *
-	 * La granularite en dessous (chaque case tombe seule) a ete mesuree puis ecartee:
-	 * elle fait tomber quelque chose dans 62 % des nettoyages contre 41 % ici, mais
-	 * elle rebouche TOUS les trous a chaque ligne faite, ce qui rend le mode deux fois
-	 * plus permissif que le classique. Choix de jeu: les pieces restent entieres, un
-	 * pont pose garde le trou qu'il recouvre.
-	 */
+	/** Decoupe le plateau en amas : cellules voisines issues de la meme piece. */
 	private findBlockGroups(board: Board, pieceIds: number[][]) : BlockGroup[] {
 		const seen = board.map((row) => row.map(() => false))
 		const isFilled = (x: number, y: number) => (board[y]?.[x] ?? 0) !== 0
@@ -726,10 +605,7 @@ export class Game {
 		}
 		return true
 	}
-	/**
-	 * Descend un amas d'une rangee, horodatages compris (fondu du mode invisible).
-	 * Renvoie true si au moins une case a bouge.
-	 */
+	/** Descend un amas d'une rangee, horodatages compris (fondu du mode invisible). */
 	private dropGroup(
 		playerState: PlayerGameState,
 		group: BlockGroup,
@@ -767,11 +643,7 @@ export class Game {
 		}
 		return moved
 	}
-	/**
-	 * Mode cheese: sert les rangees de gruyere dues au joueur. Le plateau remonte d'une
-	 * rangee toutes les CHEESE_CLEARS_PER_RISE lignes creusees, jusqu'a ce que les
-	 * CHEESE_TOTAL_GARBAGE de la partie soient toutes passees sur le plateau.
-	 */
+	/** Mode cheese : sert les rangees de gruyere dues au joueur. */
 	private serveCheeseGarbage(playerState: PlayerGameState) : void {
 		// Toute rangee servie est soit encore sur le plateau, soit deja creusee.
 		const onBoard = playerState.garbageServed - playerState.garbageCleared
@@ -779,10 +651,6 @@ export class Game {
 			CHEESE_TOTAL_GARBAGE,
 			Math.max(
 				CHEESE_START_GARBAGE + Math.floor(playerState.garbageCleared / CHEESE_CLEARS_PER_RISE),
-				// Soupape: la cadence « 2 creusees pour 1 servie » vide le plateau plus vite
-				// qu'elle ne le regarnit, et laisse la toute derniere rangee en coulisse —
-				// elle attendrait une destruction devenue impossible, course bloquee a 19/20.
-				// Des qu'il ne reste rien a creuser a l'ecran, on sert donc la suivante.
 				onBoard === 0 ? playerState.garbageServed + 1 : 0,
 			),
 		)
@@ -808,25 +676,13 @@ export class Game {
 		return Array.from({ length: BOARD_WIDTH }, (_v, x) => (x === hole ? 0 : "garbage"))
 	}
 	createPenaltyLine() : Cell[] {
-		// Lignes de pénalité pleines et indestructibles (sujet) : aucune brèche.
-		// clearLines() les exclut déjà via le marqueur "penalty" ; les rendre pleines
-		// garantit qu'elles ne peuvent jamais être complétées ni nettoyées.
 		return Array.from({ length: BOARD_WIDTH }, () => "penalty")
 	}
-	/**
-	 * Fait remonter le plateau de `lines.length` rangees et pose `lines` tout en bas.
-	 * Base commune aux lignes de penalite (pleines, indestructibles) et au gruyere du
-	 * mode cheese (percees, nettoyables): meme decalage des horodatages, meme detection
-	 * de top-out, meme remontee de la piece en vol.
-	 */
+	/** Fait remonter le plateau de `lines.length` rangees et pose `lines` tout en bas. */
 	private raiseBoard(playerState: PlayerGameState, lines: Cell[][]) : void {
 		if (lines.length === 0)
 			return
 		const count = Math.min(lines.length, BOARD_HEIGHT)
-		// Les `count` lignes du HAUT sortent du terrain. Si elles portent le moindre
-		// bloc, la pile a ete poussee au-dela du plafond => top-out. Sans ca la penalite
-		// "nettoierait" gratuitement le sommet d'une pile haute au lieu d'etre punitive
-		// (une pile au plafond survivait a une salve de penalites).
 		const toppedOut = playerState.board
 			.slice(0, count)
 			.some((row) => row.some((cell) => cell !== 0))
@@ -853,11 +709,6 @@ export class Game {
 			playerState.isAlive = false
 			return
 		}
-		// Le plateau vient de remonter de `count`: la piece en vol doit remonter avec
-		// lui. Sinon elle se retrouve incrustee DANS les lignes ajoutees et, au
-		// verrouillage, getRenderedBoard ecrase des cellules "penalty": la ligne perd
-		// son marqueur, redevient nettoyable par clearLines et n'est donc plus
-		// indestructible (et le joueur gagne des cases gratuites).
 		const piece = playerState.currentPiece
 		if (!piece)
 			return
@@ -945,9 +796,6 @@ export class Game {
 		emitSpectatorForPlayer(playerState, this.state)
 	}
 	randomPiece() : PieceType[] {
-		// Copie de PIECES_TYPES, source unique des 7 types (le tableau etait recopie a la
-		// main ici, sous le nom `pieces` — qui MASQUAIT l'import `pieces`, le dictionnaire
-		// des formes utilise juste a cote dans spawnPiece).
 		const remainingTypes: PieceType[] = [...PIECES_TYPES]
 		const bag: PieceType[] = []
 		for (let i = 0; i < PIECES_TYPES.length; i++) {
@@ -967,9 +815,6 @@ export class Game {
 		const rotate = playerState.currentPiece.getRotatedShape()
 		if (!rotate)
 			return
-		// Wall kicks: si la forme pivotee deborde a la position actuelle (piece collee a
-		// un mur, au sol ou a une pile), on essaie de la decaler avant d'abandonner la
-		// rotation (table ROTATION_KICKS).
 		for (const [dx, dy] of Game.ROTATION_KICKS) {
 			if (!this.canPlaceShape(rotate, playerState, dx, dy))
 				continue
@@ -995,21 +840,10 @@ export class Game {
 		emitGameStart(this.state, this)
 		this.restartTickInterval()
 	}
-	// Arrêt propre d'une partie EN COURS pour la relancer (restart): stoppe la gravité
-	// sans émettre game:over ni créditer/enregistrer quoi que ce soit — on repart de zéro
-	// avec une nouvelle Game juste après.
 	stop() : void {
 		this.haltGravity()
-		// Indispensable sur le chemin « Rejouer »: un joueur elimine s'est abonne en
-		// spectateur, et il redevient JOUEUR de la partie relancee (il n'a jamais quitte
-		// la room). Sans cette purge son abonnement survit et le gele pour toute la
-		// nouvelle partie. Ici aucun game:over n'est emis (restart), la purge peut donc
-		// avoir lieu immediatement.
 		this.purgeSpectators()
 	}
-	// Marque la partie terminee et coupe la gravite, SANS toucher aux abonnements
-	// spectateur: les chemins qui emettent encore un game:over doivent purger apres
-	// l'emission, pas avant.
 	private haltGravity() : void {
 		this.isOver = true
 		if (this.intervalId) {
@@ -1026,12 +860,11 @@ export class Game {
 		playerStat.nextPiece = new Piece(nextShape, nextType)
 		// Nouvelle piece: elle n'a rien touche, le sursis de la precedente ne la suit pas.
 		playerStat.groundedAt = null
+		// -1 et non 0: la piece apparait en y=0, qui doit compter comme une progression.
+		playerStat.deepestY = -1
 		if (!this.canSpawn(playerStat))
 			playerStat.isAlive = false
 	}
-	// Depart d'un joueur pendant la partie (room:leave / disconnect). Sans ca la Room est
-	// supprimee du store alors que l'interval de gravite tourne toujours, et les sockets
-	// partis continuent de recevoir des game:update.
 	abandon(socketId: string) : void {
 		const playerState = this.state.get(socketId)
 		if (!playerState || !playerState.isAlive)
@@ -1070,9 +903,6 @@ export class Game {
 				modeWinner = finisher.player.getName()
 			}
 		}
-		// Cheese: le premier a avoir creuse les 20 rangees de gruyere termine la course.
-		// En solo il n'y a PAS de vainqueur (comme en ultra): une partie sans adversaire
-		// compterait sinon comme une victoire dans les statistiques.
 		if (!endedByMode && this.mode === "cheese") {
 			const finisher = states.find((playerState) =>
 				playerState.isAlive && playerState.garbageCleared >= CHEESE_TOTAL_GARBAGE)
@@ -1081,10 +911,6 @@ export class Game {
 				modeWinner = isSolo ? null : finisher.player.getName()
 			}
 		}
-		// Ultra: c'est le CHRONO qui fait foi. La regle de survie ne doit pas cloturer
-		// la partie avant l'expiration, sinon la premiere elimination sacrerait le
-		// survivant au lieu du meilleur score. On termine uniquement a l'expiration,
-		// ou s'il ne reste plus personne pour jouer.
 		if (!endedByMode && this.deadline !== null) {
 			const expired = Date.now() >= this.deadline
 			if (!expired && alivePlayers.length > 0)
@@ -1101,10 +927,6 @@ export class Game {
 			clearInterval(this.intervalId)
 			this.intervalId = null
 		}
-
-		// Fin de partie: rouvrir la room (retour salon) et détacher la game terminée.
-		// Sinon un joueur qui ACTUALISE pendant le game over reviendrait dans le visuel
-		// de partie (room encore "playing" → joined=false → spectateur) au lieu du lobby.
 		this.room.setStatus("waiting")
 		this.room.setGame(null)
 
@@ -1112,10 +934,6 @@ export class Game {
 		const winner = endedByMode
 			? modeWinner
 			: (!isSolo && alivePlayers[0] ? alivePlayers[0].player.getName() : null)
-		// Règlement de fin de partie: chaque joueur gagne son score en berrys ET son
-		// résultat est enregistré pour les statistiques. `hadWinner` vaut false en solo
-		// ou partie sans vainqueur -> ne compte pas comme une défaite dans le ratio.
-		// Appelé une seule fois par partie (interval nettoyé + break dans tick()).
 		const hadWinner = winner !== null
 		const durationMs = Math.max(0, Date.now() - this.startedAt)
 		const rewardEntries = [...this.state.values()].map((playerState) => ({
@@ -1132,11 +950,6 @@ export class Game {
 			durationMs,
 		}))
 		void settleGameRewards(rewardEntries)
-		// emitGameOver notifie AUSSI les spectateurs purs (jamais presents dans state):
-		// la purge des abonnements doit donc venir APRES, sinon ils resteraient bloques
-		// sur l'ecran de jeu fige, sans recap ni retour lobby. Le finally garantit que
-		// la purge a lieu meme si une emission leve: un abonnement fantome bloquerait
-		// game:move/rotate/drop du socket concerne a la partie suivante.
 		try {
 			emitGameOver(this.state, winner)
 		} finally {
@@ -1147,11 +960,6 @@ export class Game {
 	lockPiece(playerState: PlayerGameState) : void {
 		const previousBoard = playerState.board
 		playerState.board = getRenderedBoard(playerState)
-		// Horodate UNIQUEMENT les cellules que ce verrouillage vient de remplir: c'est
-		// le point de depart du fondu du mode invisible ("elle disparait 3s apres avoir
-		// touche le sol"). Les cellules deja posees gardent leur horodatage.
-		// Plancher a `revealUntil`: une piece posee PENDANT une revelation doit
-		// s'effacer avec les autres, pas avant elles.
 		const now = Math.max(Date.now(), playerState.revealUntil)
 		// Meme marquage pour l'identite de la piece: les cases qu'elle vient de remplir
 		// forment desormais une unite qui tombera d'un seul tenant en mode cascade.
@@ -1182,18 +990,12 @@ export class Game {
 		this.spawnPiece(playerState)
 		const justEliminated = !playerState.isAlive
 		const isGameOver = this.checkGameOver()
-		// Mort individuelle mais partie non terminée: notifier ce joueur (game over
-		// perso + passage spectateur côté client). Si la partie est finie, emitGameOver
-		// (déjà émis par checkGameOver) s'en charge pour tout le monde.
 		if (justEliminated && !isGameOver)
 			emitPlayerEliminated(playerState, this.state)
 		return isGameOver
 	}
 	tick() : void {
 		this.lastTickAt = Date.now()
-		// Chrono ultra: seul mode dont la fin ne depend pas d'un evenement de jeu, il faut
-		// donc l'evaluer a chaque tick. Restreint aux modes chronometres pour ne rien
-		// changer au deroulement des autres (la survie reste geree par lockAndSpawnNext).
 		if (this.deadline !== null && this.checkGameOver())
 			return
 		for (const [, playerState] of this.state) {
@@ -1202,17 +1004,9 @@ export class Game {
 			const currentPiece = playerState.currentPiece
 			if (currentPiece && this.canMove(playerState, 0, 1)) {
 				currentPiece.moveDown()
-				// Le contact est date TOUT DE SUITE si la descente vient de la poser sur la
-				// pile: sinon on ne s'en apercevrait qu'au tick suivant et elle beneficierait
-				// de deux frames au lieu d'une.
 				this.refreshLockState(playerState)
 			}
 			else if (this.shouldLockNow(playerState) && this.lockAndSpawnNext(playerState))
-				// La partie vient de se terminer: checkGameOver() a deja emis game:over
-				// et coupe la gravite. Continuer la boucle enverrait des game:update
-				// APRES le game:over — les clients restants repasseraient du recap au
-				// plateau. On sort donc immediatement, la derniere frame des joueurs
-				// suivants est volontairement sacrifiee.
 				return
 			// Un joueur peut etre mort SANS que la partie se termine (elimination en
 			// multi): plus rien a lui envoyer, il bascule spectateur.

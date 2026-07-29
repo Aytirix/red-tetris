@@ -5,18 +5,6 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 
-// Le sujet interdit Canvas et SVG cote client. Or ces interdits ne vivent pas dans le
-// code source: ils dependent de ce que le BUILD embarque reellement. Deux pieges reels
-// rencontres sur ce projet:
-//   - l'ancienne route DEV-only /test tirait @mediapipe/tasks-vision, qui cree un
-//     <canvas> WebGL. Code et dependance ont depuis ete SUPPRIMES du depot; les
-//     assertions restent comme garde-fou anti-reintroduction;
-//   - le .env de la racine porte NODE_ENV=development, que Vite recupere via loadEnv,
-//     ce qui basculait TOUT le build en mode dev: `import.meta.env.DEV` valait true,
-//     la branche DEV survivait et le chunk canvas atterrissait dans dist/.
-// Aucun test de source ne peut attraper ca. On construit donc pour de vrai et on
-// inspecte le resultat, comme le ferait un correcteur avec `grep -r canvas dist/`.
-
 const outDir = mkdtempSync(join(tmpdir(), "red-tetris-build-"));
 
 function collectFiles(dir: string): string[] {
@@ -30,9 +18,6 @@ describe("bundle de production", () => {
 	afterAll(() => { rmSync(outDir, { recursive: true, force: true }); });
 
 	it("ne contient aucun interdit du sujet", () => {
-		// NODE_ENV est retire de l'environnement du fils: vitest le positionne a "test",
-		// ce qui ferait croire a Vite qu'on ne construit pas pour la production. On
-		// reproduit donc exactement un `npm run build` lance depuis un shell propre.
 		const env = { ...process.env };
 		delete env.NODE_ENV;
 

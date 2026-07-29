@@ -9,9 +9,6 @@ function makeRes() {
 			headers.set(name, value);
 			return res;
 		}),
-		// `vary()` AJOUTE au champ existant (contrairement a header/set, qui
-		// remplacent) : on reproduit ce comportement pour que le test detecte un
-		// retour a `res.header("Vary", …)`.
 		vary: vi.fn((field: string) => {
 			const current = headers.get("Vary");
 			const values = current ? current.split(", ") : [];

@@ -1,12 +1,5 @@
 import type { PieceType } from "../types/game";
 
-// ─── Thèmes de pièces (catalogue visuel côté frontend) ─────────────────────────
-// Le PRIX est autoritatif côté serveur (config/shopThemes.ts). Ici on garde le
-// rendu (recipe -> classe CSS) + la palette des 7 pièces + le libellé/desc.
-// Le prix listé sert de repli d'affichage; le catalogue serveur (shop:State)
-// prime toujours — garder les deux alignés évite d'afficher un prix périmé le temps
-// que `shop:State` arrive.
-
 export type ThemeRecipe = "neon" | "glass" | "minimal" | "synth" | "jewel";
 
 export type PieceTheme = {

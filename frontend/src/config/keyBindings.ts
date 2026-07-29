@@ -12,10 +12,6 @@ export const GAME_ACTIONS: GameAction[] = [
 	"hardDrop",
 	"joker",
 ];
-
-// Libelles explicites: "chute rapide" = descendre PLUS VITE (fleche du bas),
-// a ne pas confondre avec "faire tomber d'un coup" (espace), qui pose la piece
-// instantanement tout en bas.
 export const GAME_ACTION_LABELS: Record<GameAction, string> = {
 	moveLeft: "Déplacer à gauche",
 	moveRight: "Déplacer à droite",
@@ -37,10 +33,6 @@ export const DEFAULT_KEY_BINDINGS: Record<GameAction, string> = {
 export type KeyBindings = Record<GameAction, string>;
 
 const STORAGE_KEY = "keyBindings";
-
-// On stocke le `code` (touche PHYSIQUE) pour que le jeu se comporte pareil quelle que
-// soit la disposition. Mais l'AFFICHER brut est trompeur: en AZERTY, la touche
-// physique "KeyW" porte un Z. L'API Keyboard Map donne le vrai caractère imprimé.
 export type KeyboardLayoutMap = { get(code: string): string | undefined };
 
 type NavigatorWithKeyboard = Navigator & {
@@ -59,14 +51,6 @@ export async function loadKeyboardLayout(): Promise<KeyboardLayoutMap | null> {
 		return null;
 	}
 }
-
-// --- Disposition APPRISE ------------------------------------------------------
-// L'API Keyboard Map (navigator.keyboard) n'est pas exposée par tous les navigateurs
-// (absente sur Chrome/Linux ici). Sans elle, "KeyA" s'affichait "A" alors qu'un clavier
-// AZERTY imprime un "Q" sur cette touche physique.
-// Parade indépendante de l'API: `KeyboardEvent.key` donne le caractère RÉELLEMENT imprimé
-// (« q » pour la touche physique "KeyA" en AZERTY). On mémorise `code → caractère` à chaque
-// frappe et on le persiste, pour afficher la vraie touche du clavier du joueur.
 const LAYOUT_STORAGE_KEY = "keyLayout";
 let learnedLayout: Record<string, string> | null = null;
 const layoutSubscribers = new Set<() => void>();
@@ -89,11 +73,7 @@ function loadLearnedLayout(): Record<string, string> {
 	return learnedLayout;
 }
 
-/**
- * Mémorise le caractère imprimé d'une touche physique, appris d'une frappe réelle.
- * Seules les touches alphanumériques bénéficient de la disposition (AZERTY/QWERTY) ;
- * les touches spéciales (Espace, flèches, Shift…) ont un libellé fixe.
- */
+/** Mémorise le caractère imprimé d'une touche physique, appris d'une frappe réelle. */
 export function recordKeyLabel(code: string, key: string): void {
 	if (!code.startsWith("Key") && !code.startsWith("Digit")) return;
 	// `key` doit être un unique caractère imprimable ("q", "1"…), pas "Shift"/"Dead"/etc.
@@ -126,10 +106,7 @@ export function subscribeKeyLayout(callback: () => void): () => void {
 	return () => layoutSubscribers.delete(callback);
 }
 
-/**
- * Libellé lisible d'un `KeyboardEvent.code`, dans la disposition du joueur quand
- * elle est connue (AZERTY : "KeyW" → « Z »).
- */
+/** Libelle lisible d'un `KeyboardEvent.code`, dans la disposition du joueur. */
 export function formatKeyCode(code: string, layout?: KeyboardLayoutMap | null): string {
 	// Touches sans caractère imprimé: la disposition n'apporte rien.
 	if (code === "Space") return "Espace";
@@ -180,17 +157,10 @@ export function loadKeyBindings(): KeyBindings {
 	return dedupe(bindings);
 }
 
-/**
- * Repare une configuration ou deux actions partagent la meme touche (config
- * partielle relue avec des defauts, ou fichier bricole a la main): l'action
- * suivante recupere son defaut, sinon elle serait definitivement injouable.
- */
+/** Repare une configuration ou deux actions partagent la meme touche. */
 function dedupe(bindings: KeyBindings): KeyBindings {
 	const used = new Set<string>();
 	const fixed = { ...bindings };
-	// Réservoir = les touches par défaut. Il y en a exactement autant que d'actions et
-	// elles sont distinctes, donc il en reste TOUJOURS une libre : aucune action ne
-	// peut se retrouver sans touche (une touche vide la rendrait injouable).
 	const pool = GAME_ACTIONS.map((action) => DEFAULT_KEY_BINDINGS[action]);
 	for (const action of GAME_ACTIONS) {
 		if (!used.has(fixed[action])) {
@@ -212,10 +182,7 @@ export function saveKeyBindings(bindings: KeyBindings): void {
 	}
 }
 
-/**
- * Assigne `code` à `action`. Si la touche est déjà prise par une autre action, les
- * deux sont ÉCHANGÉES : on ne peut donc jamais laisser une action sans touche.
- */
+/** Assigne `code` à `action`. */
 export function assignKey(bindings: KeyBindings, action: GameAction, code: string): KeyBindings {
 	const next = { ...bindings };
 	const previous = next[action];

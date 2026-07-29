@@ -1,12 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { formatKeyCode, loadKeyboardLayout, subscribeKeyLayout, type KeyboardLayoutMap } from "../config/keyBindings";
 
-/**
- * Renvoie une fonction qui traduit un `KeyboardEvent.code` en libellé affichable,
- * dans la disposition clavier réelle du joueur (AZERTY : "KeyW" → « Z »).
- * Deux sources : l'API Keyboard Map quand elle existe, et surtout la disposition
- * APPRISE des frappes réelles (indépendante de l'API). Jamais rien de vide.
- */
+/** Traduit un `KeyboardEvent.code` en libelle affichable selon la disposition reelle. */
 export function useKeyLabel(): (code: string) => string {
 	const [layout, setLayout] = useState<KeyboardLayoutMap | null>(null);
 	// Compteur bumpé à chaque nouvelle touche apprise → force un re-render pour

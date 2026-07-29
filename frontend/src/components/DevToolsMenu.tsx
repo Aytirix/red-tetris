@@ -1,8 +1,4 @@
 import React, { lazy, Suspense, useEffect, useState } from "react";
-
-// Lazy: DocsWsPage (1382 LOC) ne doit être chargé que quand un dev ouvre la modale.
-// DevToolsMenu renvoie null en prod → sans ce dynamic import, DocsWsPage restait
-// embarqué dans le bundle de production.
 const DocsWsPage = lazy(() => import("../pages/DocsWsPage"));
 
 export default function DevToolsMenu() {

@@ -181,13 +181,6 @@ export default function DashboardPage() {
 		const suffix = Math.random().toString(36).substring(2, 8);
 		navigate(`/sologame_${suffix}/${username}`);
 	}
-
-	// Choisit un nom d'équipage libre (aléatoire); si tous pris, ajoute _1, _2, …
-	// Les noms d'équipage contenant une espace (« Straw Hat ») doivent être
-	// normalisés: le serveur n'accepte que [a-zA-Z0-9_] (15 max) et refuserait le
-	// join, laissant la page tourner indéfiniment sur « Connexion à la room… ».
-	// La normalisation est faite AVANT la comparaison aux salles existantes, sinon
-	// l'unicité serait testée sur des noms qui ne sont pas ceux envoyés au serveur.
 	function pickRoomName(): string {
 		const taken = new Set(rooms.map((r) => r.roomId));
 		const candidates = CREW_NAMES.map(toRoomId);
@@ -351,10 +344,6 @@ export default function DashboardPage() {
 									</div>
 								) : (
 									visibleRooms.map(room => {
-										// Le serveur refuse desormais une salle pleine
-										// (room:denied « full »). Sans ce garde-fou le bouton
-										// reste actif et l'utilisateur fait un aller-retour
-										// dashboard -> partie -> refus -> dashboard pour rien.
 										const isFull = !!room.maxPlayers
 											&& room.playerCount >= room.maxPlayers;
 										return (

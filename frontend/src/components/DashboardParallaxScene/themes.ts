@@ -1,16 +1,4 @@
-/**
- * Parallax scene themes.
- *
- * Each theme is an ordered list of layers (far → near). Layers only reference
- * files that actually exist in `public/img/dashboard/<theme>/`. Missing optional
- * layers (e.g. pirate_foreground_left) are simply omitted — the layout remains
- * balanced because the ship stays centered.
- *
- * Coordinate system:
- *   depth: 0 (far, barely moves) → 1 (near, strongest parallax)
- *   The scene exposes CSS vars --px / --py in range [-1, 1]; layers multiply by
- *   depth and a base amplitude to derive their translate offset.
- */
+/** Parallax scene themes. */
 
 export type ParallaxLayer = {
 	key: string;

@@ -25,12 +25,6 @@ vi.mock("react-router-dom", () => ({
 }));
 
 import HomePage from "./HomePage";
-
-// jsdom ne charge aucune image: sans ce double, le prechargement de la scene
-// d'inscription ne se resoudrait jamais et l'etape "register" resterait bloquee.
-// Ecrit en closure et non en classe: le sujet interdit le mot-cle `this` cote client,
-// et un correcteur greppe `this` sur tout frontend/src, tests compris. Un constructeur
-// qui renvoie un objet court-circuite `this`, donc `new Image()` reste valide.
 function InstantImage(): HTMLImageElement {
 	const image = {
 		decoding: "",

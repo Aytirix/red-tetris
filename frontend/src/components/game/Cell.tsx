@@ -8,12 +8,7 @@ type Props = {
 	ghost?: PieceType;
 	/** Mode invisible : opacité de la couche colorée (1 = pleine, 0 = invisible mais solide). */
 	opacity?: number;
-	/**
-	 * Mode Cascade : nombre de rangées que cette case vient de descendre. La case est
-	 * déjà à sa position finale ; l'animation la fait PARTIR de là où elle était.
-	 * Animer une surcouche à la place laisserait voir le bloc immobile en dessous
-	 * pendant que sa copie descend — on ne verrait donc rien tomber.
-	 */
+	/** Mode Cascade : nombre de rangees que la case vient de descendre. */
 	fallRows?: number;
 };
 
@@ -21,9 +16,6 @@ function Cell({ cell, size, ghost, opacity, fallRows }: Props) {
 	const isEmpty = cell === 0;
 	const isGhost = isEmpty && ghost != null;
 	const isFalling = !isEmpty && fallRows != null && fallRows > 0;
-	// --cs = taille de cellule → met à l'échelle le biseau/halo en CSS.
-	// --fall-rows / --fall-ms pilotent la chute : plus la case vient de haut, plus
-	// elle met de temps, mais borné pour ne pas figer le plateau après un gros effondrement.
 	const style: CSSProperties | undefined = size || isFalling
 		? ({
 			...(size ? { width: `${size}px`, height: `${size}px`, ["--cs"]: `${size}px` } : {}),
@@ -35,13 +27,6 @@ function Cell({ cell, size, ghost, opacity, fallRows }: Props) {
 				: {}),
 		} as CSSProperties)
 		: undefined;
-
-	// Mode invisible : une case pleine est rendue en DEUX couches — le fond et le
-	// quadrillage d'une case vide dessous, la couleur de la pièce au-dessus. Seule
-	// cette couche colorée s'efface : à opacité 0 la case est indiscernable d'une
-	// case vide, sinon le "trou" laissé dans la grille trahirait la pièce.
-	// La structure est stable dès que `opacity` est fourni (donc pendant tout le mode),
-	// pour que la transition CSS puisse animer le fondu sans remontage du DOM.
 	if (!isEmpty && opacity != null) {
 		return (
 			<div className="tetris-cell tetris-cell--empty tetris-cell--fading" style={style}>
@@ -61,8 +46,4 @@ function Cell({ cell, size, ghost, opacity, fallRows }: Props) {
 
 	return <div className={className} data-piece={dataPiece} style={style} />;
 }
-
-// Mémoïsé: props primitives → évite de re-render les ~200 cellules à chaque tick
-// alors que seules quelques cases (dont la projection) changent. Rendu couleur/
-// relief piloté par le CSS via data-piece + le thème équipé (data-recipe).
 export default memo(Cell);

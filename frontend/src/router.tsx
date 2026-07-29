@@ -7,11 +7,6 @@ import ThemePage from "./pages/ThemePage";
 import RouteErrorPage from "./pages/RouteErrorPage";
 import DashboardPage from "./pages/DashboardPage";
 import GamePage from "./pages/GamePage";
-
-// Route DEV-only, chargée à la demande : DocsWsPage (documentation des events
-// websocket), inutile en production.
-// Le lazy() est placé DANS la branche DEV : en production `import.meta.env.DEV` vaut
-// false et la branche est éliminée du bundle livré.
 const DocsWsPage = import.meta.env.DEV ? /*#__PURE__*/ lazy(() => import("./pages/DocsWsPage")) : null;
 
 const docsWsRoute = DocsWsPage ? [{ path: "docs-ws", element: <DocsWsPage /> }] : [];

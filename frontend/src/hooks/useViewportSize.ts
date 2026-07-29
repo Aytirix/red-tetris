@@ -9,10 +9,7 @@ function readViewport(): ViewportSize {
 	return { width: window.innerWidth, height: window.innerHeight };
 }
 
-/**
- * Taille du viewport, réévaluée à chaque redimensionnement de la fenêtre.
- * Sert à adapter le plateau de jeu aux écrans de PC les moins hauts.
- */
+/** Taille du viewport, réévaluée à chaque redimensionnement de la fenêtre. */
 export function useViewportSize(): ViewportSize {
 	const [size, setSize] = useState<ViewportSize>(readViewport);
 

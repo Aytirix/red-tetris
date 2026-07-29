@@ -12,10 +12,6 @@ import { recordKeyLabel } from "./config/keyBindings";
 document.addEventListener("dragstart", (event) => {
 	event.preventDefault();
 });
-
-// Apprend passivement la disposition clavier réelle (AZERTY/QWERTY…) à partir des
-// frappes : `event.key` donne le caractère imprimé, associé à la touche physique
-// `event.code`. Indispensable là où l'API Keyboard Map est absente (Chrome/Linux).
 window.addEventListener("keydown", (event) => {
 	recordKeyLabel(event.code, event.key);
 });

@@ -5,10 +5,6 @@ import type { Socket } from "socket.io";
 import type { Board, Cell, OpponentBoard, PlayerGameState } from "../../../types/game/gameTypes.js";
 
 type GhostCell = { x: number; y: number };
-
-// Projection d'atterrissage (ghost piece): descend la pièce courante au plus bas
-// possible SANS la muter, et renvoie les cellules occupées à cet endroit.
-// Utilise playerState.board (verrouillé, sans la pièce) pour la collision.
 function getGhostCells(playerState: PlayerGameState): GhostCell[] {
 	const piece = playerState.currentPiece;
 	if (!piece)
@@ -54,11 +50,7 @@ function getGhostCells(playerState: PlayerGameState): GhostCell[] {
 import { spectatorSocketStore } from "../spectatorSocketStore.js";
 import { userSocketStore } from "../userSocketStore.js";
 
-/**
- * Spectre d'un plateau, tel que l'impose le sujet: pour chaque colonne on ne garde que
- * la hauteur du bloc le plus haut, remplie jusqu'en bas avec un marqueur neutre.
- * Un joueur ne doit voir ni les couleurs de ses adversaires, ni les trous sous leur pile.
- */
+/** Spectre d'un plateau : hauteur de la pile par colonne, sans couleur ni trou. */
 export function getSpectrumBoard(board: Board): Board {
 	const spectrum: Board = Array.from(
 		{ length: BOARD_HEIGHT },
@@ -98,9 +90,6 @@ function getOpponentBoards(
 		// Un spectateur (ex: joueur mort) ne doit pas se voir lui-même sur le côté.
 		if (options.spectatorSocketId && socketId === options.spectatorSocketId)
 			continue;
-		// En mode invisible, le plateau de reference est le plateau MASQUE: sinon un
-		// adversaire (ou un 2e onglet du meme joueur) lirait via le spectre la hauteur
-		// exacte d'une pile que son proprietaire ne voit plus.
 		const visibleBoard = maskFadedCells(
 			playerState.board,
 			playerState.player.getGame()?.getFadeGrid(playerState) ?? null,
@@ -148,20 +137,7 @@ export function emitGameStart(state: Map<string, PlayerGameState>, game: Game) :
 	}
 }
 
-/**
- * Champs specifiques au mode de jeu, ajoutes a chaque frame:
- * - mode       : le mode courant (le client adapte son HUD)
- * - lines      : lignes nettoyees par ce joueur
- * - tetris     : nombre de « Tetris » (4 lignes d'un coup) reussis par ce joueur
- * - linesTarget: objectif (sprint) ou null
- * - timeLeftMs : temps restant (ultra) ou null
- * - fade       : opacite par cellule (invisible) ou null
- * - lockInMs   : sursis avant verrouillage de la piece posee, ou null si elle tombe
- * - garbageLeft: rangees de gruyere restant a creuser (cheese) ou null
- * - cascade    : blocs qui viennent de retomber et distance parcourue (cascade), pour
- *                que le client les anime — le plateau, lui, les montre deja arrives
- * La Game est recuperee via le Player: les emetteurs ne la recoivent pas en parametre.
- */
+/** Champs specifiques au mode de jeu, ajoutes a chaque frame. */
 function getModeFields(playerState: PlayerGameState) {
 	const game = playerState.player.getGame();
 	if (!game) {
@@ -204,35 +180,21 @@ function getModeFields(playerState: PlayerGameState) {
 	};
 }
 
-/**
- * Mode invisible: une cellule TOTALEMENT effacee ne doit pas partir sur le reseau.
- * Sinon l'invisibilite n'est qu'un style CSS, lisible dans le DOM (`data-piece`) ou
- * dans l'onglet Reseau. Les cellules encore partiellement visibles gardent leur type
- * puisqu'elles sont de toute facon a l'ecran.
- */
+/** Efface du plateau envoye les cellules devenues invisibles. */
 function maskFadedCells(board: Board, fade: number[][] | null): Board {
 	if (!fade)
 		return board;
 	return board.map((row, y) => row.map((cell, x) => ((fade[y]?.[x] ?? 1) <= 0 ? 0 : cell)));
 }
 
-/**
- * Masquer le plateau ne suffit pas: `fade[y][x] === 0` signifie « case occupee mais
- * cachee », ce qui permet de reconstruire toute la pile invisible depuis les frames
- * reseau. Une case totalement effacee est deja envoyee VIDE dans le plateau, donc son
- * opacite n'a plus d'utilite: on la remet a 1 pour qu'elle soit indiscernable d'une
- * vraie case vide.
- */
+/** Neutralise les opacites nulles: la cellule est deja retiree du plateau. */
 function maskFadeGrid(fade: number[][] | null): number[][] | null {
 	if (!fade)
 		return null;
 	return fade.map((row) => row.map((opacity) => (opacity <= 0 ? 1 : opacity)));
 }
 
-/**
- * La projection d'atterrissage est calculee sur le plateau REEL: l'afficher en mode
- * invisible revelerait la hauteur exacte de la pile cachee, colonne par colonne.
- */
+/** Pas de projection d'atterrissage en mode invisible: elle trahirait la pile. */
 function getVisibleGhostCells(playerState: PlayerGameState, mode: string): GhostCell[] {
 	return mode === "invisible" ? [] : getGhostCells(playerState);
 }
@@ -332,10 +294,6 @@ export function emitSpectatorForPlayer(playerState: PlayerGameState, state: Map<
 		emitSpectatorGame(spectatorSession.socket, subscription.game, subscription.player)
 	}
 }
-
-// Élimination individuelle: un joueur a topped-out alors que la partie continue
-// (d'autres joueurs sont encore vivants). On le notifie SEULEMENT lui, et on lui
-// indique un joueur vivant à spectater par défaut (≠ lui-même).
 export function emitPlayerEliminated(playerState: PlayerGameState, state: Map<string, PlayerGameState>) : void {
 	let spectate: string | null = null
 	for (const other of state.values()) {
@@ -369,10 +327,6 @@ export function emitGameOver(state: Map<string, PlayerGameState>, winner: string
 			level: playerState.level,
 		})
 	}
-
-	// Les spectateurs purs (arrives en cours de partie, jamais presents dans `state`)
-	// doivent eux aussi recevoir la fin de partie: sans ca ils restent bloques sur un
-	// plateau fige, sans recap ni retour au lobby.
 	for (const [spectatorSocketId, subscription] of spectatorSocketStore) {
 		if (subscription.game.getState() !== state)
 			continue

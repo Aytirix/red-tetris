@@ -34,16 +34,7 @@ function emptyBoard(): Board {
 	);
 }
 
-/**
- * Exigence du sujet (V.1.1): "Once a piece touches the pile, it becomes immobile
- * only on the next frame - allowing last-moment adjustments."
- *
- * Le sursis est mesure depuis l'instant de CONTACT (playerState.groundedAt), et vaut
- * une frame complete. Se contenter de « verrouiller au tick suivant » ne suffisait
- * pas: une piece descendue par le joueur juste avant un tick n'avait que les
- * quelques millisecondes restantes pour etre ajustee, la ou le sujet promet une
- * frame entiere. Ces tests verrouillent ce comportement.
- */
+/** Sujet V.1.1 : une piece au contact ne se fige qu'a la frame suivante. */
 describe("lock delay", () => {
 	beforeEach(() => {
 		vi.useFakeTimers();

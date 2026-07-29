@@ -39,11 +39,6 @@ describe("router", () => {
 	});
 
 	it("monte la route de developpement docs-ws sous vitest", () => {
-		// Ce test ne verifie QUE le versant developpement: sous vitest
-		// `import.meta.env.DEV` vaut toujours true, la branche production n'est donc
-		// pas exercable ici. L'invariant qui compte — docs-ws absent du bundle livre —
-		// n'est verifiable que sur un vrai build: il est couvert par
-		// `src/build.production.test.ts`.
 		expect(paths).toContain("docs-ws");
 	});
 

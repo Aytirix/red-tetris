@@ -2,11 +2,6 @@
 // EXACTE envoyée au client via `stats:State` ; le front les revalide de son côté.
 
 export type FactionName = "marine" | "pirate";
-
-// Résultat d'un joueur pour UNE partie terminée, tel que fourni par Game au moment du
-// règlement de fin de partie. `hadWinner` distingue une vraie défaite (partie décisive
-// perdue) d'une partie solo/sans vainqueur, qui ne doit pas gonfler le compteur de
-// défaites.
 export type GameResultInput = {
 	username: string;
 	faction: string | null;
