@@ -75,8 +75,8 @@ dépendances et génère le client Prisma si nécessaire — un clone frais suff
 
 | Suite | Fichiers | Tests | Statements | Branches | Functions | Lines |
 |---|---|---|---|---|---|---|
-| Serveur | 39 | 682 | **96,3 %** | **92,1 %** | **99,7 %** | **96,1 %** |
-| Frontend | 47 | 644 | **90,4 %** | **88,8 %** | **89,4 %** | **92,3 %** |
+| Serveur | 39 | 688 | **96,3 %** | **92,1 %** | **99,7 %** | **96,1 %** |
+| Frontend | 47 | 646 | **90,4 %** | **88,8 %** | **89,4 %** | **92,3 %** |
 | *Seuils sujet* | | | *70 %* | *50 %* | *70 %* | *70 %* |
 
 Les seuils sont **imposés dans les deux `vitest.config.ts`** : la commande échoue

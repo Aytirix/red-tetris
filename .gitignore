@@ -29,7 +29,5 @@ server/coverage
 graphify-out/
 .graphifyignore
 
-CLAUDE.md
 AGENTS.md
-.claude/
 .codex/
