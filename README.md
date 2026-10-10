@@ -217,3 +217,10 @@ requête ne touche la base pendant le jeu.
   questions attendues en soutenance.
 - `server/ws-docs.json` — protocole websocket complet (rendu dans l'app en dev).
 - `sujet/fr.subject.pdf`, `sujet/en.subject.pdf` — l'énoncé.
+
+---
+
+## 7. Auteurs
+
+- Théo — [@Aytirix](https://github.com/Aytirix)
+- Gabriel — [@irongab06](https://github.com/irongab06)
